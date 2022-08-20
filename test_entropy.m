@@ -9,10 +9,9 @@ eeglab
 % EEG = import_muse(file_path,'eeg');
 
 EEG = pop_loadset('filename','sub-003_task-breathcounting.set','filepath','G:\\Shared drives\\Science\\IDL\\5. DATA\\muse\\eeg\\eeg_clean\\sub-003\\eeg\\');
-
 EEG = pop_chanedit(EEG, 'lookup','C:\\Users\\IONSLAB\\Documents\\MATLAB\\eeglab\\plugins\\dipfit\\standard_BEM\\elec\\standard_1005.elc');
 % EEG = pop_eegfiltnew(EEG,'locutoff',1);
 % EEG = eeg_regepochs(EEG);
-EEG = pop_entropy(EEG);
+pop_entropy(EEG);
 
 

@@ -2,8 +2,7 @@
 %
 % Cedric Cannard, August 2022
 
-function EEG = pop_entropy(EEG)
-
+function pop_entropy(EEG,varargin)
 
 % Basic checks and warnings
 if nargin < 1, help pop_entropy; return; end
@@ -19,62 +18,59 @@ else
     continuous = false;
 end
 
-% channel_list = {EEG.chanlocs.labels};
-
 % GUI
 if nargin < 2
     drawnow;
-    eType = {'sample entropy', 'multiscale entropy', 'refined composite multiscale entropy (RCMFE)'};
-    fType = {'none', 'bandpass'};
-    uigeom = { [1 .25 0.75] [1 .25 2] };
+    eTypes = {'Sample entropy' 'Multiscale entropy' 'Refined composite multiscale fuzzy entropy (default)'};
+    cTypes = {'Mean' 'Standard deviation (default)' 'Variance'};
+    uigeom = { [.5 .5 .5] .5 [.5 .5 .5] .5 [.5 .5 .5] .5 .5};
     uilist = {
-        {'style' 'text' 'string' 'EEG channel(s):'} {} ...
-        {'style' 'pushbutton' 'string' 'List','enable' 'on' ...
-        'callback' ['tmpEEG = get(gcbf, ''userdata''); tmpchanlocs = tmpEEG.chanlocs;' ...
-        ' [tmp tmpval] = pop_chansel({tmpchanlocs.labels}, ''withindex'', ''on'');' ...
-        'set(findobj(gcbf, ''tag'', ''eegchan''), ''string'',tmpval); ' ...
-        'clear tmp tmpEEG tmpchanlocs tmpval'] }, ...
-        {'Style' 'text' 'String' 'Entropy type:'} {} ...
-        {'Style' 'popupmenu' 'String' eType 'Tag' 'etypepop'}  ...
+        {'style' 'text' 'string' 'Channel selection:'}, ...
+        {'style' 'edit' 'string' ' ' 'tag' 'chanlist'}, ...
+        {'style' 'pushbutton' 'string'  '...', 'enable' 'on' ...
+        'callback' "tmpEEG = get(gcbf, 'userdata'); tmpchanlocs = tmpEEG.chanlocs; [tmp tmpval] = pop_chansel({tmpchanlocs.labels},'withindex','on'); set(findobj(gcbf,'tag','chanlist'),'string',tmpval); clear tmp tmpEEG tmpchanlocs tmpval" }, ...
+        {} ...
+        {'style' 'text' 'string' 'Entropy type:'} ...
+        {'style' 'popupmenu' 'string' eTypes 'tag' 'etype'} {} ...
+        {} ...
+        {'style' 'text' 'string' 'Coarse graining method:'} ...
+        {'style' 'popupmenu' 'string' cTypes 'tag' 'stype'} {} ...
+        {} ...
+        {'style' 'checkbox' 'string' 'Bandpass filter each scale to control for spectral bias (recommended)?','tag' 'filter','value',0}  ...
         };
-    result = inputgui(uigeom,uilist,'pophelp(''pop_brainheart'')','brainheart EEGLAB plugin',EEG);
-
+    result = inputgui(uigeom,uilist,'pophelp(''pop_entropy'')','entropy EEGLAB plugin',EEG);
     if isempty(result), return; end
-
-    % decode user inputs
+    
+    %decode user inputs
     args = {};
     if ~isempty(result{1})
-        [~, chanlist] = eeg_decodechan(EEG.chanlocs, result{1});
-        args = [ args {'eegchannel'} {chanlist} ];
+        chanlist = split(result{1})';
+        args = { args 'channel'  chanlist };
+    else
+        error('You must select at least one channel to compute entropy.');
     end
-
-
-
-
-
-    args = [args {'ftype'} eType(result{2})];
-    args = [args {'wtype'} wtypes(result{3})];
-    if ~isempty(result{4})
-        args = [args {'warg'} {str2double(result{4})}];
-    end
-    if ~isempty(result{5})
-        args = [args {'forder'} {str2double(result{5})}];
-    end
-    args = [args {'minphase'} result{6}];
-    args = [args {'usefftfilt'} result{7}];
+    args = [args {'etype'} eTypes(result{2})];
+    args = [args {'ctype'} cTypes(result{3})];
+    args = [args {'filter'} result{4}];
 else
     args = varargin;
 end
 
+% Defaults
+args = struct(args{:});
+if ~isfield(args, 'chanlist') || isempty(args.chanlist)
+    args.chanlist = {EEG.chanlocs.labels};
+end
+if ~isfield(args, 'etype') || isempty(args.etype)
+    args.etype = 'Refined composite multiscale fuzzy entropy (default)';
+end
+if ~isfield(args, 'ctype') || isempty(args.ctype)
+    args.ctype = 'Standard deviation (default)';
+end
+if ~isfield(args, 'filter') || isempty(args.filter)
+    args.filter = 0;
+end
 
+if strcmp(args.etype, 'Sample entropy')
 
-% Callback estimate filter order
-function entropytype(obj, evt, wtypes, srate)
-    wtype = wtypes{get(findobj(gcbf, 'Tag', 'wtypepop'), 'Value')};
-    dev = get(findobj(gcbf, 'Tag', 'devedit'), 'String');
-    [forder, dev] = pop_firwsord(wtype, srate, [], dev);
-    set(findobj(gcbf, 'Tag', 'forderedit'), 'String', forder);
-    set(findobj(gcbf, 'Tag', 'devedit'), 'String', dev);
-
-
-
+end
