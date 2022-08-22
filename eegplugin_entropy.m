@@ -34,6 +34,14 @@ function vers = eegplugin_entropy(fig, trystrs, catchstrs)
 %plugin version
 vers = 'pop_entropy1.0';
 
+% add paths to subfolders
+try
+%     addpath(fileparts(which('sampEn.m')));
+    addpath(genpath(fileparts(which('pop_entropy.m'))));
+catch
+    error("Couldn't add path to plugin and subfolders. Please add path manually")
+end
+
 if nargin < 3
     error('eegplugin_entropy requires 3 arguments');
 end
