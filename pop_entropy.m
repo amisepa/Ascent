@@ -2,7 +2,7 @@
 %
 % Cedric Cannard, August 2022
 
-function sampEn = pop_entropy(EEG,varargin)
+function se = pop_entropy(EEG,varargin)
 
 % Basic checks and warnings
 if nargin < 1, help pop_entropy; return; end
@@ -72,7 +72,7 @@ if ~isfield(args, 'filter') || isempty(args.filter)
 end
 
 tau = 1;    % time lag (default = 1)
-m = 2;      % embedding dimension (default = 2)
+dim = 2;      % embedding dimension (default = 2)
 r = .15;    % threshold (default = .15 of standard deviation)
 
 % Sample entropy
@@ -83,23 +83,23 @@ if strcmp(args.etype, 'Sample entropy')
         for iChan = 1:length([args.chanlist])
             disp([' Channel ' num2str(iChan)])
 %             se2(iChan,:) = fastSampen(EEG.data(iChan,:),m,r);       %fast method
-            se(iChan,:) = sampEnFast(EEG.data(iChan,:),m,r);
+            se(iChan,:) = sampEnFast(EEG.data(iChan,:),dim,r);
         end
     elseif continuous && EEG.pnts <= 34000
         disp('Computing standard sample entropy on continuous data. This may take a while...')
         for iChan = 1:length([args.chanlist])
             disp([' Channel ' num2str(iChan)])
-            se(iChan,:) = sampEn(EEG.data(iChan,:),m,r,tau);     %standard method
+            se(iChan,:) = sampEn(EEG.data(iChan,:),dim,r,tau);     %standard method
         end
     end
-%     t2 = toc(t1)
-
-    figure; topoplot([],EEG.chanlocs,'style','blank','electrodes','labelpoint','chaninfo',EEG.chaninfo);
-    figure; topoplot([],EEG.chanlocs,'style','blank','electrodes','numpoint','chaninfo',EEG.chaninfo);
-    figure; topoplot([],EEG.chanlocs)
-
+% t2 = toc(t1)
+% open convert_3Dto2D for plotting
 end
 
-n = 2;      % fuzzy power
-
-
+fuzzypower = 2;      % fuzzy power
+nscales = 10; % number of scale factors to compute (starting at 2)
+% rcmfe_NN = RCMFE_std(data, 2, .15, 2, 1, nscalesNN);
+[rcmfe, f] = get_rcmfe(data,dim,r,fuzzypower,tau,nscales,EEG.srate);
+    
+% [1] H. Azami and J. Escudero, "Refined Multiscale Fuzzy Entropy based on Standard Deviation 
+% for Biomedical Signal Analysis", Medical & Biological Engineering & Computing, 2016.

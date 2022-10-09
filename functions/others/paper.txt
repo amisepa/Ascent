@@ -1,1 +1,7 @@
 https://datashare.ed.ac.uk/handle/10283/2099
+
+Costa, Goldberger, and Peng (2005), "Multiscale entropy analysis of biological signals". 
+Phys. Rev. E 71, 021906.
+
+Azami and Escudero (2016), "Refined Multiscale Fuzzy Entropy based on Standard Deviation 
+% for Biomedical Signal Analysis", Medical & Biological Engineering & Computing.

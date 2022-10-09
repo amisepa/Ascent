@@ -1,4 +1,4 @@
-% eegplugin_heartbrain() - EEGLAB plugin for different types of entropy measures:
+% eegplugin_entropy() - EEGLAB plugin for different types of entropy measures:
 % sample entropy, multiscale entropy, refined composite multiscale entropy. 
 % Implements the option to bandpass-filter each scale to remove spectral biases.
 % 

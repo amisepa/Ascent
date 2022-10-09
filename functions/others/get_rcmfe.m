@@ -3,13 +3,13 @@
 % 
 % Inputs:
 %
-% x: univariate signal - a vector of size 1 x N (the number of sample points)
-% m: embedding dimension
-% r: threshold (it is usually equal to 0.15 of the standard deviation of a signal - because we normalize signals to have a standard deviation of 1, here, r is usually equal to 0.15)
-% n: fuzzy power (it is usually equal to 2)
-% tau: time lag (it is usually equal to 1)
-% Scale: the number of scale factors
-%
+% signal: univariate signal
+% dim: embedding dimension
+% thresh: threshold (default = 0.15 of signal's SD after normalization of signal to SD =1)
+% fpower: fuzzy power (default = 2)
+% tau: time lag (default = 1)
+% nscales: number of scale factors (default = 30)
+% srate = sample rate of signal;
 %
 % Outputs:
 %
@@ -30,17 +30,32 @@
 %   1) filtering out spectral contamination for each scale
 %   2) adjust r to each scale
 
-function [rcmfe, freqs] = get_rcmfe(x,m,r,n,tau,nscales,fs)
+function [rcmfe, freqs] = get_rcmfe(signal,m,r,n,tau,nscales,fs)
 
-% Signal is centered and normalised to standard deviation 1
-x = x-mean(x);
-x = x./std(x);
+% ADD INPUT CHECKS
 
+% if not srate provided somehow, try to interpolate
+if ~exist(fs, 'var')
+	fs = (1/(EEG.times(end)) - EEG.times(1)));
+	warning([ 'No sample rate inputted, sample rate detected = ' num2str(fs) ])
+end
+
+% max scale factor
 nf = fs/2; %Nyquist frequency
+if nscales >= nf
+	warning(["Scale factor cannot be as high as signal's Nyquist frequency. ...
+	Lowering it to " num2str(nf-1) ]);
+end
+
+% Signal is centered and normalized to standard deviation 1
+disp('Normalizing signal to SD = 1.')
+signal = signal - mean(signal);
+signal = signal ./ std(signal);
+
 rcmfe = nan(1,nscales);
 freqs = nan(2,nscales);
 
-parfor iScale = 2:nscales
+for iScale = 2:nscales
     
     signal = x;
     

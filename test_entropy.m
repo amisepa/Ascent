@@ -2,7 +2,7 @@ clear; close all; clc
 folder = 'C:\Users\IONSLAB\Desktop\eegplugin_entropy';
 addpath(folder)
 addpath(fullfile(folder, 'functions'))
-eeglab
+eeglab; close;
 
 % EEG = pop_biosig('G:\Shared drives\Grants\Post Award Grants\(736) Bial Full-trance 2017\Research\Data\EEG\BDF_files\subj02_1.bdf');
 % EEG = pop_chanedit(EEG, 'lookup','C:\\Users\\IONSLAB\\Documents\\MATLAB\\eeglab\\plugins\\dipfit\\standard_BEM\\elec\\standard_1005.elc');
