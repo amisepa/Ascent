@@ -12,11 +12,11 @@
 %   r     radius
 %
 % output:
-%   s     Sample Entropy
+%   se     Sample Entropy
 %
 % Cedric Cannard
 
-function sample_entropy = sampEnFast(signal,m,r)
+function se = sample_entropy_fast(signal,m,r)
 
 if size(signal, 1) > size(signal,2), signal = signal'; end
 
@@ -29,7 +29,9 @@ Dyy = pdist(yy,'chebychev');
 A = mean( Dxx < r ) ;
 B = mean( Dyy < r );
 
-sample_entropy = -log(B/A);
+se = -log(B/A);
+
+%% Subfunctions
 
 % Create an observation vector yy(:,t) containing the last k values of y, newest first
 % e.g., k=2, y = (a1 a2 a3)     yy  = a2 a3

@@ -32,12 +32,12 @@
 function vers = eegplugin_entropy(fig, trystrs, catchstrs)
 
 %plugin version
-vers = 'pop_entropy1.0';
+vers = 'get_entropy1.0';
 
 % add paths to subfolders
 try
 %     addpath(fileparts(which('sampEn.m')));
-    addpath(genpath(fileparts(which('pop_entropy.m'))));
+    addpath(genpath(fileparts(which('get_entropy.m'))));
 catch
     error("Couldn't add path to plugin and subfolders. Please add path manually")
 end
@@ -57,7 +57,7 @@ end
 menui = findobj(fig, 'tag', 'import data');
 
 %Menu callbacks
-comcnt = [trystrs.no_check '[EEG, LASTCOM] = pop_entropy;'  catchstrs.new_non_empty];
+comcnt = [trystrs.no_check '[EEG, LASTCOM] = get_entropy;'  catchstrs.new_non_empty];
 
 %Create menus
 uimenu(menui, 'label', 'file containing EEG data', 'separator', 'on', 'callback', comcnt);

@@ -6,12 +6,13 @@
 % 
 % Inputs:
 %   x: univariate signal - a vector of size 1 x n (the number of sample points)
-%   m: embedding dimension
-%   r: threshold (it is usually equal to 0.15 of the standard deviation of a signal - because we normalize signals to have a standard deviation of 1, here, r is usually equal to 0.15)
+%   m: embedding dimension (default = 2)
+%   r: threshold (it is usually equal to 0.15 of the standard deviation of
+%       a signal. So here .15 because we normalize signals to have a standard deviation of 1)
 %   tau: time lag (it is usually equal to 1)
 %
 % Outputs:
-%   sampEn: scalar quantity - the SampEn of x
+%   se: sample entropy
 %   p: a vector of length 2 : [the total number of template matches of length m, the total number of forward matches of length m+1]
 %
 % Please cite:
@@ -22,11 +23,11 @@
 %
 % Cedric Cannard, August 2022
 
-function [sampEn,p] = sampEn(signal,m,r,tau)
+function [entropy,p] = sample_entropy(signal,m,r,tau)
 
-if nargin < 4, tau = 1; end
+% downsample
 if tau > 1 
-    signal = downsample(signal, tau); 
+    signal = downsamp(signal, tau); 
 end
 
 n = length(signal);
@@ -44,6 +45,7 @@ for k = m:m+1
     for i = 1:n-k
         % calculate Chebyshev distance without counting self-matches
         dist = max(abs(tempMat(:,i+1:n-m) - repmat(tempMat(:,i),1,n-m-i)));
+        
         % calculate the number of distance values that are less than the threshold r
         D = (dist < r);
         count(i) = sum(D)/(n-m);
@@ -51,5 +53,26 @@ for k = m:m+1
     
     p(k-m+1) = sum(count)/(n-m);
 end
-sampEn = log(p(1)/p(2));
+entropy = log(p(1)/p(2));
+
+%% Downsample subfunction
+
+function y = downsamp(x, n, phase)
+
+if nargin<2 || nargin>3, print_usage; end
+
+if nargin<3
+  phase = 0;
+end
+
+if phase > n - 1
+  warning('This is incompatible with Matlab (phase = 0:n-1). See octave-forge signal package release notes for details.')
+end
+
+if isvector(x)
+  y = x(phase + 1:n:end);
+else
+  y = x(phase + 1:n:end,:);
+end
+
 

@@ -1,4 +1,4 @@
-function [Out_SampEn,P] = SampEn(x,m,r,tau)
+function [Out_SampEn,P] = sampEnOld(x,m,r,tau)
 %
 % This function calculates sample entropy (SampEn) of a univariate signal x
 %

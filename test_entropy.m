@@ -1,7 +1,7 @@
 clear; close all; clc
-folder = 'C:\Users\IONSLAB\Desktop\eegplugin_entropy';
+folder = 'C:\Users\Cedric\Documents\MATLAB\get_entropy';
 addpath(folder)
-addpath(fullfile(folder, 'functions'))
+% addpath(fullfile(folder, 'functions'))
 eeglab; close;
 
 % EEG = pop_biosig('G:\Shared drives\Grants\Post Award Grants\(736) Bial Full-trance 2017\Research\Data\EEG\BDF_files\subj02_1.bdf');
@@ -12,7 +12,7 @@ eeglab; close;
 
 EEG = pop_loadset('filename','sub-003_task-breathcounting.set','filepath','G:\\Shared drives\\Science\\IDL\\5. DATA\\muse\\eeg\\eeg_clean\\sub-003\\eeg\\');
 % EEG = pop_chanedit(EEG, 'lookup','C:\\Users\\IONSLAB\\Documents\\MATLAB\\eeglab\\plugins\\dipfit\\standard_BEM\\elec\\standard_1005.elc');
-% EEG = pop_eegfiltnew(EEG,'locutoff',1);
+EEG = pop_eegfiltnew(EEG,'locutoff',0.5);
 
 % rawEEG = EEG;
 % EEG = eeg_regepochs(EEG);
@@ -22,6 +22,6 @@ EEG = pop_loadset('filename','sub-003_task-breathcounting.set','filepath','G:\\S
 % [psd2, ~] = get_psd(fixedEEG.data(1,:),EEG.srate*2,'hamming',50,[],EEG.srate,[1 50],'psd');
 % figure; plot(f,psd1); hold on; plot(f,psd2); legend('raw', 'fixed')
 
-sampEn = pop_entropy(EEG);
+entropy = get_entropy(EEG);
 
 
