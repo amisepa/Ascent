@@ -14,15 +14,13 @@ EEG = pop_loadset('filename','sub-003_task-breathcounting.set','filepath','G:\\S
 % EEG = pop_chanedit(EEG, 'lookup','C:\\Users\\IONSLAB\\Documents\\MATLAB\\eeglab\\plugins\\dipfit\\standard_BEM\\elec\\standard_1005.elc');
 % EEG = pop_eegfiltnew(EEG,'locutoff',1);
 
-rawEEG = EEG;
-EEG = eeg_regepochs(EEG);
-fixedEEG = epoch2continuous(EEG);
-vis_artifacts(fixedEEG,rawEEG)
-
-[psd1, f] = get_psd(rawEEG.data(1,:),EEG.srate*2,'hamming',50,[],EEG.srate,[1 50],'psd');
-[psd2, ~] = get_psd(fixedEEG.data(1,:),EEG.srate*2,'hamming',50,[],EEG.srate,[1 50],'psd');
-figure; plot(f,psd1); hold on; plot(f,psd2); legend('raw', 'fixed')
-
+% rawEEG = EEG;
+% EEG = eeg_regepochs(EEG);
+% fixedEEG = epoch2continuous(EEG);
+% vis_artifacts(fixedEEG,rawEEG)
+% [psd1, f] = get_psd(rawEEG.data(1,:),EEG.srate*2,'hamming',50,[],EEG.srate,[1 50],'psd');
+% [psd2, ~] = get_psd(fixedEEG.data(1,:),EEG.srate*2,'hamming',50,[],EEG.srate,[1 50],'psd');
+% figure; plot(f,psd1); hold on; plot(f,psd2); legend('raw', 'fixed')
 
 sampEn = pop_entropy(EEG);
 
