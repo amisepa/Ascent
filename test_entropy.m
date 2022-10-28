@@ -22,6 +22,7 @@ EEG = pop_eegfiltnew(EEG,'locutoff',0.5);
 % [psd2, ~] = get_psd(fixedEEG.data(1,:),EEG.srate*2,'hamming',50,[],EEG.srate,[1 50],'psd');
 % figure; plot(f,psd1); hold on; plot(f,psd2); legend('raw', 'fixed')
 
-entropy = get_entropy(EEG);
-
+entropy = get_entropy(EEG);   % GUI mode
+% [ae, se, fe, p, mse, rcmfe, scales] = get_entropy(EEG,'Approximate entropy');
+% [ae, se, fe, p, mse, rcmfe, scales] = get_entropy(EEG, {'TP9' 'TP10'}, 'Sample entropy', 1, 2, 'Mean', 1, 2);
 
