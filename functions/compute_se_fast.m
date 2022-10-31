@@ -16,7 +16,7 @@
 %
 % Cedric Cannard
 
-function se = sample_entropy_fast(signal,m,r)
+function se = compute_se_fast(signal,m,r)
 
 if size(signal, 1) > size(signal,2), signal = signal'; end
 

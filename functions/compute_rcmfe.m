@@ -36,15 +36,14 @@ function [rcmfe, freqs] = get_rcmfe(signal,m,r,n,tau,nscales,fs)
 
 % if not srate provided somehow, try to interpolate
 if ~exist(fs, 'var')
-	fs = (1/(EEG.times(end)) - EEG.times(1)));
+	fs = (1/(EEG.times(end)) - EEG.times(1));
 	warning([ 'No sample rate inputted, sample rate detected = ' num2str(fs) ])
 end
 
 % max scale factor
 nf = fs/2; %Nyquist frequency
 if nscales >= nf
-	warning(["Scale factor cannot be as high as signal's Nyquist frequency. ...
-	Lowering it to " num2str(nf-1) ]);
+	warning(["Scale factor cannot be as high as signal's Nyquist frequency. Lowering it to " num2str(nf-1) ]);
 end
 
 % Signal is centered and normalized to standard deviation 1
@@ -56,9 +55,7 @@ rcmfe = nan(1,nscales);
 freqs = nan(2,nscales);
 
 for iScale = 2:nscales
-    
-    signal = x;
-    
+        
     temp_A = [];
     temp_B = [];
     

@@ -1,4 +1,4 @@
-%% Computes sample entropy of a univariate signal. 
+%% Computes sample entropy (SE) of a univariate signal. 
 % Sample entropy quantifies the likelihood that a sequence of m consecutive 
 % data points that matches another sequence of the same length (match within
 % a tolerance of r) will still match the other sequence when their length 
@@ -23,7 +23,7 @@
 %
 % Cedric Cannard, August 2022
 
-function [entropy,p] = sample_entropy(signal,m,r,tau)
+function [entropy,p] = compute_se(signal,m,r,tau)
 
 % downsample
 if tau > 1 

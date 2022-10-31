@@ -2,7 +2,7 @@
 %
 % Cedric Cannard, August 2022
 
-function [ae, se, fe, p, mse, rcmfe, scales] = get_entropy(EEG, entropyType, chanlist, tau, m, coarseType, filtData, n)
+function [ae,se,fe,p,mse,rcmfe,scales] = get_entropy(EEG, entropyType, chanlist, tau, m, coarseType, nScales, filtData, n, vis)
 
 ae = [];
 se = [];
@@ -47,7 +47,7 @@ if nargin == 1
     uigeom = { [.5 .9] .5 [.5 .4 .2] .5 [.5 .1] .5 [.5 .1] };
     uilist = {
         {'style' 'text' 'string' 'Entropy type:' 'fontweight' 'bold'} ...
-        {'style' 'popupmenu' 'string' eTypes 'tag' 'etype' 'value' 3} ...
+        {'style' 'popupmenu' 'string' eTypes 'tag' 'etype' 'value' 6} ...
         {} ...
         {'style' 'text' 'string' 'Channel selection:' 'fontweight' 'bold'} ...
         {'style' 'edit' 'tag' 'chanlist'} ...
@@ -77,16 +77,20 @@ end
 
 if nargin == 1 && contains(entropyType, 'Multiscale')
     cTypes = {'Mean' 'Standard deviation (default)' 'Variance'};
-    uigeom = { [.5 .4] .5 .5 };
+    uigeom = { [.5 .6] .5 [.9 .3] .5 .5 };
     uilist = {
         {'style' 'text' 'string' 'Coarse graining method:'} ...
         {'style' 'popupmenu' 'string' cTypes 'tag' 'stype' 'value' 2} ...
         {} ...
-        {'style' 'checkbox' 'string' 'Bandpass filter each time scale (default to control for spectral bias)','tag' 'filter','value',1}  ...
+        {'style' 'text' 'string' 'Number of scale factors:' } ...
+        {'style' 'edit' 'string' '15' 'tag' 'n'}  ...
+        {} ...
+        {'style' 'checkbox' 'string' 'Bandpass filter each time scale (recommended to control for spectral bias)','tag' 'filtData','value',0}  ...
             };
     param = inputgui(uigeom,uilist,'pophelp(''pop_entropy'')','entropy EEGLAB plugin',EEG);
     coarseType = cTypes{param{1}};
-    filter = logical(param{2});
+    nScales = str2double(param{2});
+    filtData = logical(param{3});
 end
 
 %% 3rd GUI for fuzzy power
@@ -117,21 +121,40 @@ if ~exist('m','var') || isempty(m)
     disp('No embedding dimension selected: selecting m = 2 (default).')
     m = 2;
 end
-if contains(entropyType, 'Multiscale') && nargin > 4 && nargin < 6
+if contains(lower(entropyType), 'multiscale')
     if ~exist('coarseType','var') || isempty(coarseType)
         disp('No coarse graining method selected: selecting standard deviation (default).')
         coarseType = 'Standard deviation';
     end
-    if ~exist('filter','var') || isempty(filter)
-        disp('Selecting bandpass filtering at each time scale to control for the spectral bias (default).')
-        filtData = true;
+    if ~exist('nScales','var') || isempty(nScales)
+        disp('Number of scale factors not selected: selecting nScales = 15 (default).')
+        nScales = 15;
+    end
+    if ~exist('filtData','var') || isempty(filtData)
+%         disp('Selecting bandpass filtering at each time scale to control for the spectral bias (default).')
+        filtData = false;
     end
 end
-if contains(entropyType, 'fuzzy') 
+if contains(lower(entropyType), 'fuzzy')
     if ~exist('n','var') || isempty(n)
         disp('No fuzzy power selected: selecting n = 2 (default).')
         n = 2;
     end
+end
+
+% Simplify entropy names 
+if contains(lower(entropyType), 'approximate')
+    entropyType = 'AE';
+elseif contains(lower(entropyType), 'sample')
+    entropyType = 'SE';
+elseif strcmpi(entropyType, 'fuzzy entropy')
+    entropyType = 'FE';
+elseif strcmpi(entropyType, 'multiscale entropy')
+    entropyType = 'MSE';
+elseif strcmpi(entropyType, 'multiscale fuzzy entropy')
+    entropyType = 'MFE';
+elseif contains(lower(entropyType), 'refined')
+    entropyType = 'RCMFE';
 end
 
 %% Compute entropy depending on choices
@@ -142,59 +165,73 @@ nchan = length(chanlist);
 
 switch entropyType
 
-    case 'Approximate entropy'
+    case 'AE'
         disp('Computing approximate entropy...')
         ae = nan(nchan,1);
         for ichan = 1:nchan
-            ae(ichan,:) = approx_entropy(EEG.data(ichan,:), m, r);
+            ae(ichan,:) = compute_ae(EEG.data(ichan,:), m, r);
             fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, ae(ichan,:))
         end
 
-    case 'Sample entropy'
+    case 'SE'
         disp('Computing sample entropy...')
         se = nan(nchan,1);
-        % t1 = tic;
         if continuous && EEG.pnts <= 34000  % CHECK THRESHOLD
             disp('Computing sample entropy on continuous data (standard method)...')
             disp('If this takes too long, try the fast method (see main_script code)')
             for ichan = 1:nchan
-                se(ichan,:) = sample_entropy(EEG.data(ichan,:),m,r,tau);  % standard method
+                se(ichan,:) = compute_se(EEG.data(ichan,:),m,r,tau);  % standard method
                 fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, se(ichan,:))
             end
 
         else
             disp('Large continuous data detected, computing sample entropy using the fast method...')
             for ichan = 1:nchan
-                se(ichan,:) = sample_entropy_fast(EEG.data(ichan,:),m,r); % fast method
+                se(ichan,:) = compute_se_fast(EEG.data(ichan,:),m,r); % fast method
                 fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, se(ichan,:))
             end
         end
-        % t2 = toc(t1)
     
-    case 'Fuzzy entropy'
+    case 'FE'
         disp('Computing fuzzy entropy...')
         fe = nan(nchan,1);
         for ichan = 1:nchan
-            [fe(ichan,:), p(ichan,:)] = fuzzy_entropy(EEG.data(ichan,:),m,r,n,tau);
+            [fe(ichan,:), p(ichan,:)] = compute_fe(EEG.data(ichan,:),m,r,n,tau);
             fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, fe(ichan,:))
         end
 
-
-
-
-    case 'Refined composite multiscale fuzzy entropy (default)'
-
-        % number of scale factors to compute (starting at 2)
-        nScales = inpdlg('Select fuzzy power: ');
-        if isempty(nScales)
-            nScales = 30;
+    case 'MSE'
+        disp('Computing multiscale entropy...')
+        mse = nan(nchan,nScales);
+        scales = nan(2,nScales);
+%         if vis
+%             figure('color','w')
+%         end
+        for ichan = 1:nchan
+            [mse(ichan,:), scales] = compute_mse(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate);
+%             if vis
+%                 plot(1:nScales, mse, 'linewidth',2); hold on;
+%                 nans = isnan(mse(1,:));
+%                 if nans(1)
+%                     xticks(2:nScales); xticklabels(join(string(scales(:,2:end)),1)); xtickangle(45)
+%                     xlim([2 nScales]);
+%                 else
+%                     xticks(1:nScales); xticklabels(join(string(scales),1)); xtickangle(45)
+%                 end
+%                 legend({EEG.chanlocs.labels})
+%             end
         end
 
-        % rcmfe_NN = RCMFE_std(data, 2, .15, 2, 1, nscalesNN);
-        [rcmfe, scales] = get_rcmfe(data, m, r, fuzzypower, tau, nScales, EEG.srate);
+    case 'RFCMFE'
 
-% [1] H. Azami and J. Escudero, "Refined Multiscale Fuzzy Entropy based on Standard Deviation 
-% for Biomedical Signal Analysis", Medical & Biological Engineering & Computing, 2016.
+%         % number of scale factors to compute (starting at 2)
+%         nScales = inpdlg('Select fuzzy power: ');
+%         if isempty(nScales)
+%             nScales = 30;
+%         end
+% 
+%         % rcmfe_NN = RCMFE_std(data, 2, .15, 2, 1, nscalesNN);
+%         [rcmfe, scales] = get_rcmfe(data, m, r, fuzzypower, tau, nScales, EEG.srate);
 
 
 end

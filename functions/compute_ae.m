@@ -1,4 +1,4 @@
-% Computes the approximate entropy
+% Computes the approximate entropy (AE)
 %
 % INPUTS
 %   signal : time-series data
@@ -10,7 +10,7 @@
 % Cedric Cannard
 
 
-function ae = approx_entropy(signal, m, r)
+function ae = compute_ae(signal, m, r)
 
 N = length(signal);
 result = zeros(1,2);
@@ -41,7 +41,7 @@ for j = 1:2
     end
     
     % summing over the counts
-    result(j) = log( mean(phi, 'omitnan') );    
+    result(j) = log(mean(phi, 'omitnan'));    
 end
 
 ae = result(1) - result(2) ;

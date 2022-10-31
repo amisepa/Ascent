@@ -1,4 +1,4 @@
-% Calculates fuzzy entropy (fe) of a univariate signal x
+% Calculates fuzzy entropy (FE) of a univariate signal x
 %
 % Inputs:
 %   x: univariate signal - a vector of size 1 x N (the number of sample points)
@@ -20,7 +20,7 @@
 % 
 % Cedric Cannard
 
-function [fe, p] = fuzzy_entropy(x,m,r,n,tau)
+function [fe, p] = compute_fe(x,m,r,n,tau)
 
 if nargin == 4, tau = 1; end
 if nargin == 3, n = 2; tau=1; end
