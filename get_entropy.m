@@ -1,4 +1,21 @@
-%% Computes entropy on EEGLAB-formatted data.
+%% EEGLAB plugin to compute entropy-based measures on MEEG data.
+% Also works on other types of biosignals (e.g., ECG, HRV).
+% Founded on code developed by Costa et al. (2002) and Azami and Escudero
+% (2017). 
+% 
+% INPUTS:
+%   EEG - EEG structure in EEGLAB format
+%   entropyType - 'Approximate entropy', 'Sample entropy', 'Fuzzy entropy',
+%                   'Multiscale entropy', 'Multiscale fuzzy entropy',
+%                   'Refined composite multiscale fuzzy entropy (default)'
+%   chanlist - EEG channels of interest (empty will select all channels)
+%   tau - time lag (default = 1)
+%   m - embedding dimension (default = 2)
+%   coarseType - coarse graining method for multiscale entropies: 'Mean', 
+%                 'Standard deviation' (default), or 'Variance'
+%   nScales - number of scale factors (default = 15)
+%   filtData - apply band pass filters to each time scale to control for
+%   broadband spectral bias (see Kosciessa et al. 2020 for more detail). 
 %
 % Cedric Cannard, August 2022
 
@@ -87,7 +104,7 @@ if nargin == 1 && contains(entropyType, 'Multiscale')
         {} ...
         {'style' 'checkbox' 'string' 'Bandpass filter each time scale (recommended to control for spectral bias)','tag' 'filtData','value',0}  ...
             };
-    param = inputgui(uigeom,uilist,'pophelp(''pop_entropy'')','entropy EEGLAB plugin',EEG);
+    param = inputgui(uigeom,uilist,'pophelp(''pop_entropy'')','get_entropy() EEGLAB plugin',EEG);
     coarseType = cTypes{param{1}};
     nScales = str2double(param{2});
     filtData = logical(param{3});

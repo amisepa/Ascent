@@ -29,7 +29,7 @@ function [mse, freqs] = compute_mse(signal, m, r, tau, coarseType, nScales, filt
 % Max scale factor cannot be greater than Nyquist frequency
 nf = fs/2;
 if nScales >= nf
-    warning(["Scale factor cannot be as high as signal's Nyquist frequency. Lowering it to " num2str(nf-1) ]);
+    warning(["Scale factor cannot be as high as the Nyquist frequency. Lowering it to " num2str(nf-1) ]);
 end
 
 % Signal is centered and normalized to have SD = 1
