@@ -14,7 +14,11 @@
 %
 % OUTPUTS:
 %   mse: entropy values for each scale factor
+%   scales: lower and upper frequency bounds of each time scale
 %
+% EXAMPLE:
+%   [mse, scales] = compute_mse(signal, m, r, tau, coarseType, nScales, filtData, fs)
+% 
 % Ref:
 %   [1] H. Azami and J. Escudero, "Refined Multiscale Fuzzy Entropy based on
 %   Standard Deviation for Biomedical Signal Analysis", Medical & Biological
@@ -24,7 +28,7 @@
 %
 % Cedric Cannard, 2022
 
-function [mse, freqs] = compute_mse(signal, m, r, tau, coarseType, nScales, filtData, fs)
+function [mse, scales] = compute_mse(signal, m, r, tau, coarseType, nScales, filtData, fs)
 
 % Max scale factor cannot be greater than Nyquist frequency
 nf = fs/2;
@@ -41,94 +45,80 @@ if contains(lower(coarseType), 'standard')
     coarseType = 'SD';
 end
 
-% if vis
-%     figure('color','w')
-% end
-
 mse = nan(1,nScales);
-freqs = nan(2,nScales);
-for iScale = 1:nScales
+scales = nan(2,nScales);
+parfor iScale = 1:nScales
     
-%     fprintf('Scale %d \n', iScale)
-    % make copy of signal in case it is bandpass-filtered at each scale
+    % Make copy of signal in case it is bandpass-filtered at each scale
     sig = signal;
     
-    % scale factor bounds
-    highBound = (1/iScale).*nf + .05*((1./iScale).*nf);
-    lowBound = (1/(iScale+1)).*nf - .05*((1./(iScale+1)).*nf);
+    % Scale factor bounds
+    upperBound = (1/iScale).*nf + .05*((1./iScale).*nf);
+    lowerBound = (1/(iScale+1)).*nf - .05*((1./(iScale+1)).*nf);
+
     % Display the corresponding frequencies for this scale
-    freqs(:,iScale) = [round(lowBound,3) round(highBound,3) ];
-    disp(['scale ' num2str(iScale) ': ' num2str(round(lowBound,3)) ' - ' num2str(round(highBound,3)) ' Hz']);
+    scales(:,iScale) = [round(lowerBound,3) round(upperBound,3) ];
+    disp(['scale ' num2str(iScale) ': ' num2str(round(lowerBound,3)) ' - ' num2str(round(upperBound,3)) ' Hz']);
 
     % Bandpass filter outside these bounds to control for spectral bias (if selected)
     if filtData
         disp('Applying bandpasss-filter remove spectral bias from outside these bounds.')
 
         if iScale > 1
-            if highBound-lowBound > .05*nf    % for broad passbands: Chebyshev Type I zero-phase bandpass
-                [b,a] = cheby1(4,1,highBound/nf,'low');
+            if upperBound-lowerBound > .05*nf    % for broad passbands: Chebyshev Type I zero-phase bandpass
+                [b,a] = cheby1(4,1,upperBound/nf,'low');
                 % figure; freqz(b,a);
                 sig = filtfilt(b,a,sig);
-                [b,a] = cheby1(4,1,lowBound/nf,'high');
+                [b,a] = cheby1(4,1,lowerBound/nf,'high');
                 sig = filtfilt(b,a,sig);
             else                                 % Butterworth zero-phase bandpass
-                [b,a] = butter(10,highBound/nf,'low');
+                [b,a] = butter(10,upperBound/nf,'low');
                 sig = filtfilt(b,a,sig);
-                [b,a] = butter(10,lowBound/nf,'high');
+                [b,a] = butter(10,lowerBound/nf,'high');
                 sig = filtfilt(b,a,sig);
             end
         else
-            [b,a]= butter(10,lowBound/nf,'high');   % only Butterworth highpass for scale 1
-            %         highcutoff = nf;
+            [b,a]= butter(10,lowerBound/nf,'high');   % only Butterworth highpass for scale 1
+            % upperBound = nf;
             sig = filtfilt(b,a,sig);
         end
 
 %         % Visualize filter effect on the power spectrum
 %         [psd,f] = pwelch(sig,[],[],[],fs);
 %         plot(f,psd); hold on;
-%         title(num2str(iScale)); legend([num2str(lowcutoff) '-' num2str(highcutoff)]);
+%         title(num2str(iScale)); legend([num2str(lowerBound) '-' num2str(upperBound)]);
 
     end
 
+    y = reshape(sig(1:floor(length(sig)/iScale)*iScale),iScale,[]);
 
     switch coarseType
 
         case 'Mean'
 %             disp('Selected coarse-graining method: Mean')
-            y = reshape(sig(1:floor(length(sig)/iScale)*iScale),iScale,[]);
-            x = mean(y,'omitnan');
-            mse(:,iScale) = compute_se(x, m, r, tau);
+%             y = reshape(sig(1:floor(length(sig)/iScale)*iScale),iScale,[]);
+            sig = mean(y,'omitnan');
+%             mse(:,iScale) = compute_se(sig, m, r, tau);
 
         case 'SD'
 
 %             disp('Selected coarse-graining method: Standard deviation')
-            y = reshape(sig(1:floor(length(sig)/iScale)*iScale),iScale,[]);
-            x = std(y,'omitnan');
-            mse(:,iScale) = compute_se(x, m, r, tau);
+%             y = reshape(sig(1:floor(length(sig)/iScale)*iScale),iScale,[]);
+            sig = std(y,'omitnan');
+%             mse(:,iScale) = compute_se(sig, m, r, tau);
 
         case 'Variance'
 
 %             disp('Selected coarse-graining method: Variance')
-            y = reshape(sig(1:floor(length(sig)/iScale)*iScale),iScale,[]);
-            x = var(y,'omitnan');
-            mse(:,iScale) = compute_se(x, m, r, tau);
+%             y = reshape(sig(1:floor(length(sig)/iScale)*iScale),iScale,[]);
+            sig = var(y,'omitnan');
+%             mse(:,iScale) = compute_se(sig, m, r, tau);
 
     end
 
-%     if vis
-%         plot(1:nScales, mse); hold on;
-%     end
-end
+    mse(:,iScale) = compute_se(sig, m, r, tau);
 
-% if vis
-%     nans = isnan(mse(1,:));
-%     if nans(1)
-%         xticks(2:nScales); xticklabels(join(string(freqs(:,2:end)),1)); xtickangle(45)
-%         xlim([2 nScales]);
-%     else
-%         xticks(1:nScales); xticklabels(join(string(freqs),1)); xtickangle(45)
-%     end
-% end
+end
 
 % Cite references
 disp('Please cite: ')
