@@ -15,7 +15,7 @@
 %                 'Standard deviation' (default), or 'Variance'
 %   nScales - number of scale factors (default = 15)
 %   filtData - apply band pass filters to each time scale to control for
-%   broadband spectral bias (see Kosciessa et al. 2020 for more detail). 
+%       broadband spectral bias (see Kosciessa et al. 2020 for more detail). 
 %
 % Cedric Cannard, August 2022
 
@@ -254,18 +254,21 @@ switch entropyType
 end
 
 % Cite references
-disp('Please cite: ')
-switch coarseType
-    case 'Mean'
-        disp('Costa, Goldberger, and Peng (2002) - Multiscale entropy analysis of complex physiologic time series. Physical review letters.')
-    case 'SD'
-        disp('   [1] Costa, Goldberger, and Peng (2002) - Multiscale entropy analysis of complex physiologic time series. Physical review letters.')
-        disp('   [2] Azami and Escudero (2016) - Refined Multiscale Fuzzy Entropy based on Standard Deviation for Biomedical Signal Analysis. Medical & Biological Engineering & Computing')
-    case 'Variance'
-        disp('   [1] Costa, Goldberger, and Peng (2002) - Multiscale entropy analysis of complex physiologic time series. Physical review letters.')
-        disp('   [2] Azami and Escudero (2016) - Refined Multiscale Fuzzy Entropy based on Standard Deviation for Biomedical Signal Analysis. Medical & Biological Engineering & Computing')
+disp('For the parameters you have used, please cite: ')
+if contains(lower(entropyType), 'multiscale')
+    switch coarseType
+        case 'Mean'
+            disp('Costa, Goldberger, and Peng (2002) - Multiscale entropy analysis of complex physiologic time series. Physical review letters.')
+        case 'Standard deviation'
+            disp('   [1] Costa, Goldberger, and Peng (2002) - Multiscale entropy analysis of complex physiologic time series. Physical review letters.')
+            disp('   [2] Azami and Escudero (2016) - Refined Multiscale Fuzzy Entropy based on Standard Deviation for Biomedical Signal Analysis. Medical & Biological Engineering & Computing')
+        case 'Variance'
+            disp('   [1] Costa, Goldberger, and Peng (2002) - Multiscale entropy analysis of complex physiologic time series. Physical review letters.')
+            disp('   [2] Azami and Escudero (2016) - Refined Multiscale Fuzzy Entropy based on Standard Deviation for Biomedical Signal Analysis. Medical & Biological Engineering & Computing')
+    end
+    if filtData
+        disp('Bandpass filters were applied to each scale factor to control for spectral bias, following recommendations by: ');
+        disp('   [3] Kosciessa, Kloosterman, and Garrett (2020) - Standard multiscale entropy reflects neural dynamics at mismatched temporal scales: What''s signal irregularity got to do with it? Plos Computational Biology.')
+    end
 end
-if filtData
-    disp('Bandpass filters were applied to each scale factor to control for spectral bias, following recommendations by: ');
-    disp('   [3] Kosciessa, Kloosterman, and Garrett (2020) - Standard multiscale entropy reflects neural dynamics at mismatched temporal scales: What''s signal irregularity got to do with it? Plos Computational Biology.')
-end
+
