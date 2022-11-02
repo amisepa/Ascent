@@ -14,7 +14,7 @@
 % output:
 %   se     Sample Entropy
 %
-% Cedric Cannard
+% Cedric Cannard, 2022
 
 function se = compute_se_fast(signal,m,r)
 

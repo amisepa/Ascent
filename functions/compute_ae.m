@@ -21,12 +21,12 @@ for j = 1:2
     dataMat = zeros(m,N-m+1);
     
     % setting up data matrix
-    for i = 1:m
+    parfor i = 1:m
         dataMat(i,:) = signal(i:N-m+i);
     end
     
     % counting similar patterns using distance calculation
-    for i = 1:N-m+1
+    parfor i = 1:N-m+1
         
         if sum( isnan( dataMat(:,i) ) ) == 0
         

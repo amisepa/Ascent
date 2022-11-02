@@ -100,19 +100,3 @@ parfor iScale = 1:nScales
 
 end
 
-% Cite references
-disp('Please cite: ')
-switch coarseType
-    case 'Mean'
-        disp('Costa, Goldberger, and Peng (2002) - Multiscale entropy analysis of complex physiologic time series. Physical review letters.')
-    case 'SD'
-        disp('   [1] Costa, Goldberger, and Peng (2002) - Multiscale entropy analysis of complex physiologic time series. Physical review letters.')
-        disp('   [2] Azami and Escudero (2016) - Refined Multiscale Fuzzy Entropy based on Standard Deviation for Biomedical Signal Analysis. Medical & Biological Engineering & Computing')
-    case 'Variance'
-        disp('   [1] Costa, Goldberger, and Peng (2002) - Multiscale entropy analysis of complex physiologic time series. Physical review letters.')
-        disp('   [2] Azami and Escudero (2016) - Refined Multiscale Fuzzy Entropy based on Standard Deviation for Biomedical Signal Analysis. Medical & Biological Engineering & Computing')
-end
-if filtData
-    disp('Bandpass filters were applied to each scale factor to control for spectral bias, following recommendations by: ');
-    disp('   [3] Kosciessa, Kloosterman, and Garrett (2020) - Standard multiscale entropy reflects neural dynamics at mismatched temporal scales: What''s signal irregularity got to do with it? Plos Computational Biology.')
-end

@@ -29,7 +29,7 @@ if tau > 1, x = downsample(x, tau); end
 N = length(x);
 p = zeros(1,2);
 xMat = zeros(m+1,N-m);
-for i = 1:m+1
+parfor i = 1:m+1
     xMat(i,:) = x(i:N-m+i-1);
 end
 
@@ -37,7 +37,7 @@ for k = m:m+1
     count = zeros(1,N-m);
     tempMat = xMat(1:k,:);
     
-    for i = 1:N-k
+    parfor i = 1:N-k
 
         % calculate Chebyshev distance without counting self-matches
         dist = max(abs(tempMat(:,i+1:N-m) - repmat(tempMat(:,i),1,N-m-i)));

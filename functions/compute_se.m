@@ -34,11 +34,11 @@ n = length(signal);
 p = zeros(1,2);
 sMat = zeros(m+1,n-m);
 
-for i = 1:m+1
+parfor i = 1:m+1
     sMat(i,:) = signal(i:n-m+i-1);
 end
 
-for k = m:m+1
+parfor k = m:m+1
     count = zeros(1,n-m);
     tempMat = sMat(1:k,:);
     
