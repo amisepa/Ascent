@@ -1,15 +1,5 @@
-% eegplugin_entropy() - EEGLAB plugin for computing different types of entropy measures:
-% approximate entropy (AE), sample entropy (SE), fuzzy entropy (FE),
-% multiscale entropy (MSE), refined composite multiscale entropy (RCMFE).
-% Implements the option to bandpass-filter each scale to control for spectral
-% biases (see Kosciessa et al. 2020).
-%
-% Usage: eegplugin_entropy(fig, trystrs, catchstrs);
-%
-% Inputs:
-%   fig        - [integer]  EEGLAB figure
-%   trystrs    - [struct] "try" strings for menu callbacks.
-%   catchstrs  - [struct] "catch" strings for menu callbacks.
+% eegplugin_entropy() - EEGLAB plugin for computing different types of
+% entropy measures.
 %
 % Copyright (C) - Cedric Cannard, August 2022
 %
@@ -27,37 +17,24 @@
 % along with this program; if not, write to the Free Software
 % Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-function vers = eegplugin_entropy(fig, trystrs, catchstrs)
+function vers = eegplugin_entropy(fig,try_strings,catch_strings)
 
 % Plugin version
-vers = 'get_entropy1.0';
+vers = '1.0';
 
 % Add paths to subfolders
-try
-    %     addpath(fileparts(which('sampEn.m')));
-    addpath(genpath(fileparts(which('get_entropy.m'))));
-catch
-    error("Couldn't add path to plugin and subfolders. Please add path manually")
-end
+p = fileparts(which('eegplugin_entropy.m'));
+addpath(p);
+addpath(fullfile(p,'functions'))
 
-if nargin < 3
-    error('eegplugin_entropy requires 3 arguments');
-end
+cmd = [ try_strings.check_data ...
+        '[EEG,LASTCOM] = get_entropy(EEG);' ...
+        catch_strings.new_and_hist ];
 
-% Add folder to path
-p = which('eegplugin_entropy.m');
-p = p(1:strfind(p,'eegplugin_entropy.m')-1);
-if ~exist('eegplugin_entropy','dir')
-    addpath(p);
-end
 
-% Find menu to import data
-menui = findobj(fig, 'tag', 'import data');
-
-% Menu callbacks
-comcnt = [trystrs.no_check '[EEG, LASTCOM] = get_entropy;'  catchstrs.new_non_empty];
-
-% Create menus
-uimenu(menui, 'label', 'EEG data', 'separator', 'on', 'callback', comcnt);
+% create menu
+toolsmenu = findobj(fig, 'tag', 'tools');
+uimenu( toolsmenu, 'label', 'Compute entropy', 'userdata', 'startup:off;epoch:off;study:off', ...
+    'callback', cmd, 'position', 8);
 
 end
