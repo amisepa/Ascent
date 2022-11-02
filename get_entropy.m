@@ -239,6 +239,10 @@ switch entropyType
 %             end
         end
 
+        % Remove NaN scales
+        idx = isnan(mse(1,:));
+        mse(:,idx) = []; scales(:,idx) = [];
+
     case 'MFE'
         disp('Computing multiscale fuzzy entropy (MFE)...')
 %         mfe = nan(nchan,nScales);
@@ -263,6 +267,10 @@ switch entropyType
 %                 legend({EEG.chanlocs.labels}); % note outputs are to fix color problem
 %             end
         end
+
+        % Remove NaN scales
+%         idx = isnan(mfe(1,:));
+%         mfe(:,idx) = []; scales(:,idx) = [];
 
     case 'RFCMFE'
 

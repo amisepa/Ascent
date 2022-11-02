@@ -26,6 +26,7 @@ else
 end
 
 p = figure('color','w');
+% p.Position = [100 100 540 400];
 axis equal
 axis vis3d
 axis off
@@ -49,13 +50,15 @@ for iChan = 1:length(chanlabels)
     else % for multiscale entorpies, take area under the curve as sensor size
         p(iChan) = plot3(proj(iChan,1),proj(iChan,2),proj(iChan,3), ...
             'MarkerEdgeColor','k','MarkerFaceColor', 'k', ...
-            'Marker','o','MarkerSize', 10, 'UserData',iChan, ...
+            'Marker','o','MarkerSize', trapz(entropyData(iChan,:))/2, 'UserData',iChan, ...
             'ButtonDownFcn', @(~,~,~) buttonCallback(entropyData(iChan,:), proj(iChan,:), chanlabels{iChan}));
 
         % display channel label above each electrode
         text(proj(iChan,1)-7,proj(iChan,2)+10,proj(iChan,3), ...
             sprintf('%s %6.3f',chanlabels{iChan}), ...
             'FontSize',10,'fontweight','bold');
+        title('[Click on sensors to display entropy values]', ...
+            'Position', [1 120 1], 'fontweight', 'bold')
 
     end
 end
@@ -71,12 +74,13 @@ function buttonCallback(tmpdata, coord, label)
 %     text(coord(1)-15,coord(2)+15,coord(3), sprintf('%s: %6.3f',label, tmpdata),...
 %         'FontSize',10); % at the 3D coordinates.
 % else % multiscale entropy measures
-    figure('color','w');
-    plot(tmpdata,'linewidth',2);
-    title(label,'FontSize',14)
-    % xticks(2:nScales); xticklabels(join(string(scales(:,2:end)),1)); xtickangle(45)
-    % xlim([2 nScales]);
-    xlabel('Time scale','FontSize',12,'fontweight','bold'); 
-    ylabel('Entropy','FontSize',12,'fontweight','bold')
+figure('color','w','Position', [500 500 280 210]);
+plot(tmpdata,'linewidth',2,'color','black'); % blue: [0, 0.4470, 0.7410]
+% area(tmpdata,'linewidth',2);
+title(label,'FontSize',14)
+% xticks(2:nScales); xticklabels(join(string(scales(:,2:end)),1)); xtickangle(45)
+% xlim([2 nScales]);
+xlabel('Time scale','FontSize',12,'fontweight','bold'); 
+ylabel('Entropy','FontSize',12,'fontweight','bold')
 
 % end
