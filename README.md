@@ -1,4 +1,4 @@
-# get_entropy
+# get_entropy()
 
 EEGLAB plugin to compute different types of entropy measures:
 - Approximate entropy
