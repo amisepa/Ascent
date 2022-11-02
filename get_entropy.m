@@ -15,17 +15,18 @@
 %                 'Standard deviation' (default), or 'Variance'
 %   nScales - number of scale factors (default = 15)
 %   filtData - apply band pass filters to each time scale to control for
-%       broadband spectral bias (see Kosciessa et al. 2020 for more detail). 
+%   broadband spectral bias (see Kosciessa et al. 2020 for more detail). 
 %
 % Cedric Cannard, August 2022
 
-function [ae,se,fe,p,mse,rcmfe,scales] = get_entropy(EEG, entropyType, chanlist, tau, m, coarseType, nScales, filtData, n, vis)
+function [ae,se,fe,p,mse,mfe,rcmfe,scales] = get_entropy(EEG, entropyType, chanlist, tau, m, coarseType, nScales, filtData, n, vis)
 
 ae = [];
 se = [];
 fe = [];
 p = [];
 mse = [];
+mfe = [];
 rcmfe = [];
 scales = [];
 
@@ -183,48 +184,47 @@ nchan = length(chanlist);
 switch entropyType
 
     case 'AE'
-        disp('Computing approximate entropy...')
+        disp('Computing approximate entropy (AE)...')
         ae = nan(nchan,1);
-        for ichan = 1:nchan
+        parfor ichan = 1:nchan
             ae(ichan,:) = compute_ae(EEG.data(ichan,:), m, r);
             fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, ae(ichan,:))
         end
 
     case 'SE'
-        disp('Computing sample entropy...')
+        disp('Computing sample entropy (SE)...')
         se = nan(nchan,1);
         if continuous && EEG.pnts <= 34000  % CHECK THRESHOLD
             disp('Computing sample entropy on continuous data (standard method)...')
             disp('If this takes too long, try the fast method (see main_script code)')
-            for ichan = 1:nchan
+            parfor ichan = 1:nchan
                 se(ichan,:) = compute_se(EEG.data(ichan,:),m,r,tau);  % standard method
                 fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, se(ichan,:))
             end
 
         else
             disp('Large continuous data detected, computing sample entropy using the fast method...')
-            for ichan = 1:nchan
+            parfor ichan = 1:nchan
                 se(ichan,:) = compute_se_fast(EEG.data(ichan,:),m,r); % fast method
                 fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, se(ichan,:))
             end
         end
     
     case 'FE'
-        disp('Computing fuzzy entropy...')
+        disp('Computing fuzzy entropy (FE)...')
         fe = nan(nchan,1);
-        for ichan = 1:nchan
+        parfor ichan = 1:nchan
             [fe(ichan,:), p(ichan,:)] = compute_fe(EEG.data(ichan,:),m,r,n,tau);
             fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, fe(ichan,:))
         end
 
     case 'MSE'
-        disp('Computing multiscale entropy...')
-        mse = nan(nchan,nScales);
-        scales = nan(2,nScales);
-%         if vis
-%             figure('color','w')
-%         end
-        for ichan = 1:nchan
+        disp('Computing multiscale entropy (MSE)...')
+%         mse = nan(nchan,nScales);
+%         scales = nan(2,nScales);
+%         if vis, figure('color','w'); end
+        parfor ichan = 1:nchan
+            fprintf('Channel %d: \n', ichan)
             [mse(ichan,:), scales] = compute_mse(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate);
 %             if vis
 %                 plot(1:nScales, mse, 'linewidth',2); hold on;
@@ -239,36 +239,61 @@ switch entropyType
 %             end
         end
 
+    case 'MFE'
+        disp('Computing multiscale fuzzy entropy (MFE)...')
+%         mfe = nan(nchan,nScales);
+%         scales = nan(2,nScales);
+        
+%         if vis, figure('color','w'); end
+
+        parfor ichan = 1:nchan
+            fprintf('Channel %d: \n', ichan)
+            [mfe(ichan,:), scales] = compute_mfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate,n);
+
+%             % plot
+%             if vis
+%                 plot(1:nScales, mfe, 'linewidth',2); hold on;
+%                 nans = isnan(mfe(1,:));
+%                 if nans(1)
+%                     xticks(2:nScales); xticklabels(join(string(scales(:,2:end)),1)); xtickangle(45)
+%                     xlim([2 nScales]);
+%                 else
+%                     xticks(1:nScales); xticklabels(join(string(scales),1)); xtickangle(45)
+%                 end
+%                 legend({EEG.chanlocs.labels}); % note outputs are to fix color problem
+%             end
+        end
+
     case 'RFCMFE'
 
-%         % number of scale factors to compute (starting at 2)
-%         nScales = inpdlg('Select fuzzy power: ');
-%         if isempty(nScales)
-%             nScales = 30;
+%         disp('Computing refined composite multiscale fuzzy entropy (RCMFE)...')
+%         rcmfe = nan(nchan,nScales);
+%         scales = nan(2,nScales);
+%         if vis
+%             figure('color','w')
 %         end
-% 
+%         for ichan = 1:nchan
+%             fprintf('Channel %d: \n', ichan)
+%             [rcmfe(ichan,:), scales] = compute_rcmfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate);
+%             if vis
+%                 plot(1:nScales, mse, 'linewidth',2); hold on;
+%                 nans = isnan(rcmfe(1,:));
+%                 if nans(1)
+%                     xticks(2:nScales); xticklabels(join(string(scales(:,2:end)),1)); xtickangle(45)
+%                     xlim([2 nScales]);
+%                 else
+%                     xticks(1:nScales); xticklabels(join(string(scales),1)); xtickangle(45)
+%                 end
+%                 legend({EEG.chanlocs.labels})
+%             end
+%         end
+
 %         % rcmfe_NN = RCMFE_std(data, 2, .15, 2, 1, nscalesNN);
 %         [rcmfe, scales] = get_rcmfe(data, m, r, fuzzypower, tau, nScales, EEG.srate);
 
 
 end
 
-% Cite references
-disp('For the parameters you have used, please cite: ')
-if contains(lower(entropyType), 'multiscale')
-    switch coarseType
-        case 'Mean'
-            disp('Costa, Goldberger, and Peng (2002) - Multiscale entropy analysis of complex physiologic time series. Physical review letters.')
-        case 'Standard deviation'
-            disp('   [1] Costa, Goldberger, and Peng (2002) - Multiscale entropy analysis of complex physiologic time series. Physical review letters.')
-            disp('   [2] Azami and Escudero (2016) - Refined Multiscale Fuzzy Entropy based on Standard Deviation for Biomedical Signal Analysis. Medical & Biological Engineering & Computing')
-        case 'Variance'
-            disp('   [1] Costa, Goldberger, and Peng (2002) - Multiscale entropy analysis of complex physiologic time series. Physical review letters.')
-            disp('   [2] Azami and Escudero (2016) - Refined Multiscale Fuzzy Entropy based on Standard Deviation for Biomedical Signal Analysis. Medical & Biological Engineering & Computing')
-    end
-    if filtData
-        disp('Bandpass filters were applied to each scale factor to control for spectral bias, following recommendations by: ');
-        disp('   [3] Kosciessa, Kloosterman, and Garrett (2020) - Standard multiscale entropy reflects neural dynamics at mismatched temporal scales: What''s signal irregularity got to do with it? Plos Computational Biology.')
-    end
-end
+%% Plot results on scalp surface
 
+% open convert_3Dto2D for plotting
