@@ -26,23 +26,20 @@
 function [entropy,p] = compute_se(signal,m,r,tau)
 
 % downsample
-if tau > 1 
-    signal = downsamp(signal, tau); 
-end
+if tau > 1, signal = downsamp(signal, tau); end
 
 n = length(signal);
 p = zeros(1,2);
 sMat = zeros(m+1,n-m);
-
 parfor i = 1:m+1
     sMat(i,:) = signal(i:n-m+i-1);
 end
 
-parfor k = m:m+1
+for k = m:m+1
     count = zeros(1,n-m);
     tempMat = sMat(1:k,:);
     
-    for i = 1:n-k
+    parfor i = 1:n-k
         % calculate Chebyshev distance without counting self-matches
         dist = max(abs(tempMat(:,i+1:n-m) - repmat(tempMat(:,i),1,n-m-i)));
         
@@ -54,6 +51,7 @@ parfor k = m:m+1
     p(k-m+1) = sum(count)/(n-m);
 end
 entropy = log(p(1)/p(2));
+
 
 %% Downsample subfunction
 

@@ -5,6 +5,10 @@
 % is increased of one sample (sequences of length m + 1).
 % 
 % Developed by Shamim Nemati and Giulia Da Poian (Physionet toolbox)
+% Please cite: 
+%   Vest A, Da Poian G, Li Q, Liu C, Nemati S, Shah A, Clifford GD, 
+%   An Open Source Benchmarked Toolbox for Cardiovascular Waveform and Interval Analysis", 
+%   Physiological measurement 39, no. 10 (2018): 105004.
 % 
 % inputs:
 %   y     num_var x num_samples
