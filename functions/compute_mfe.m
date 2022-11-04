@@ -43,17 +43,18 @@ end
 
 mfe = nan(1,nScales);
 scales = nan(2,nScales);
-parfor iScale = 1:nScales
+for iScale = 1:nScales
     
     % make copy of signal in case it is bandpass-filtered at each scale
     sig = signal;
     
     % scale factor bounds
-    upperBound = (1/iScale).*nf + .05*((1./iScale).*nf);
-    lowerBound = (1/(iScale+1)).*nf - .05*((1./(iScale+1)).*nf);
+    upperBound = (1/iScale).*nf + .05*((1./iScale).*nf);           % CHECK THIS IS CORRECT
+    lowerBound = (1/(iScale+1)).*nf - .05*((1./(iScale+1)).*nf);   % CHECK THIS IS CORRECT     
     % Display the corresponding frequencies for this scale
     scales(:,iScale) = [round(lowerBound,3) round(upperBound,3) ];
-    disp(['scale ' num2str(iScale) ': ' num2str(round(lowerBound,3)) ' - ' num2str(round(upperBound,3)) ' Hz']);
+%     disp(['scale ' num2str(iScale) ': ' num2str(round(lowerBound,3)) ' - ' num2str(round(upperBound,3)) ' Hz']);
+    fprintf('Scale %d \n', iScale)
 
     % Bandpass filter outside these bounds to control for spectral bias (if selected)
     if filtData

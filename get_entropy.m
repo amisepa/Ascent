@@ -246,11 +246,11 @@ switch entropyType
     case 'FE'
         disp('Computing fuzzy entropy (FE)...')
         entropy = nan(nchan,1);
-        progressbar('Channels')
+%         progressbar('Channels')
         for ichan = 1:nchan
             [entropy(ichan,:), p(ichan,:)] = compute_fe(EEG.data(ichan,:),m,r,n,tau);
             fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
-            progressbar(ichan/nchan)
+%             progressbar(ichan/nchan)
         end        
         if vis, plot_entropy(entropy, EEG.chanlocs); end
 
@@ -266,11 +266,11 @@ switch entropyType
 
     case 'MFE'
         disp('Computing multiscale fuzzy entropy (MFE)...')
-        progressbar('Channels')
+%         progressbar('Channels')
         for ichan = 1:nchan
             fprintf('Channel %d: \n', ichan)
             [mfe(ichan,:), scales] = compute_mfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate,n);
-            progressbar(ichan/nchan)
+%             progressbar(ichan/nchan)
         end
         if vis, plot_entropy(entropy, EEG.chanlocs); end
 
