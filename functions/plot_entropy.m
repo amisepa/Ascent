@@ -25,6 +25,13 @@ else
     proj = chanpos; % use 3-D data for plotting
 end
 
+% deal with near-0 values
+idx = entropyData < 0.01;
+if sum(idx) > 0
+    entropyData(idx) = 0.0001;
+    warning(['Channel ' chanlocs(idx).labels ' is probably a bad channel.'])
+end
+
 p = figure('color','w');
 % p.Position = [100 100 540 400];
 axis equal
@@ -37,7 +44,8 @@ for iChan = 1:length(chanlabels)
 %         p(iChan) = plot3(proj(iChan,1),proj(iChan,2),proj(iChan,3), ...
 %             'MarkerEdgeColor','k','MarkerFaceColor', 'k', ...
 %             'Marker','o','MarkerSize', entropyData(iChan).^3, 'UserData',iChan, ...
-%             'ButtonDownFcn', @(~,~,~) buttonCallback(entropyData(iChan,:), proj(iChan,:), chanlabels{iChan}));
+%             'ButtonDownFcn', @(~,~,~)
+%             buttonCallback(entropyData(iChan,:), proj(iChan,:), chanlabels{iChan}));% 
         p(iChan) = plot3(proj(iChan,1),proj(iChan,2),proj(iChan,3), ...
             'MarkerEdgeColor','k','MarkerFaceColor', 'k', ...
             'Marker','o','MarkerSize', entropyData(iChan).*5);
