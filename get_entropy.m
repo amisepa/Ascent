@@ -17,6 +17,26 @@
 %   filtData - apply band pass filters to each time scale to control for
 %       broadband spectral bias (see Kosciessa et al. 2020 for more detail). 
 %   vis - visualize entropy outputs (1, default) or not (0)
+% 
+% USAGE:
+%   1) Import EEG datra into EEGLAB
+%   2) Preprocess as necessary (e.g., reference, clean data with ASR, etc.)
+%   3) GUI mode: Tools > Compute entropy
+% or
+%   entropy = get_entropy(EEG);     % launch GUI mode
+% or
+%   entropy = get_entropy(EEG, 'Fuzzy entropy','Fpz',[],[],'Variance'); 
+%                                       % compute fuzzy entropy only on Fpz 
+%                                       % channel with default tau and m but using
+%                                       % variance for the coarse-graining
+% or
+%   [entropy, scales] = get_entropy(EEG,'Multiscale fuzzy entropy',[],[],[],[],50,1,[],0);
+%                                       % compute multiscale fuzzy entropy
+%                                       % on all channels with default
+%                                       % parameters but on 50 time scales,
+%                                       % controlling for spectral bias, and
+%                                       % turning plotting OFF.
+% 
 %
 % Copyright - Cedric Cannard, 2022
 

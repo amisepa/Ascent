@@ -13,11 +13,29 @@
 %   m - embedding dimension (default = 2)
 %   coarseType - coarse graining method for multiscale entropies: 'Mean', 
 %                 'Standard deviation' (default), or 'Variance'
-%   nScales - number of scale factors (default = 15)
+%   nScales - number of scale factors (default = 30)
 %   filtData - apply band pass filters to each time scale to control for
-%   broadband spectral bias (see Kosciessa et al. 2020 for more detail). 
+%       broadband spectral bias (see Kosciessa et al. 2020 for more detail). 
+%   vis - visualize entropy outputs (1, default) or not (0)
+% 
+% USAGE:
+%   1) Import EEG datra into EEGLAB
+%   2) Preprocess as necessary (e.g., reference, clean data with ASR, etc.)
+%   3) GUI mode: Tools > Compute entropy
+% or
+%       entropy = get_entropy(EEG);     % launch GUI mode
+% or
+%       entropy = get_entropy(EEG, 'Fuzzy entropy','Fpz',[],[],'Variance'); 
+%                                       % compute fuzzy entropy only on Fpz 
+%                                       % channel with default tau and m but using
+%                                       % variance for the coarse-graining
+% or
+%       entropy = get_entropy(EEG, 'Multiscale fuzzy entropy');
+% or    
+%       [entropy, scales] = get_entropy(EEG,'Multiscale fuzzy entropy',[],[],[],'Standard deviation',nScales,filtData,[],vis);
+
 %
-% Cedric Cannard, August 2022
+% Copyright - Cedric Cannard, 2022
 
 function [entropy,scales] = get_entropy(EEG, entropyType, chanlist, tau, m, coarseType, nScales, filtData, n, vis)
 
@@ -38,11 +56,15 @@ end
 if isempty(EEG.chanlocs(1).labels)
     error('No channel labels.'); 
 end
-% if ~isfield(EEG.chanlocs, 'X') || isempty(EEG.chanlocs(1).X), error("Electrode locations are required. " + ...
-%         "Go to 'Edit > Channel locations' and import the appropriate coordinates for your montage"); end
+if vis
+    if ~isfield(EEG.chanlocs, 'X') || isempty(EEG.chanlocs(1).X) 
+        error("Electrode locations are required. " + ...
+            "Go to 'Edit > Channel locations' and import the appropriate coordinates for your montage"); 
+    end
+end
 if isempty(EEG.ref)
     warning(['EEG data not referenced! Referencing is highly recommended ' ...
-        '(e.g., CSD-transformation, infinity-, or average- reference)!']); 
+        '(e.g., average- reference)!']); 
 end
 
 % Continuous/epoched data
@@ -56,7 +78,7 @@ end
 
 if nargin == 1
     eTypes = {'Approximate entropy' 'Sample entropy' 'Fuzzy entropy' 'Multiscale entropy' 'Multiscale fuzzy entropy' 'Refined composite multiscale fuzzy entropy (default)'};
-    uigeom = { [.5 .9] .5 [.5 .4 .2] .5 [.5 .1] .5 [.5 .1] .5 };
+    uigeom = { [.5 .9] .5 [.5 .4 .2] .5 [.5 .1] .5 [.5 .1] .5 .5};
     uilist = {
         {'style' 'text' 'string' 'Entropy type:' 'fontweight' 'bold'} ...
         {'style' 'popupmenu' 'string' eTypes 'tag' 'etype' 'value' 6} ...
@@ -71,6 +93,8 @@ if nargin == 1
         {} ...
         {'style' 'text' 'string' 'Embedding dimension:' 'fontweight' 'bold'} ...
         {'style' 'edit' 'string' '2' 'tag' 'm'}  ...
+        {} ...
+        {'style' 'checkbox' 'string' 'Plot entropy outputs' 'tag' 'vis' 'value' 1 'fontweight' 'bold'}  ...
             };
     param = inputgui(uigeom,uilist,'pophelp(''pop_entropy'')','entropy EEGLAB plugin',EEG);
     entropyType = eTypes{param{1}};
@@ -81,7 +105,7 @@ if nargin == 1
     end
     tau  = str2double(param{3});
     m = str2double(param{4});
-
+    vis = logical(param{5});
 end
 
 
@@ -95,7 +119,7 @@ if nargin == 1 && contains(entropyType, 'Multiscale')
         {'style' 'popupmenu' 'string' cTypes 'tag' 'stype' 'value' 2} ...
         {} ...
         {'style' 'text' 'string' 'Number of scale factors:' } ...
-        {'style' 'edit' 'string' '15' 'tag' 'n'}  ...
+        {'style' 'edit' 'string' '30' 'tag' 'n'}  ...
         {} ...
         {'style' 'checkbox' 'string' 'Bandpass filter each time scale (recommended to control for spectral bias)','tag' 'filtData','value',0}  ...
             };
@@ -133,6 +157,10 @@ if ~exist('m','var') || isempty(m)
     disp('No embedding dimension selected: selecting m = 2 (default).')
     m = 2;
 end
+if ~exist('vis','var') || isempty(vis)
+    disp('Plotting option not selected: turning plotting ON (default).')
+    vis = true;
+end
 if contains(lower(entropyType), 'multiscale')
     if ~exist('coarseType','var') || isempty(coarseType)
         disp('No coarse graining method selected: selecting standard deviation (default).')
@@ -140,7 +168,7 @@ if contains(lower(entropyType), 'multiscale')
     end
     if ~exist('nScales','var') || isempty(nScales)
         disp('Number of scale factors not selected: selecting nScales = 15 (default).')
-        nScales = 15;
+        nScales = 30;
     end
     if ~exist('filtData','var') || isempty(filtData)
 %         disp('Selecting bandpass filtering at each time scale to control for the spectral bias (default).')
@@ -220,68 +248,22 @@ switch entropyType
         parfor ichan = 1:nchan
             fprintf('Channel %d: \n', ichan)
             [entropy(ichan,:), scales] = compute_mse(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate);
-%             if vis
-%                 plot(1:nScales, mse, 'linewidth',2); hold on;
-%                 nans = isnan(mse(1,:));
-%                 if nans(1)
-%                     xticks(2:nScales); xticklabels(join(string(scales(:,2:end)),1)); xtickangle(45)
-%                     xlim([2 nScales]);
-%                 else
-%                     xticks(1:nScales); xticklabels(join(string(scales),1)); xtickangle(45)
-%                 end
-%                 legend({EEG.chanlocs.labels})
-%             end
         end
         if vis, plot_entropy(entropy, EEG.chanlocs); end
 
-%         % Remove NaN scales
-%         idx = isnan(entropy(1,:));
-%         entropy(:,idx) = []; scales(:,idx) = [];
-
     case 'MFE'
         disp('Computing multiscale fuzzy entropy (MFE)...')
-%         mfe = nan(nchan,nScales);
-%         scales = nan(2,nScales);
         parfor ichan = 1:nchan
             fprintf('Channel %d: \n', ichan)
             [mfe(ichan,:), scales] = compute_mfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate,n);
-%             % plot
-%             if vis
-%                 plot(1:nScales, mfe, 'linewidth',2); hold on;
-%                 nans = isnan(mfe(1,:));
-%                 if nans(1)
-%                     xticks(2:nScales); xticklabels(join(string(scales(:,2:end)),1)); xtickangle(45)
-%                     xlim([2 nScales]);
-%                 else
-%                     xticks(1:nScales); xticklabels(join(string(scales),1)); xtickangle(45)
-%                 end
-%                 legend({EEG.chanlocs.labels}); % note outputs are to fix color problem
-%             end
         end
         if vis, plot_entropy(entropy, EEG.chanlocs); end
 
     case 'RFCMFE'
 
 %         disp('Computing refined composite multiscale fuzzy entropy (RCMFE)...')
-%         rcmfe = nan(nchan,nScales);
-%         scales = nan(2,nScales);
-%         if vis
-%             figure('color','w')
-%         end
 %         for ichan = 1:nchan
 %             fprintf('Channel %d: \n', ichan)
 %             [rcmfe(ichan,:), scales] = compute_rcmfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate);
-%             if vis
-%                 plot(1:nScales, mse, 'linewidth',2); hold on;
-%                 nans = isnan(rcmfe(1,:));
-%                 if nans(1)
-%                     xticks(2:nScales); xticklabels(join(string(scales(:,2:end)),1)); xtickangle(45)
-%                     xlim([2 nScales]);
-%                 else
-%                     xticks(1:nScales); xticklabels(join(string(scales),1)); xtickangle(45)
-%                 end
-%                 legend({EEG.chanlocs.labels})
-%             end
-%         end
 
 end
