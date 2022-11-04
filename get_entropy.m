@@ -59,12 +59,12 @@ end
 if isempty(EEG.chanlocs(1).labels)
     error('No channel labels.'); 
 end
-if vis
-    if ~isfield(EEG.chanlocs, 'X') || isempty(EEG.chanlocs(1).X) 
-        error("Electrode locations are required. " + ...
-            "Go to 'Edit > Channel locations' and import the appropriate coordinates for your montage"); 
-    end
+% if exist(vis,'var') && ~isempty(vis)
+if ~isfield(EEG.chanlocs, 'X') || isempty(EEG.chanlocs(1).X) 
+    error("Electrode locations are required. " + ...
+        "Go to 'Edit > Channel locations' and import the appropriate coordinates for your montage"); 
 end
+% end
 if isempty(EEG.ref)
     warning(['EEG data not referenced! Referencing is highly recommended ' ...
         '(e.g., average- reference)!']); 
