@@ -18,7 +18,7 @@
 %       broadband spectral bias (see Kosciessa et al. 2020 for more detail). 
 %   vis - visualize entropy outputs (1, default) or not (0)
 %
-% Cedric Cannard, August 2022
+% Copyright - Cedric Cannard, 2022
 
 function [entropy,scales] = get_entropy(EEG, entropyType, chanlist, tau, m, coarseType, nScales, filtData, n, vis)
 
@@ -39,11 +39,15 @@ end
 if isempty(EEG.chanlocs(1).labels)
     error('No channel labels.'); 
 end
-% if ~isfield(EEG.chanlocs, 'X') || isempty(EEG.chanlocs(1).X), error("Electrode locations are required. " + ...
-%         "Go to 'Edit > Channel locations' and import the appropriate coordinates for your montage"); end
+if vis
+    if ~isfield(EEG.chanlocs, 'X') || isempty(EEG.chanlocs(1).X) 
+        error("Electrode locations are required. " + ...
+            "Go to 'Edit > Channel locations' and import the appropriate coordinates for your montage"); 
+    end
+end
 if isempty(EEG.ref)
     warning(['EEG data not referenced! Referencing is highly recommended ' ...
-        '(e.g., CSD-transformation, infinity-, or average- reference)!']); 
+        '(e.g., average- reference)!']); 
 end
 
 % Continuous/epoched data
@@ -227,68 +231,22 @@ switch entropyType
         parfor ichan = 1:nchan
             fprintf('Channel %d: \n', ichan)
             [entropy(ichan,:), scales] = compute_mse(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate);
-%             if vis
-%                 plot(1:nScales, mse, 'linewidth',2); hold on;
-%                 nans = isnan(mse(1,:));
-%                 if nans(1)
-%                     xticks(2:nScales); xticklabels(join(string(scales(:,2:end)),1)); xtickangle(45)
-%                     xlim([2 nScales]);
-%                 else
-%                     xticks(1:nScales); xticklabels(join(string(scales),1)); xtickangle(45)
-%                 end
-%                 legend({EEG.chanlocs.labels})
-%             end
         end
         if vis, plot_entropy(entropy, EEG.chanlocs); end
 
-%         % Remove NaN scales
-%         idx = isnan(entropy(1,:));
-%         entropy(:,idx) = []; scales(:,idx) = [];
-
     case 'MFE'
         disp('Computing multiscale fuzzy entropy (MFE)...')
-%         mfe = nan(nchan,nScales);
-%         scales = nan(2,nScales);
         parfor ichan = 1:nchan
             fprintf('Channel %d: \n', ichan)
             [mfe(ichan,:), scales] = compute_mfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate,n);
-%             % plot
-%             if vis
-%                 plot(1:nScales, mfe, 'linewidth',2); hold on;
-%                 nans = isnan(mfe(1,:));
-%                 if nans(1)
-%                     xticks(2:nScales); xticklabels(join(string(scales(:,2:end)),1)); xtickangle(45)
-%                     xlim([2 nScales]);
-%                 else
-%                     xticks(1:nScales); xticklabels(join(string(scales),1)); xtickangle(45)
-%                 end
-%                 legend({EEG.chanlocs.labels}); % note outputs are to fix color problem
-%             end
         end
         if vis, plot_entropy(entropy, EEG.chanlocs); end
 
     case 'RFCMFE'
 
 %         disp('Computing refined composite multiscale fuzzy entropy (RCMFE)...')
-%         rcmfe = nan(nchan,nScales);
-%         scales = nan(2,nScales);
-%         if vis
-%             figure('color','w')
-%         end
 %         for ichan = 1:nchan
 %             fprintf('Channel %d: \n', ichan)
 %             [rcmfe(ichan,:), scales] = compute_rcmfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate);
-%             if vis
-%                 plot(1:nScales, mse, 'linewidth',2); hold on;
-%                 nans = isnan(rcmfe(1,:));
-%                 if nans(1)
-%                     xticks(2:nScales); xticklabels(join(string(scales(:,2:end)),1)); xtickangle(45)
-%                     xlim([2 nScales]);
-%                 else
-%                     xticks(1:nScales); xticklabels(join(string(scales),1)); xtickangle(45)
-%                 end
-%                 legend({EEG.chanlocs.labels})
-%             end
-%         end
 
 end

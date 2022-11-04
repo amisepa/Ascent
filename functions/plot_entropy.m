@@ -63,17 +63,11 @@ for iChan = 1:length(chanlabels)
     end
 end
 
-
 %% subfunction to display entropy values in the plot where use clicks
 
 function buttonCallback(tmpdata, coord, label)
 
 % Entropy measures with only one value per channel
-% if length(tmpdata) == 1
-%     fprintf('Entropy value for %s: %6.3f \n', label, tmpdata); % command window
-%     text(coord(1)-15,coord(2)+15,coord(3), sprintf('%s: %6.3f',label, tmpdata),...
-%         'FontSize',10); % at the 3D coordinates.
-% else % multiscale entropy measures
 figure('color','w','Position', [500 500 280 210]);
 plot(tmpdata,'linewidth',2,'color','black'); % blue: [0, 0.4470, 0.7410]
 % area(tmpdata,'linewidth',2);
