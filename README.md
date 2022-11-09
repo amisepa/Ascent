@@ -25,6 +25,11 @@ Users can visualize the entropy indexes for each file, displayed on a scalp topo
 
 When possible, the code implements Matlab's parrallel computing to enhance computing speed.
 
+## Tutorial
+
+<img src="https://github.com/amisepa/Effective-Rank-Deficiency/blob/main/illustrations/filename.png" width="200">
+
+
 ## References
 
 Costa, Goldberger, and Peng (2005). Multiscale entropy analysis of biological signals. Phys. Rev. E 71, 021906.
