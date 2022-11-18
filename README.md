@@ -49,7 +49,7 @@ Note that you need to import channel locations before this step if you want to p
 
 6) If you selected a measure with multiple scale factors, a new GUI window opens:
 
-ADD IMAGE
+<img src="https://github.com/amisepa/get_entropy/blob/main/tutorial/img6.png" width="300">
 
 Here you can select the coarse graining method, the number of time scales, and if you want to control for spectral bias (i.e. apply bandpass filter to each scale; see Kosciessa et al., 2020). 
 

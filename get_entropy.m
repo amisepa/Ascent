@@ -182,6 +182,8 @@ if contains(lower(entropyType), 'fuzzy')
         disp('No fuzzy power selected: selecting n = 2 (default).')
         n = 2;
     end
+else
+    n = [];
 end
 
 % % Simplify entropy names 
@@ -300,7 +302,7 @@ switch entropyType
         disp('Computing multiscale fuzzy entropy...')
         progressbar('Channels')
         t1 = tic;
-        parfor ichan = 1:nchan
+        for ichan = 1:nchan
             fprintf('Channel %d: \n', ichan)
             [entropy(ichan,:), scales] = compute_mfe(EEG.data(chanIdx(ichan),:),m,r, ...
                 tau,coarseType,nScales,filtData,EEG.srate,n);
@@ -330,8 +332,16 @@ if contains(lower(entropyType), 'multiscale')
 end
 
 % Command history
-com = sprintf('EEG = get_entropy(''%s'', ''%s'', %d, %d, ''%s'', %d, %d, %d, %d);', ...
-    entropyType,tau, m, coarseType, nScales, filtData, n, vis);
+chanLabels = strjoin(chanlist);
+chanLabels = insertBefore(chanLabels," ", "'");
+chanLabels = insertAfter(chanLabels," ", "'");
+if isempty(n)
+    com = sprintf('EEG = get_entropy(''%s'', {''%s''}, %d, %d, %s, %d, %d, %s, %d);', ...
+        entropyType, chanLabels, tau,m,coarseType,nScales,filtData,'[]',vis);
+else
+    com = sprintf('EEG = get_entropy(''%s'', {''%s''}, %d, %d, %s, %d, %d, %n, %d);', ...
+        entropyType, chanLabels, tau,m,coarseType,nScales,filtData,n,vis);
+end
 
 gong
 disp('Done!')

@@ -38,6 +38,9 @@ axis equal
 axis vis3d
 axis off
 hold on
+
+adj = mean(entropyData(1,:))*5;
+
 for iChan = 1:size(chanlabels,2)
     
     if length(entropyData(iChan,:)) == 1 % adjust sensor size according to entropy type
@@ -48,7 +51,7 @@ for iChan = 1:size(chanlabels,2)
 %             buttonCallback(entropyData(iChan,:), proj(iChan,:), chanlabels{iChan}));% 
         p(iChan) = plot3(coord(iChan,1),coord(iChan,2),coord(iChan,3), ...
             'MarkerEdgeColor','k','MarkerFaceColor', 'k', ...
-            'Marker','o','MarkerSize', entropyData(iChan).*3);
+            'Marker','o','MarkerSize', entropyData(iChan).*2);
 
         % Display channel label above each electrode
         text(coord(iChan,1)-15,coord(iChan,2)+10,coord(iChan,3), ...
@@ -58,7 +61,7 @@ for iChan = 1:size(chanlabels,2)
     else % for multiscale entorpies, take area under the curve as sensor size
         p(iChan) = plot3(coord(iChan,1),coord(iChan,2),coord(iChan,3), ...
             'MarkerEdgeColor','k','MarkerFaceColor', 'k', ...
-            'Marker','o','MarkerSize', trapz(entropyData(iChan,:))/2, 'UserData',iChan, ...
+            'Marker','o','MarkerSize', trapz(entropyData(iChan,:))/adj, 'UserData',iChan, ...
             'ButtonDownFcn', @(~,~,~) buttonCallback(entropyData(iChan,:), coord(iChan,:), chanlabels{iChan}));
 
         % display channel label above each electrode
