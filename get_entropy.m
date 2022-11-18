@@ -170,7 +170,7 @@ if contains(lower(entropyType), 'multiscale')
         coarseType = 'Standard deviation';
     end
     if ~exist('nScales','var') || isempty(nScales)
-        disp('Number of scale factors not selected: selecting nScales = 15 (default).')
+        disp('Number of scale factors not selected: selecting nScales = 30 (default).')
         nScales = 30;
     end
     if ~exist('filtData','var') || isempty(filtData)
@@ -206,6 +206,14 @@ end
 r = .15;
 nchan = length(chanlist);
 
+% preallocate memory for the entropy variable
+if contains(lower(entropyType), 'multiscale')
+    entropy = nan(EEG,nbchan, nScales);
+else
+    entropy = nan(EEG.nbchan,1);
+end
+
+% COMPUTE ENTROPY 
 switch entropyType
 
     case 'AE'
@@ -266,11 +274,11 @@ switch entropyType
 
     case 'MFE'
         disp('Computing multiscale fuzzy entropy (MFE)...')
-%         progressbar('Channels')
+        progressbar('Channels')
         for ichan = 1:nchan
             fprintf('Channel %d: \n', ichan)
-            [mfe(ichan,:), scales] = compute_mfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate,n);
-%             progressbar(ichan/nchan)
+            [entropy(ichan,:), scales] = compute_mfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate,n);
+            progressbar(ichan/nchan)
         end
         if vis, plot_entropy(entropy, EEG.chanlocs); end
 
