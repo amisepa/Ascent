@@ -27,7 +27,14 @@ When possible, the code implements Matlab's parrallel computing to enhance compu
 
 ## Tutorial
 
-<img src="https://github.com/amisepa/Effective-Rank-Deficiency/blob/main/illustrations/filename.png" width="200">
+1) Install EEGLAB and the *get_entropy()* plugin
+
+2) Tools > Compute entroy
+<img src="https://github.com/amisepa/Effective-Rank-Deficiency/blob/main/illustrations/img2.png" width="600">
+
+Here, select entropy measure of interest, EEG channels of interest, *tau*, *m*, and if you want to plot the result. 
+
+Note that you need to import channel locations first if you want to plot the outputs (Edit > Channel locations). 
 
 
 ## References
