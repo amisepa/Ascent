@@ -29,12 +29,29 @@ When possible, the code implements Matlab's parrallel computing to enhance compu
 
 1) Install EEGLAB and the *get_entropy()* plugin
 
-2) Tools > Compute entroy
+2) Import your data and prepross them if necessary (import channel locations if you want to plot the entropy outputs).
+
+3) Tools > Compute entroy
+
 <img src="https://github.com/amisepa/get_entropy/blob/main/tutorial/img2.png" width="400">
 
-Here, select entropy measure of interest, EEG channels of interest, *tau*, *m*, and if you want to plot the result. 
+4) 1st GUI window
 
-Note that you need to import channel locations first if you want to plot the outputs (Edit > Channel locations). 
+<img src="https://github.com/amisepa/get_entropy/blob/main/tutorial/img3.png" width="400">
+
+Here, you can select the entropy measure you wish to compute, the EEG channels of interest, *tau*, *m*, and if you want to plot the result. 
+
+Note that you need to import channel locations before this step if you want to plot the outputs (Edit > Channel locations). 
+
+5) If you selected a fuzzy entropy measure, this window will pop-up to allow you to adjjust fuzzy power. 
+
+<img src="https://github.com/amisepa/get_entropy/blob/main/tutorial/img4.png" width="400">
+
+6) If you selected a measure with multiple scale factors, a new GUI window opens:
+
+ADD IMAGE
+
+Here you can select the coarse graining method, the number of time scales, and if you want to control for spectral bias (i.e. apply bandpass filter to each scale; see Kosciessa et al., 2020). 
 
 
 ## References
