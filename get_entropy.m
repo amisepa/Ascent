@@ -290,3 +290,9 @@ switch entropyType
 %             [rcmfe(ichan,:), scales] = compute_rcmfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate);
 
 end
+
+% save outputs in EEG structure
+EEG.entropy = entropy;
+if contains(lower(entropyType), 'multiscale')
+    EEG.scales = scales;
+end
