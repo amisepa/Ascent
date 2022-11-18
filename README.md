@@ -45,7 +45,7 @@ Note that you need to import channel locations before this step if you want to p
 
 5) If you selected a fuzzy entropy measure, this window will pop-up to allow you to adjjust fuzzy power. 
 
-<img src="https://github.com/amisepa/get_entropy/blob/main/tutorial/img4.png" width="400">
+<img src="https://github.com/amisepa/get_entropy/blob/main/tutorial/img4.png" width="150">
 
 6) If you selected a measure with multiple scale factors, a new GUI window opens:
 
