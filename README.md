@@ -53,14 +53,20 @@ Note that you need to import channel locations before this step if you want to p
 
 Here you can select the coarse graining method, the number of time scales, and if you want to control for spectral bias (i.e. apply bandpass filter to each scale; see Kosciessa et al., 2020). 
 
-7) Plot for entropy measures with one value per channel (approximate, sample, and fuzzy entropy):
+7) Plot for entropy measures with one value per channel (i.e., approximate, sample, and fuzzy entropy):
 
 <img src="https://github.com/amisepa/get_entropy/blob/main/tutorial/img5.png" width="300">
 
-You can rotate the 3D image if some channels are hard to see:
+You can rotate the 3D image if some channels are hard to see.
 
 https://user-images.githubusercontent.com/58382227/202803880-f266aa24-77b8-449f-89ab-66d74e29b092.mp4
 
+
+8) Plot for entropy measures with several values per channel (i.e., multiple time scales):
+
+You can rotate the 3D image if some channels are hard to see and click on the channels to display the entropy values at all time scales.
+
+https://user-images.githubusercontent.com/58382227/202819448-dc521f09-1229-4271-8eb3-662214597fec.mp4
 
 
 
