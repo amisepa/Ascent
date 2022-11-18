@@ -58,7 +58,8 @@ parfor iScale = 1:nScales
 
     % Display the corresponding frequencies for this scale
     scales(:,iScale) = [round(lowerBound,3) round(upperBound,3) ];
-    disp(['scale ' num2str(iScale) ': ' num2str(round(lowerBound,3)) ' - ' num2str(round(upperBound,3)) ' Hz']);
+%     disp(['scale ' num2str(iScale) ': ' num2str(round(lowerBound,3)) ' - ' num2str(round(upperBound,3)) ' Hz']);
+    fprintf('   scale %d \n', iScale)
 
     % Bandpass filter outside these bounds to control for spectral bias (if selected)
     if filtData
@@ -93,46 +94,19 @@ parfor iScale = 1:nScales
     y = reshape(sig(1:floor(length(sig)/iScale)*iScale),iScale,[]);
 
     switch coarseType
-
         case 'Mean'
-%             disp('Selected coarse-graining method: Mean')
-%             y = reshape(sig(1:floor(length(sig)/iScale)*iScale),iScale,[]);
             sig = mean(y,'omitnan');
-%             mse(:,iScale) = compute_se(sig, m, r, tau);
-
         case 'SD'
-
-%             disp('Selected coarse-graining method: Standard deviation')
-%             y = reshape(sig(1:floor(length(sig)/iScale)*iScale),iScale,[]);
             sig = std(y,'omitnan');
-%             mse(:,iScale) = compute_se(sig, m, r, tau);
-
         case 'Variance'
-
-%             disp('Selected coarse-graining method: Variance')
-%             y = reshape(sig(1:floor(length(sig)/iScale)*iScale),iScale,[]);
             sig = var(y,'omitnan');
-%             mse(:,iScale) = compute_se(sig, m, r, tau);
-
     end
 
     mse(:,iScale) = compute_se(sig, m, r, tau);
 
 end
 
-% Cite references
-disp('Please cite: ')
-switch coarseType
-    case 'Mean'
-        disp('Costa, Goldberger, and Peng (2002) - Multiscale entropy analysis of complex physiologic time series. Physical review letters.')
-    case 'SD'
-        disp('   [1] Costa, Goldberger, and Peng (2002) - Multiscale entropy analysis of complex physiologic time series. Physical review letters.')
-        disp('   [2] Azami and Escudero (2016) - Refined Multiscale Fuzzy Entropy based on Standard Deviation for Biomedical Signal Analysis. Medical & Biological Engineering & Computing')
-    case 'Variance'
-        disp('   [1] Costa, Goldberger, and Peng (2002) - Multiscale entropy analysis of complex physiologic time series. Physical review letters.')
-        disp('   [2] Azami and Escudero (2016) - Refined Multiscale Fuzzy Entropy based on Standard Deviation for Biomedical Signal Analysis. Medical & Biological Engineering & Computing')
-end
-if filtData
-    disp('Bandpass filters were applied to each scale factor to control for spectral bias, following recommendations by: ');
-    disp('   [3] Kosciessa, Kloosterman, and Garrett (2020) - Standard multiscale entropy reflects neural dynamics at mismatched temporal scales: What''s signal irregularity got to do with it? Plos Computational Biology.')
-end
+% % Remove NaN scales
+% idx = isnan(mse);
+% mse(idx) = [];
+% scales(idx) = [];

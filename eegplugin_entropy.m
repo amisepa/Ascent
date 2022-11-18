@@ -27,14 +27,13 @@ p = fileparts(which('eegplugin_entropy.m'));
 addpath(p);
 addpath(fullfile(p,'functions'))
 
-cmd = [ try_strings.check_data ...
-        '[EEG,LASTCOM] = get_entropy(EEG);' ...
+cmd = [ try_strings.check_data '[EEG,LASTCOM] = get_entropy(EEG);' ...
         catch_strings.new_and_hist ];
 
 
 % create menu
 toolsmenu = findobj(fig, 'tag', 'tools');
-uimenu( toolsmenu, 'label', 'Compute entropy', 'userdata', 'startup:off;epoch:off;study:off', ...
-    'callback', cmd, 'position', 8);
+uimenu(toolsmenu, 'label', 'Compute entropy', 'userdata', 'startup:off;epoch:off;study:off', ...
+    'callback', cmd, 'position', 15);
 
 end

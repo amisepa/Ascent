@@ -23,14 +23,14 @@
 %   2) Preprocess as necessary (e.g., reference, clean data with ASR, etc.)
 %   3) GUI mode: Tools > Compute entropy
 % or
-%   entropy = get_entropy(EEG);     % launch GUI mode
+%   EEG = get_entropy(EEG);     % launch GUI mode
 % or
-%   entropy = get_entropy(EEG, 'Fuzzy entropy','Fpz',[],[],'Variance'); 
+%   EEG = get_entropy(EEG, 'Fuzzy entropy','Fpz',[],[],'Variance'); 
 %                                       % compute fuzzy entropy only on Fpz 
 %                                       % channel with default tau and m but using
 %                                       % variance for the coarse-graining
 % or
-%   [entropy, scales] = get_entropy(EEG,'Multiscale fuzzy entropy',[],[],[],[],50,1,[],0);
+%   EEG = get_entropy(EEG,'Multiscale fuzzy entropy',[],[],[],[],50,1,[],0);
 %                                       % compute multiscale fuzzy entropy
 %                                       % on all channels with default
 %                                       % parameters but on 50 time scales,
@@ -40,10 +40,9 @@
 %
 % Copyright - Cedric Cannard, 2022
 
-function [entropy,scales] = get_entropy(EEG, entropyType, chanlist, tau, m, coarseType, nScales, filtData, n, vis)
+function [EEG, com] = get_entropy(EEG, entropyType, chanlist, tau, m, coarseType, nScales, filtData, n, vis)
 
-entropy = [];
-scales = [];
+com = '';
 
 % add path to subfolders
 mainpath = fileparts(which('get_entropy.m'));
@@ -80,11 +79,11 @@ end
 %% 1st GUI to select channels and type of entropy
 
 if nargin == 1
-    eTypes = {'Approximate entropy' 'Sample entropy' 'Fuzzy entropy' 'Multiscale entropy' 'Multiscale fuzzy entropy' 'Refined composite multiscale fuzzy entropy (default)'};
+    eTypes = {'Approximate entropy' 'Sample entropy' 'Fuzzy entropy' 'Multiscale entropy' 'Multiscale fuzzy entropy' 'Refined composite multiscale fuzzy entropy'};
     uigeom = { [.5 .9] .5 [.5 .4 .2] .5 [.5 .1] .5 [.5 .1] .5 .5};
     uilist = {
         {'style' 'text' 'string' 'Entropy type:' 'fontweight' 'bold'} ...
-        {'style' 'popupmenu' 'string' eTypes 'tag' 'etype' 'value' 6} ...
+        {'style' 'popupmenu' 'string' eTypes 'tag' 'etype' 'value' 5} ...
         {} ...
         {'style' 'text' 'string' 'Channel selection:' 'fontweight' 'bold'} ...
         {'style' 'edit' 'tag' 'chanlist'} ...
@@ -150,7 +149,7 @@ if ~exist('chanlist','var') || isempty(chanlist)
 end
 if ~exist('entropyType','var') || isempty(entropyType)
     disp('No entropy type selected: selecting Refined composite multiscale fuzzy entropy (default)')
-    entropyType = 'Refined composite multiscale fuzzy entropy (default)';
+    entropyType = 'Refined composite multiscale fuzzy entropy';
 end
 if ~exist('tau','var') || isempty(tau)
     disp('No time lag selected: selecting tau = 1 (default).')
@@ -185,106 +184,171 @@ if contains(lower(entropyType), 'fuzzy')
     end
 end
 
-% Simplify entropy names 
-if contains(lower(entropyType), 'approximate')
-    entropyType = 'AE';
-elseif contains(lower(entropyType), 'sample')
-    entropyType = 'SE';
-elseif strcmpi(entropyType, 'fuzzy entropy')
-    entropyType = 'FE';
-elseif strcmpi(entropyType, 'multiscale entropy')
-    entropyType = 'MSE';
-elseif strcmpi(entropyType, 'multiscale fuzzy entropy')
-    entropyType = 'MFE';
-elseif contains(lower(entropyType), 'refined')
-    entropyType = 'RCMFE';
-end
+% % Simplify entropy names 
+% if contains(lower(entropyType), 'approximate')
+%     entropyType = 'AE';
+% elseif contains(lower(entropyType), 'sample')
+%     entropyType = 'SE';
+% elseif strcmpi(entropyType, 'fuzzy entropy')
+%     entropyType = 'FE';
+% elseif strcmpi(entropyType, 'multiscale entropy')
+%     entropyType = 'MSE';
+% elseif strcmpi(entropyType, 'multiscale fuzzy entropy')
+%     entropyType = 'MFE';
+% elseif contains(lower(entropyType), 'refined')
+%     entropyType = 'RCMFE';
+% end
 
 %% Compute entropy depending on choices
 
 % Hardcode r to .15 because data are scaled to have SD of 1
 r = .15;
-nchan = length(chanlist);
 
-if contains(lower(entropyType), 'multiscale')
-    entropy = nan(EEG,nbchan, nScales);
+% index with channels of interest
+nchan = length(chanlist);
+if nchan > 1
+    [~, chanIdx] = intersect({EEG.chanlocs.labels}, split(chanlist));
 else
-    entropy = nan(EEG.nbchan,1);
+    [~, chanIdx] = intersect({EEG.chanlocs.labels}, chanlist);
 end
 
+% preallocate memory for the entropy variable
+if contains(lower(entropyType), 'multiscale')
+    entropy = nan(nchan, nScales);
+else
+    entropy = nan(nchan,1);
+end
+
+% COMPUTE ENTROPY 
 switch entropyType
 
-    case 'AE'
-        disp('Computing approximate entropy (AE)...')
+    case 'Approximate entropy'
+        disp('Computing approximate entropy...')
         entropy = nan(nchan,1);
         progressbar('Channels')
         for ichan = 1:nchan
-            entropy(ichan,:) = compute_ae(EEG.data(ichan,:), m, r);
-            fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
+                fprintf('Channel %d: \n', ichan)
+            entropy(ichan,:) = compute_ae(EEG.data(chanIdx(ichan),:), m, r);
+%             fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
             progressbar(ichan/nchan)
         end
-        if vis, plot_entropy(entropy, EEG.chanlocs); end
+        if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
 
-    case 'SE'
-        disp('Computing sample entropy (SE)...')
+    case 'Sample entropy'
+        disp('Computing sample entropy...')
         entropy = nan(nchan,1);
         if continuous && EEG.pnts <= 34000  % CHECK THRESHOLD
             disp('Computing sample entropy on continuous data (standard method)...')
             disp('If this takes too long, try the fast method (see main_script code)')
             progressbar('Channels')
             for ichan = 1:nchan
-                entropy(ichan,:) = compute_se(EEG.data(ichan,:),m,r,tau);  % standard method
-                fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
+                fprintf('Channel %d: \n', ichan)
+                entropy(ichan,:) = compute_se(EEG.data(chanIdx(ichan),:),m,r,tau);  % standard method
+%                 fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
                 progressbar(ichan/nchan)
             end
+            
+            % plot
+            if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
 
         else
             disp('Large continuous data detected, computing sample entropy using the fast method...')
             progressbar('Channels')
             for ichan = 1:nchan
-                entropy(ichan,:) = compute_se_fast(EEG.data(ichan,:),m,r); % fast method
-                fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
+                fprintf('Channel %d: \n', ichan)
+                entropy(ichan,:) = compute_se_fast(EEG.data(chanIdx(ichan),:),m,r); % fast method
+%                 fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
                 progressbar(ichan/nchan)
             end
         end
-        if vis, plot_entropy(entropy, EEG.chanlocs); end
 
-    case 'FE'
-        disp('Computing fuzzy entropy (FE)...')
+        % plot
+        if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
+
+    case 'Fuzzy entropy'
+        disp('Computing fuzzy entropy...')
         entropy = nan(nchan,1);
-%         progressbar('Channels')
-        for ichan = 1:nchan
-            [entropy(ichan,:), p(ichan,:)] = compute_fe(EEG.data(ichan,:),m,r,n,tau);
-            fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
-%             progressbar(ichan/nchan)
-        end        
-        if vis, plot_entropy(entropy, EEG.chanlocs); end
-
-    case 'MSE'
-        disp('Computing multiscale entropy (MSE)...')
         progressbar('Channels')
         for ichan = 1:nchan
             fprintf('Channel %d: \n', ichan)
-            [entropy(ichan,:), scales] = compute_mse(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate);
+            entropy(ichan,:) = compute_fe(EEG.data(chanIdx(ichan),:),m,r,n,tau);
+%             fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
             progressbar(ichan/nchan)
-        end
-        if vis, plot_entropy(entropy, EEG.chanlocs); end
+        end    
 
-    case 'MFE'
-        disp('Computing multiscale fuzzy entropy (MFE)...')
+        % Plot
+        if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
+
+    case 'Multiscale entropy'
+        disp('Computing multiscale entropy...')
         progressbar('Channels')
         for ichan = 1:nchan
             fprintf('Channel %d: \n', ichan)
-            [entropy(ichan,:), scales] = compute_mfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate,n);
+            [entropy(ichan,:), scales] = compute_mse(EEG.data(chanIdx(ichan),:), ...
+                m,r,tau,coarseType,nScales,filtData,EEG.srate);
             progressbar(ichan/nchan)
         end
-        if vis, plot_entropy(entropy, EEG.chanlocs); end
+        
+        % Remove NaN scales
+        idx = isnan(entropy(1,:));
+        entropy(:,idx) = []; scales(idx) = [];
+        
+        % Plot
+        if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
 
-    case 'RFCMFE'
+    case 'Multiscale fuzzy entropy'
+        disp('Computing multiscale fuzzy entropy...')
+        progressbar('Channels')
+        t1 = tic;
+        parfor ichan = 1:nchan
+            fprintf('Channel %d: \n', ichan)
+            [entropy(ichan,:), scales] = compute_mfe(EEG.data(chanIdx(ichan),:),m,r, ...
+                tau,coarseType,nScales,filtData,EEG.srate,n);
+            progressbar(ichan/nchan)
+        end
+        toc(t1)
 
-%         disp('Computing refined composite multiscale fuzzy entropy (RCMFE)...')
-%         for ichan = 1:nchan
-%             fprintf('Channel %d: \n', ichan)
-%             [rcmfe(ichan,:), scales] = compute_rcmfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate);
+        % Remove NaN scales
+        idx = isnan(entropy(1,:));
+        entropy(:,idx) = []; scales(idx) = [];
+        
+        % Plot
+        if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
+
+    case 'Refined composite multiscale fuzzy entropy'
+
+%      [rcmfe(ichan,:), scales] = compute_rcmfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate);
+
+    otherwise
+        error('Unknown entropy type. Please select one of the options (see help get_entropy).')
+end
+
+% save outputs in EEG structure
+EEG.entropy = entropy;
+if contains(lower(entropyType), 'multiscale')
+    EEG.scales = scales;
+end
+
+% Command history
+% if nargin < 2
+%     tmp = fieldnames(params);
+%     tmp = tmp(logical(cell2mat(opt)));
+%     if isempty(tmp)
+%         com = sprintf('EEG = import_muse(''%s'');', file_path);
+%     else
+%         com = sprintf('EEG = import_muse(''%s'', %s);', file_path, vararg2str(tmp));
+%     end
+% else
+%     com = sprintf('EEG = import_muse(''%s'', %s);', file_path, vararg2str(opt));
+% end
+% chanlist =  cat(1,chanlist{:});
+% split(chanlist')
+% 
+com = sprintf('EEG = get_entropy(''%s'', ''%s'', %d, %d, ''%s'', %d, %d, %d, %d);', ...
+    entropyType,tau, m, coarseType, nScales, filtData, n, vis);
+
+gong
+disp('Done!')
 
 end
+
