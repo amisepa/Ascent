@@ -59,7 +59,8 @@ Here you can select the coarse graining method, the number of time scales, and i
 
 You can rotate the 3D image if some channels are hard to see:
 
-<img src="https://github.com/amisepa/get_entropy/blob/main/tutorial/plot1.mp4" width="300">
+https://user-images.githubusercontent.com/58382227/202803880-f266aa24-77b8-449f-89ab-66d74e29b092.mp4
+
 
 
 
