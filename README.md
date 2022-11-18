@@ -33,11 +33,11 @@ When possible, the code implements Matlab's parrallel computing to enhance compu
 
 3) Tools > Compute entroy
 
-<img src="https://github.com/amisepa/get_entropy/blob/main/tutorial/img2.png" width="400">
+<img src="https://github.com/amisepa/get_entropy/blob/main/tutorial/img2.png" width="300">
 
 4) 1st GUI window
 
-<img src="https://github.com/amisepa/get_entropy/blob/main/tutorial/img3.png" width="400">
+<img src="https://github.com/amisepa/get_entropy/blob/main/tutorial/img3.png" width="300">
 
 Here, you can select the entropy measure you wish to compute, the EEG channels of interest, *tau*, *m*, and if you want to plot the result. 
 
@@ -52,6 +52,15 @@ Note that you need to import channel locations before this step if you want to p
 ADD IMAGE
 
 Here you can select the coarse graining method, the number of time scales, and if you want to control for spectral bias (i.e. apply bandpass filter to each scale; see Kosciessa et al., 2020). 
+
+7) Plot for entropy measures with one value per channel (approximate, sample, and fuzzy entropy):
+
+<img src="https://github.com/amisepa/get_entropy/blob/main/tutorial/img5.png" width="300">
+
+You can rotate the 3D image if some channels are hard to see:
+
+<img src="https://github.com/amisepa/get_entropy/blob/main/tutorial/plot1.mp4" width="300">
+
 
 
 ## References
