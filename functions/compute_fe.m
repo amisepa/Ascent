@@ -37,7 +37,7 @@ for k = m:m+1
     count = zeros(1,N-m);
     tempMat = xMat(1:k,:);
     
-    for i = 1:N-k
+    parfor i = 1:N-k
 
         % calculate Chebyshev distance without counting self-matches
         dist = max(abs(tempMat(:,i+1:N-m) - repmat(tempMat(:,i),1,N-m-i)));

@@ -173,9 +173,12 @@ if contains(lower(entropyType), 'multiscale')
         nScales = 30;
     end
     if ~exist('filtData','var') || isempty(filtData)
-%         disp('Selecting bandpass filtering at each time scale to control for the spectral bias (default).')
         filtData = false;
     end
+else
+    coarseType = []; 
+    nScales = [];
+    filtData = [];
 end
 if contains(lower(entropyType), 'fuzzy')
     if ~exist('n','var') || isempty(n)
@@ -186,21 +189,6 @@ else
     n = [];
 end
 
-% % Simplify entropy names 
-% if contains(lower(entropyType), 'approximate')
-%     entropyType = 'AE';
-% elseif contains(lower(entropyType), 'sample')
-%     entropyType = 'SE';
-% elseif strcmpi(entropyType, 'fuzzy entropy')
-%     entropyType = 'FE';
-% elseif strcmpi(entropyType, 'multiscale entropy')
-%     entropyType = 'MSE';
-% elseif strcmpi(entropyType, 'multiscale fuzzy entropy')
-%     entropyType = 'MFE';
-% elseif contains(lower(entropyType), 'refined')
-%     entropyType = 'RCMFE';
-% end
-
 %% Compute entropy depending on choices
 
 % Hardcode r to .15 because data are scaled to have SD of 1
@@ -208,10 +196,10 @@ r = .15;
 
 % index with channels of interest
 nchan = length(chanlist);
-if nchan > 1
+if nchan > 1 && nchan < EEG.nbchan
     [~, chanIdx] = intersect({EEG.chanlocs.labels}, split(chanlist));
 else
-    [~, chanIdx] = intersect({EEG.chanlocs.labels}, chanlist);
+    chanIdx = 1:EEG.nbchan;
 end
 
 % preallocate memory for the entropy variable
@@ -229,9 +217,9 @@ switch entropyType
         entropy = nan(nchan,1);
         progressbar('Channels')
         for ichan = 1:nchan
-                fprintf('Channel %d: \n', ichan)
+%             fprintf('Channel %d \n', ichan)
             entropy(ichan,:) = compute_ae(EEG.data(chanIdx(ichan),:), m, r);
-%             fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
+            fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
             progressbar(ichan/nchan)
         end
         if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
@@ -244,9 +232,9 @@ switch entropyType
             disp('If this takes too long, try the fast method (see main_script code)')
             progressbar('Channels')
             for ichan = 1:nchan
-                fprintf('Channel %d: \n', ichan)
+%                 fprintf('Channel %d \n', ichan)
                 entropy(ichan,:) = compute_se(EEG.data(chanIdx(ichan),:),m,r,tau);  % standard method
-%                 fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
+                fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
                 progressbar(ichan/nchan)
             end
             
@@ -257,9 +245,9 @@ switch entropyType
             disp('Large continuous data detected, computing sample entropy using the fast method...')
             progressbar('Channels')
             for ichan = 1:nchan
-                fprintf('Channel %d: \n', ichan)
+%                 fprintf('Channel %d \n', ichan)
                 entropy(ichan,:) = compute_se_fast(EEG.data(chanIdx(ichan),:),m,r); % fast method
-%                 fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
+                fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
                 progressbar(ichan/nchan)
             end
         end
@@ -272,9 +260,9 @@ switch entropyType
         entropy = nan(nchan,1);
         progressbar('Channels')
         for ichan = 1:nchan
-            fprintf('Channel %d: \n', ichan)
+%             fprintf('Channel %d \n', ichan)
             entropy(ichan,:) = compute_fe(EEG.data(chanIdx(ichan),:),m,r,n,tau);
-%             fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
+            fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
             progressbar(ichan/nchan)
         end    
 
@@ -335,13 +323,10 @@ end
 chanLabels = strjoin(chanlist);
 chanLabels = insertBefore(chanLabels," ", "'");
 chanLabels = insertAfter(chanLabels," ", "'");
-if isempty(n)
-    com = sprintf('EEG = get_entropy(''%s'', {''%s''}, %d, %d, %s, %d, %d, %s, %d);', ...
-        entropyType, chanLabels, tau,m,coarseType,nScales,filtData,'[]',vis);
-else
-    com = sprintf('EEG = get_entropy(''%s'', {''%s''}, %d, %d, %s, %d, %d, %n, %d);', ...
-        entropyType, chanLabels, tau,m,coarseType,nScales,filtData,n,vis);
-end
+
+% TO FIX   
+com = sprintf('EEG = get_entropy(''%s'', {''%s''}, %d, %d, %s, %d, %d, %s, %d);', ...
+    entropyType,chanLabels,tau,m,coarseType,nScales,filtData,'[]',vis);
 
 gong
 disp('Done!')
