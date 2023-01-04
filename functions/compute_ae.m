@@ -1,11 +1,12 @@
 % Computes the approximate entropy (AE)
 %
-% INPUTS
-%   signal : time-series data
-%   m    : Template length
-%   r    : tolerance (typically 0.2 * std)
-% OUTPUT
-%   ae : approximate entropy
+% Inputs:
+%   signal  - univariate signal, a vector of size 1 x N (the number of sample points)
+%   m       - embedding dimension
+%   r       - tolerance, typically 0.15 * std(signal)
+% 
+% Outputs:
+%   ae - approximate entropy
 %
 % Cedric Cannard
 

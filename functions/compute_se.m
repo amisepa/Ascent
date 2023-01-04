@@ -5,15 +5,16 @@
 % is increased of one sample (sequences of length m + 1).
 % 
 % Inputs:
-%   x: univariate signal - a vector of size 1 x n (the number of sample points)
-%   m: embedding dimension (default = 2)
-%   r: threshold (it is usually equal to 0.15 of the standard deviation of
-%       a signal. So here .15 because we normalize signals to have a standard deviation of 1)
-%   tau: time lag (it is usually equal to 1)
+%   x   - univariate signal - a vector of size 1 x n (the number of sample points)
+%   m   - embedding dimension (default = 2)
+%   r   - threshold/tolerance (usually .15 of the signal' sd, so .15 because 
+%           we normalize signals to have a sd of 1)
+%   tau - time lag (it is usually equal to 1)
 %
 % Outputs:
-%   se: sample entropy
-%   p: a vector of length 2 : [the total number of template matches of length m, the total number of forward matches of length m+1]
+%   se  - sample entropy
+%   p   - a vector of length 2 (the number of template matches of length m 
+%           and number of forward matches of length m+1).
 %
 % Please cite:
 %   Azami & Escudero, "Refined Multiscale Fuzzy Entropy based on Standard Deviation for Biomedical Signal Analysis", 
@@ -25,7 +26,7 @@
 
 function [entropy,p] = compute_se(signal,m,r,tau)
 
-% downsample
+% Downsample
 if tau > 1, signal = downsamp(signal, tau); end
 
 n = length(signal);
@@ -53,8 +54,7 @@ end
 entropy = log(p(1)/p(2));
 
 
-%% Downsample subfunction
-
+% Downsample subfunction
 function y = downsamp(x, n, phase)
 
 if nargin<2 || nargin>3, print_usage; end

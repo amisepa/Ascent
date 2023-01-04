@@ -218,7 +218,7 @@ switch entropyType
         progressbar('Channels')
         for ichan = 1:nchan
 %             fprintf('Channel %d \n', ichan)
-            entropy(ichan,:) = compute_ae(EEG.data(chanIdx(ichan),:), m, r);
+            entropy(ichan,:) = compute_ae( EEG.data(chanIdx(ichan),:), m, r*std(EEG.data(ichan,:)) );
             fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
             progressbar(ichan/nchan)
         end
@@ -233,7 +233,7 @@ switch entropyType
             progressbar('Channels')
             for ichan = 1:nchan
 %                 fprintf('Channel %d \n', ichan)
-                entropy(ichan,:) = compute_se(EEG.data(chanIdx(ichan),:),m,r,tau);  % standard method
+                entropy(ichan,:) = compute_se( EEG.data(chanIdx(ichan),:), m, r*std(EEG.data(ichan,:)), tau );  % standard method
                 fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
                 progressbar(ichan/nchan)
             end
@@ -246,7 +246,7 @@ switch entropyType
             progressbar('Channels')
             for ichan = 1:nchan
 %                 fprintf('Channel %d \n', ichan)
-                entropy(ichan,:) = compute_se_fast(EEG.data(chanIdx(ichan),:),m,r); % fast method
+                entropy(ichan,:) = compute_se_fast( EEG.data(chanIdx(ichan),:), m, r*std(EEG.data(ichan,:)) );     % fast method
                 fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
                 progressbar(ichan/nchan)
             end
@@ -261,7 +261,7 @@ switch entropyType
         progressbar('Channels')
         for ichan = 1:nchan
 %             fprintf('Channel %d \n', ichan)
-            entropy(ichan,:) = compute_fe(EEG.data(chanIdx(ichan),:),m,r,n,tau);
+            entropy(ichan,:) = compute_fe(EEG.data(chanIdx(ichan),:), m, r, n, tau);
             fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
             progressbar(ichan/nchan)
         end    
@@ -275,7 +275,7 @@ switch entropyType
         for ichan = 1:nchan
             fprintf('Channel %d: \n', ichan)
             [entropy(ichan,:), scales] = compute_mse(EEG.data(chanIdx(ichan),:), ...
-                m,r,tau,coarseType,nScales,filtData,EEG.srate);
+                m, r, tau, coarseType, nScales, filtData, EEG.srate);
             progressbar(ichan/nchan)
         end
         
@@ -292,8 +292,8 @@ switch entropyType
         t1 = tic;
         for ichan = 1:nchan
             fprintf('Channel %d: \n', ichan)
-            [entropy(ichan,:), scales] = compute_mfe(EEG.data(chanIdx(ichan),:),m,r, ...
-                tau,coarseType,nScales,filtData,EEG.srate,n);
+            [entropy(ichan,:), scales] = compute_mfe(EEG.data(chanIdx(ichan),:), ...
+                m, r, tau, coarseType, nScales, filtData, EEG.srate, n);
             progressbar(ichan/nchan)
         end
         toc(t1)
@@ -306,7 +306,7 @@ switch entropyType
         if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
 
     case 'Refined composite multiscale fuzzy entropy'
-
+        error('Work in progress, sorry. Coming soon!')
 %      [rcmfe(ichan,:), scales] = compute_rcmfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate);
 
     otherwise
@@ -330,6 +330,4 @@ com = sprintf('EEG = get_entropy(''%s'', {''%s''}, %d, %d, %s, %d, %d, %s, %d);'
 
 gong
 disp('Done!')
-
-end
 

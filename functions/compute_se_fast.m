@@ -1,4 +1,4 @@
-% Fast method to compute sample entropy.
+%% Fast method to compute sample entropy.
 % Sample entropy quantifies the likelihood that a sequence of m consecutive 
 % data points that matches another sequence of the same length (match within
 % a tolerance of r) will still match the other sequence when their length 
@@ -10,13 +10,13 @@
 %   An Open Source Benchmarked Toolbox for Cardiovascular Waveform and Interval Analysis", 
 %   Physiological measurement 39, no. 10 (2018): 105004.
 % 
-% inputs:
-%   y     num_var x num_samples
-%   m     template length
-%   r     radius
+% Inputs:
+%   y   - num_var x num_samples
+%   m   - template length
+%   r   - radius
 %
-% output:
-%   se     Sample Entropy
+% Output:
+%   se  - sample Entropy
 %
 % Cedric Cannard, 2022
 
