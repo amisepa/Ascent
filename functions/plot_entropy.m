@@ -32,6 +32,21 @@ if sum(idx) > 0
     warning(['Channel ' chanlocs(idx).labels ' is probably a bad channel.'])
 end
 
+% Scalp topo
+if var(entropyData) > 0.1
+    figure('color','w');
+    topoplot(entropyData, chanlocs, 'emarker', {'.','k',15,1},'electrodes','labels');
+    clim([min(entropyData) max(entropyData)]);
+    c = colorbar; colormap('parula'); %ylabel(c,'Power spectral difference (log)','FontSize',12)
+    % title('Entropy','FontSize',10); 
+    c.Label.String = 'Entropy';
+    c.Label.FontSize = 12;
+    c.Label.FontWeight = 'normal';
+else
+    disp('Not enough variance across electrodes to plot an informative scalp topography.')
+end
+
+% 3D figure allowing to open entropy data for each electrode
 p = figure('color','w');
 % p.Position = [100 100 540 400];
 axis equal
@@ -44,23 +59,17 @@ hold on
 for iChan = 1:size(entropyData,1)
     
     if length(entropyData(iChan,:)) == 1 % measures with one value per channel
-%         p(iChan) = plot3(coord(iChan,1),coord(iChan,2),coord(iChan,3), ...
-%             'MarkerEdgeColor','k','MarkerFaceColor', 'k', ...
-%             'Marker','o','MarkerSize', entropyData(iChan).*2);
+        % 3D plot of entropy values at electrode locations
         p(iChan) = plot3(coord(iChan,1),coord(iChan,2),coord(iChan,3), ...
             'MarkerEdgeColor','k','MarkerFaceColor', 'k', ...
             'Marker','o','MarkerSize',5);
-
+        
         % Display channel label + entropy value for each channel
         text(coord(iChan,1)-15,coord(iChan,2)+10,coord(iChan,3), ...
            sprintf('%s: %6.1f',chanlabels{iChan}, ...
            round(entropyData(iChan,:),2)),'FontSize',10,'fontweight','bold');
 
     else % for multiscales, take area under the curve as sensor size
-%         p(iChan) = plot3(coord(iChan,1),coord(iChan,2),coord(iChan,3), ...
-%             'MarkerEdgeColor','k','MarkerFaceColor', 'k', ...
-%             'Marker','o','MarkerSize', trapz(entropyData(iChan,:))/adj, 'UserData',iChan, ...
-%             'ButtonDownFcn', @(~,~,~) buttonCallback(entropyData(iChan,:), coord(iChan,:), chanlabels{iChan}));
         p(iChan) = plot3(coord(iChan,1),coord(iChan,2),coord(iChan,3), ...
             'MarkerEdgeColor','k','MarkerFaceColor', 'k', ...
             'Marker','o','MarkerSize', 5, 'UserData',iChan, ...
