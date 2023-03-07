@@ -7,8 +7,7 @@
 % Inputs:
 %   x   - univariate signal - a vector of size 1 x n (the number of sample points)
 %   m   - embedding dimension (default = 2)
-%   r   - threshold/tolerance (usually .15 of the signal' sd, so .15 because 
-%           we normalize signals to have a sd of 1)
+%   r   - threshold/tolerance (.15 of the signal' sd)
 %   tau - time lag (it is usually equal to 1)
 %
 % Outputs:
@@ -25,6 +24,11 @@
 % Cedric Cannard, August 2022
 
 function [entropy,p] = compute_se(signal,m,r,tau)
+
+% Defaults
+if ~exist('m', 'var'), m = 2; end
+if ~exist('r', 'var'), r = .15*std(signal); end
+if ~exist('tau', 'var'), tau = 1; end
 
 % Downsample
 if tau > 1, signal = downsamp(signal, tau); end

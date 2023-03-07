@@ -1,9 +1,9 @@
 % Computes the approximate entropy (AE)
 %
 % Inputs:
-%   signal  - univariate signal, a vector of size 1 x N (the number of sample points)
-%   m       - embedding dimension
-%   r       - tolerance, typically 0.15 * std(signal)
+%   x   - univariate signal - a vector of size 1 x n (the number of sample points)
+%   m   - embedding dimension (default = 2)
+%   r   - threshold/tolerance (.15 of the signal' sd)
 % 
 % Outputs:
 %   ae - approximate entropy
@@ -12,6 +12,11 @@
 
 
 function ae = compute_ae(signal, m, r)
+
+% Defaults
+if ~exist('m', 'var'), m = 2; end
+if ~exist('r', 'var'), r = .15*std(signal); end
+if ~exist('tau', 'var'), tau = 1; end
 
 N = length(signal);
 result = zeros(1,2);
