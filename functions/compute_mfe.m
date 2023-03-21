@@ -24,7 +24,7 @@
 %
 % Cedric Cannard, 2022
 
-function [mfe, scales] = compute_mfe(signal, m, r, tau, coarseType, nScales, filtData, fs, n)
+function [mfe, scales] = compute_mfe(signal, m, r, tau, coarseType, nScales, filtData, fs, n, usegpu)
 
 % Max scale factor cannot be greater than Nyquist frequency
 nf = fs/2;
@@ -45,9 +45,19 @@ mfe = nan(1,nScales);
 scales = nan(2,nScales);
 parfor iScale = 1:nScales
     
-    % make copy of signal in case it is bandpass-filtered at each scale
+    % Make copy of signal in case it is bandpass-filtered at each scale
     sig = signal;
-    
+
+    % Move it to GPU if applicable
+    if usegpu && length(signal) > 1000
+        try
+            sig = gpuArray(sig);
+            disp('Using GPU computing')
+        catch
+            disp('Could not use GPU computing.')
+        end
+    end
+
     % scale factor bounds
     upperBound = (1/iScale).*nf + .05*((1./iScale).*nf);           % CHECK THIS IS CORRECT
     lowerBound = (1/(iScale+1)).*nf - .05*((1./(iScale+1)).*nf);   % CHECK THIS IS CORRECT     

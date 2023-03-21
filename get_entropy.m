@@ -113,7 +113,7 @@ end
 
 %% 2nd GUI to select additional parameters
 
-if nargin == 1 && contains(entropyType, 'Multiscale')
+if nargin == 1 && contains(lower(entropyType), 'multiscale')
     cTypes = {'Mean' 'Standard deviation (default)' 'Variance'};
     uigeom = { [.5 .6] .5 [.9 .3] .5 .5 };
     uilist = {
@@ -306,8 +306,22 @@ switch entropyType
         if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
 
     case 'Refined composite multiscale fuzzy entropy'
-        error('Work in progress, sorry. Coming soon!')
-%      [rcmfe(ichan,:), scales] = compute_rcmfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate);
+        disp('Computing multiscale fuzzy entropy...')
+        progressbar('Channels')
+        for ichan = 1:nchan
+            fprintf('Channel %d: \n', ichan)
+            [entropy(ichan,:), scales] = compute_rcmfe(EEG.data(chanIdx(ichan),:), ...
+                m, r, tau, coarseType, nScales, filtData, EEG.srate, n);
+%           [entropy(ichan,:), scales] = compute_rcmfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate);
+            progressbar(ichan/nchan)
+        end
+
+        % Remove NaN scales
+        idx = isnan(entropy(1,:));
+        entropy(:,idx) = []; scales(idx) = [];
+        
+        % Plot
+        if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
 
     otherwise
         error('Unknown entropy type. Please select one of the options (see help get_entropy).')
