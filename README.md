@@ -2,6 +2,8 @@
 
 EEGLAB plugin to compute different types of entropy measures from electrophysiology time series (e.g., EEG, MEG, ECG, HRV).
 
+See our preprint here for more detail: https://psyarxiv.com/xwmyk/
+
 ## Entropy measures
 
 - Approximate entropy
