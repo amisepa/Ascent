@@ -218,7 +218,7 @@ switch entropyType
         progressbar('Channels')
         for ichan = 1:nchan
 %             fprintf('Channel %d \n', ichan)
-            entropy(ichan,:) = compute_ae( EEG.data(chanIdx(ichan),:), m, r*std(EEG.data(ichan,:)) );
+            entropy(ichan,:) = compute_ae( zscore(EEG.data(chanIdx(ichan),:)), m, r*std(EEG.data(ichan,:)) );
             fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
             progressbar(ichan/nchan)
         end
@@ -233,7 +233,7 @@ switch entropyType
             progressbar('Channels')
             for ichan = 1:nchan
 %                 fprintf('Channel %d \n', ichan)
-                entropy(ichan,:) = compute_se( EEG.data(chanIdx(ichan),:), m, r*std(EEG.data(ichan,:)), tau );  % standard method
+                entropy(ichan,:) = compute_se( zscore(EEG.data(chanIdx(ichan),:)), m, r*std(EEG.data(ichan,:)), tau );  % standard method
                 fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
                 progressbar(ichan/nchan)
             end
@@ -246,7 +246,7 @@ switch entropyType
             progressbar('Channels')
             for ichan = 1:nchan
 %                 fprintf('Channel %d \n', ichan)
-                entropy(ichan,:) = compute_se_fast( EEG.data(chanIdx(ichan),:), m, r*std(EEG.data(ichan,:)) );     % fast method
+                entropy(ichan,:) = compute_se_fast( zscore(EEG.data(chanIdx(ichan),:)), m, r*std(EEG.data(ichan,:)) );     % fast method
                 fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
                 progressbar(ichan/nchan)
             end

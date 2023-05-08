@@ -23,32 +23,33 @@
 function [fe, p] = compute_fe(signal,m,r,n,tau)
 
 if ~exist('m','var'), m = 2; end
-if ~exist('r','var'), r = .15*std(signal); end
+if ~exist('r','var'), r = .15; end
 if ~exist('n','var'), n = 2; end
 if ~exist('tau','var'), tau = 1; end
 if tau > 1, signal = downsample(signal, tau); end
 
+% z-score signal
+signal = zscore(signal);  % remove mean and divide by sd
+
 N = length(signal);
 p = zeros(1,2);
 xMat = zeros(m+1,N-m);
-parfor i = 1:m+1
+for i = 1:m+1
     xMat(i,:) = signal(i:N-m+i-1);
 end
 
 for k = m:m+1
     count = zeros(1,N-m);
     tmp = xMat(1:k,:);
-    
-    parfor i = 1:N-k
+    for i = 1:N-k
 
         % calculate Chebyshev distance without counting self-matches
         dist = max(abs(tmp(:,i+1:N-m) - repmat(tmp(:,i),1,N-m-i)));
         df = exp((-dist.^n)/r);
         count(i) = sum(df)/(N-m);
     end
-    
     p(k-m+1) = sum(count)/(N-m);
 end
 
 fe = log(p(1)/p(2));
-end
+
