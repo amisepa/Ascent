@@ -2,7 +2,7 @@
 %
 % INPUTS:
 %   signal: univariate signal - a vector of size 1 x N (the number of sample points)
-%   m: embedding dimension
+%   m: embedding dimension (default = 2)
 %   r: threshold (it is usually equal to 0.15 of the standard deviation of a signal - 
 %       because we normalize signals to have a standard deviation of 1, here, r is usually equal to 0.15)
 %   tau: time lag (it is usually equal to 1)
@@ -11,20 +11,31 @@
 %   filtData: bandpass filter each scale factor to control for spectral 
 %       bias (1) or not (0; default)
 %   fs: sample rate (Hz)
-%   n: fuzzy power
+%   n: fuzzy power (default = 2)
 %
 % OUTPUTS:
 %   mfe: entropy values for each scale factor
 %   scales: lower and upper frequency bounds of each time scale
 % 
 % Ref:
-%   [1] H. Azami and J. Escudero, "Refined Multiscale Fuzzy Entropy based on
+%   [1] Azami & Escudero (2016), "Refined Multiscale Fuzzy Entropy based on
 %   Standard Deviation for Biomedical Signal Analysis", Medical & Biological
-%   Engineering & Computing, 2016.
+%   Engineering & Computing.
+% 
+%   [2] Costa, Goldberger, Peng (2002). Multiscale entropy analysis of 
+%   complex physiologic time series. Phys Rev Lett. 
 %
 % Cedric Cannard, 2022
 
 function [mfe, scales] = compute_mfe(signal, m, r, tau, coarseType, nScales, filtData, fs, n, usegpu)
+
+% FIXME: Determine max number of scales using file length. As a rough guideline, 
+% some researchers suggest having at least 10 times as many data points as 
+% the embedding dimension m used in the entropy calculation. For instance, 
+% if you are using an embedding dimension of 2, you might want to have at 
+% least 20 data points in each coarse-grained time series. So, the maximum 
+% scale factor τ_max that you could use would be approximately N/20 when 
+% using an embedding dimension of 2.
 
 if ~exist('m','var'), m = 2; end
 if ~exist('r','var'), r = .15; end
