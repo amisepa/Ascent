@@ -41,6 +41,7 @@ if ~exist('m','var'), m = 2; end
 if ~exist('r','var'), r = .15; end
 if ~exist('n','var'), n = 2; end
 if ~exist('tau','var'), tau = 1; end
+if ~exist('usegpu','var'), usegpu = false; end
 if tau > 1, signal = downsample(signal, tau); end
 
 % Max scale factor cannot be greater than Nyquist frequency (for EEG)
