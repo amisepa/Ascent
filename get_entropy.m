@@ -246,8 +246,9 @@ switch entropyType
             progressbar('Channels')
             for ichan = 1:nchan
 %                 fprintf('Channel %d \n', ichan)
-                entropy(ichan,:) = compute_se_fast( zscore(EEG.data(chanIdx(ichan),:)), m, r*std(EEG.data(ichan,:)) );     % fast method
+                enttmp = compute_se_fast( zscore(EEG.data(chanIdx(ichan),:)), m, r*std(EEG.data(ichan,:)) );     % fast method
                 fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
+                entropy(ichan,1:length(enttmp)) = enttmp;
                 progressbar(ichan/nchan)
             end
         end
@@ -261,8 +262,9 @@ switch entropyType
         progressbar('Channels')
         for ichan = 1:nchan
 %             fprintf('Channel %d \n', ichan)
-            entropy(ichan,:) = compute_fe(EEG.data(chanIdx(ichan),:), m, r, n, tau);
+            enttmp = compute_fe(EEG.data(chanIdx(ichan),:), m, r, n, tau);
             fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
+            entropy(ichan,1:length(enttmp)) = enttmp;
             progressbar(ichan/nchan)
         end    
 
@@ -274,9 +276,10 @@ switch entropyType
         progressbar('Channels')
         for ichan = 1:nchan
             fprintf('Channel %d: \n', ichan)
-            [entropy(ichan,:), scales] = compute_mse(EEG.data(chanIdx(ichan),:), ...
+            [enttmp, scales] = compute_mse(EEG.data(chanIdx(ichan),:), ...
                 m, r, tau, coarseType, nScales, filtData, EEG.srate);
             progressbar(ichan/nchan)
+            entropy(ichan,1:length(enttmp)) = enttmp;
         end
         
         % Remove NaN scales
@@ -292,15 +295,19 @@ switch entropyType
         t1 = tic;
         for ichan = 1:nchan
             fprintf('Channel %d: \n', ichan)
-            [entropy(ichan,:), scales] = compute_mfe(EEG.data(chanIdx(ichan),:), ...
+            [enttmp, scales] = compute_mfe(EEG.data(chanIdx(ichan),:), ...
                 m, r, tau, coarseType, nScales, filtData, EEG.srate, n);
             progressbar(ichan/nchan)
+            entropy(ichan,1:length(enttmp)) = enttmp;
         end
         toc(t1)
 
         % Remove NaN scales
         idx = isnan(entropy(1,:));
-        entropy(:,idx) = []; scales(idx) = [];
+        entropy(:,idx) = []; 
+        try
+            scales(idx) = []; 
+        catch, end
         
         % Plot
         if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
