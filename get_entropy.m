@@ -25,10 +25,11 @@
 % or
 %   EEG = get_entropy(EEG);     % launch GUI mode
 % or
-%   EEG = get_entropy(EEG, 'Fuzzy entropy','Fpz',[],[],'Variance'); 
+%   EEG = get_entropy(EEG, 'Fuzzy entropy',{'Fpz' 'Cz'},[],[],'Variance'); 
 %                                       % compute fuzzy entropy only on Fpz 
-%                                       % channel with default tau and m but using
-%                                       % variance for the coarse-graining
+%                                       % and Cz channels with default tau 
+%                                       % and m but using variance for the 
+%                                       % coarse-graining
 % or
 %   EEG = get_entropy(EEG,'Multiscale fuzzy entropy',[],[],[],[],50,1,[],0);
 %                                       % compute multiscale fuzzy entropy
@@ -271,8 +272,36 @@ switch entropyType
         % Plot
         if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
 
+    case 'Fractal votality'
+        disp('Computing spectral entropy...')
+        entropy = nan(nchan,1);
+        progressbar('Channels')
+        for ichan = 1:nchan
+            % fprintf('Channel %d \n', ichan)
+            % [entropy(ichan,:),te] = pentropy( zscore(EEG.data(chanIdx(ichan),:)), EEG.srate);
+            [entropy(ichan,:), std] = fractal_volatility(zscore(EEG.data(chanIdx(ichan),:)));
+
+            fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
+            progressbar(ichan/nchan)
+        end
+        if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
+
+    % case 'Spectral entropy'
+    %     disp('Computing spectral entropy...')
+    %     entropy = nan(nchan,1);
+    %     progressbar('Channels')
+    %     for ichan = 1:nchan
+    %         % fprintf('Channel %d \n', ichan)
+    %         [entropy(ichan,:),te] = pentropy( zscore(EEG.data(chanIdx(ichan),:)), EEG.srate);
+    % 
+    %         fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
+    %         progressbar(ichan/nchan)
+    %     end
+    %     if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
+    
     case 'Multiscale entropy'
         disp('Computing multiscale entropy...')
+
         progressbar('Channels')
         for ichan = 1:nchan
             fprintf('Channel %d: \n', ichan)
