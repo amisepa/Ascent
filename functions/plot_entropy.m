@@ -1,6 +1,7 @@
-function plot_entropy(entropyData, chanlocs, chanIdx, scales)
+function plot_entropy(entropyData, chanlocs, scales)
 
-chanlabels = {chanlocs(chanIdx).labels};
+chanlabels = {chanlocs.labels};
+load("colormap_rufin.mat");
 
 % % deal with near-0 values
 % idx = entropyData < 0.0001;
@@ -9,46 +10,81 @@ chanlabels = {chanlocs(chanIdx).labels};
 %     warning(['Channel ' chanlocs(idx).labels ' is probably a bad channel.'])
 % end
 entropyData(entropyData==0) = NaN;
+% mymap(1,:) = [.9 .9 .9]; % set NaNs to gray
 
 % Scalp topo
 % if var(entropyData) > 0.1
 plot2 = false;
-try
 
-    
+% mass univariate plot scales (x-axis) x channels (y-axis)
+if exist('scales','var')
+
+    % main plot
     figure('Color','w','InvertHardCopy','off');
+    hold on
     subplot(3,3,[1 2 4 5 7 8]);
-
     nScales = 1:size(entropyData,2);
     nChan = 1:size(entropyData,1);
     imagesc(nScales, nChan, entropyData);
 
+    % time series of peak channel
+    subplot(3,4,6)
+    [~, peakchan] = max(entropyData); 
 
-    [~, maxChan] = max(entropyData); 
 
+    plot(xaxis, stats(peakChan,:),'LineWidth',2);
+    chanLabel = chanlocs(peakChan).labels;
+    title(sprintf('Course plot: %s',chanLabel),'FontSize',11,'fontweight','bold')
+    % plot(xaxis,stats(cluster_maxe,:),'LineWidth',2);  % plot peak effect of all clusters superimposed
+    % chanLabel = {chanlocs(cluster_maxe).labels};
+    % legend(chanLabel)
+    grid on; axis tight;
+    ylabel('t-values','FontSize',11,'fontweight','bold'); 
+    xlabel('Frequency (Hz)','FontSize',11,'fontweight','bold')
 
-    figure('color','w');
+    % Plot bars of significnace for peak electrode
+    plotSigBar(mask(peakChan,:)~=0,xaxis);
+
+    % Topography of peak scale
+    subplot(3,3,6)
     topoplot(entropyData, chanlocs, 'emarker', {'.','k',15,1},'electrodes','labels');
     clim([min(entropyData) max(entropyData)]);
-    c = colorbar; colormap('parula'); %ylabel(c,'Power spectral difference (log)','FontSize',12)
+    c = colorbar; 
+    colormap('hot');
     % title('Entropy','FontSize',10); 
     c.Label.String = 'Entropy';
     c.Label.FontSize = 11;
     c.Label.FontWeight = 'bold';
-    colormap('Hot')
 
-catch
-    plot2 = true; % use back up plot
+else
+    % Topography of uniscale entropy
+    figure('Color','w','InvertHardCopy','off');
+    topoplot(entropyData, chanlocs, 'emarker', {'.','k',15,1},'electrodes','labels');
+    % clim([min(entropyData) max(entropyData)]);
+    clim([0 max(entropyData)]);
+    % clim([-1 1])
+    c = colorbar;
+    % colormap(mymap);  
+    colormap('hot'); % 'hot' 'bone' 'winter' 'summer'
 
+    % title('Entropy','FontSize',10); 
+    c.Label.String = 'Entropy';
+    c.Label.FontSize = 11;
+    c.Label.FontWeight = 'bold';
 end
+
+% catch
+%     plot2 = true; % use back up plot
+
+% end
 
 
 if plot2
     disp('Not enough electrodes or variance across electrodes to plot the scalp topography. Defaulting to secondary plot. ')
 
-    x = [ chanlocs(chanIdx).X ]';
-    y = [ chanlocs(chanIdx).Y ]';
-    z = [ chanlocs(chanIdx).Z ]';
+    x = [ chanlocs.X ]';
+    y = [ chanlocs.Y ]';
+    z = [ chanlocs.Z ]';
     
     % Rotate X Y Z coordinates
     % rotate = 0;       %nosedir = +x

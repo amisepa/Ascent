@@ -205,9 +205,9 @@ end
 
 % preallocate memory for the entropy variable
 if contains(lower(entropyType), 'multiscale')
-    entropy = nan(nchan, nScales);
+    entropy = nan(EEG.nbchan, nScales);
 else
-    entropy = nan(nchan,1);
+    entropy = nan(EEG.nbchan,1);
 end
 
 % COMPUTE ENTROPY 
@@ -215,72 +215,61 @@ switch entropyType
 
     case 'Approximate entropy'
         disp('Computing approximate entropy...')
-        entropy = nan(nchan,1);
         progressbar('Channels')
         for ichan = 1:nchan
-%             fprintf('Channel %d \n', ichan)
-            entropy(ichan,:) = compute_ae( zscore(EEG.data(chanIdx(ichan),:)), m, r*std(EEG.data(ichan,:)) );
-            fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
+            entropy(ichan,:) = compute_ae( zscore(EEG.data(chanIdx(ichan),:)), m, r * std(EEG.data(ichan,:)) );
+            fprintf('   %s: %6.2f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
             progressbar(ichan/nchan)
         end
-        if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
+        if vis
+            if nchan>1
+                plot_entropy(entropy, EEG.chanlocs(chanIdx)); 
+            else
+                disp("Sorry, you need to select more than 1 EEG channel to plot the scalp topography")
+            end
+        end
 
     case 'Sample entropy'
         disp('Computing sample entropy...')
-        entropy = nan(nchan,1);
         if continuous && EEG.pnts <= 34000  % CHECK THRESHOLD
             disp('Computing sample entropy on continuous data (standard method)...')
-            disp('If this takes too long, try the fast method (see main_script code)')
+            disp('If this takes too long, try the fast method (see get_entropy code)')
             progressbar('Channels')
             for ichan = 1:nchan
-%                 fprintf('Channel %d \n', ichan)
                 entropy(ichan,:) = compute_se( zscore(EEG.data(chanIdx(ichan),:)), m, r*std(EEG.data(ichan,:)), tau );  % standard method
                 fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
                 progressbar(ichan/nchan)
             end
-            
-            % plot
             if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
 
         else
-            disp('Large continuous data detected, computing sample entropy using the fast method...')
+            disp('Large continuous data detected, computing sample entropy using fast method from Physionet...')
             progressbar('Channels')
             for ichan = 1:nchan
-%                 fprintf('Channel %d \n', ichan)
-                enttmp = compute_se_fast( zscore(EEG.data(chanIdx(ichan),:)), m, r*std(EEG.data(ichan,:)) );     % fast method
+                entropy(ichan,:) = compute_se_fast( zscore(EEG.data(chanIdx(ichan),:)), m, r*std(EEG.data(ichan,:)) );     % fast method
+                % entropy(ichan,1:length(enttmp)) = enttmp;
                 fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
-                entropy(ichan,1:length(enttmp)) = enttmp;
                 progressbar(ichan/nchan)
             end
         end
-
-        % plot
         if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
 
     case 'Fuzzy entropy'
         disp('Computing fuzzy entropy...')
-        entropy = nan(nchan,1);
         progressbar('Channels')
         for ichan = 1:nchan
-%             fprintf('Channel %d \n', ichan)
-            enttmp = compute_fe(EEG.data(chanIdx(ichan),:), m, r, n, tau);
-            fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
-            entropy(ichan,1:length(enttmp)) = enttmp;
+            entropy(ichan,:) = compute_fe(EEG.data(chanIdx(ichan),:), m, r, n, tau);
+            % entropy(ichan,1:length(enttmp)) = enttmp;
+            fprintf('   %s: %g \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
             progressbar(ichan/nchan)
         end    
-
-        % Plot
-        if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
+        if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end  % Plot
 
     case 'Fractal votality'
         disp('Computing spectral entropy...')
-        entropy = nan(nchan,1);
         progressbar('Channels')
         for ichan = 1:nchan
-            % fprintf('Channel %d \n', ichan)
-            % [entropy(ichan,:),te] = pentropy( zscore(EEG.data(chanIdx(ichan),:)), EEG.srate);
-            [entropy(ichan,:), std] = fractal_volatility(zscore(EEG.data(chanIdx(ichan),:)));
-
+            [entropy(ichan,:), ~] = fractal_volatility(zscore(EEG.data(chanIdx(ichan),:)));
             fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
             progressbar(ichan/nchan)
         end
@@ -288,7 +277,6 @@ switch entropyType
 
     % case 'Spectral entropy'
     %     disp('Computing spectral entropy...')
-    %     entropy = nan(nchan,1);
     %     progressbar('Channels')
     %     for ichan = 1:nchan
     %         % fprintf('Channel %d \n', ichan)
@@ -301,19 +289,19 @@ switch entropyType
     
     case 'Multiscale entropy'
         disp('Computing multiscale entropy...')
-
         progressbar('Channels')
         for ichan = 1:nchan
             fprintf('Channel %d: \n', ichan)
-            [enttmp, scales] = compute_mse(EEG.data(chanIdx(ichan),:), ...
+            [entropy(ichan,:), scales] = compute_mse(EEG.data(chanIdx(ichan),:), ...
                 m, r, tau, coarseType, nScales, filtData, EEG.srate);
             progressbar(ichan/nchan)
-            entropy(ichan,1:length(enttmp)) = enttmp;
+            % entropy(ichan,1:length(enttmp)) = enttmp;
         end
         
         % Remove NaN scales
         idx = isnan(entropy(1,:));
-        entropy(:,idx) = []; scales(idx) = [];
+        entropy(:,idx) = []; 
+        scales(idx) = [];
         
         % Plot
         if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
@@ -321,22 +309,20 @@ switch entropyType
     case 'Multiscale fuzzy entropy'
         disp('Computing multiscale fuzzy entropy...')
         progressbar('Channels')
-        t1 = tic;
+        % t1 = tic;
         for ichan = 1:nchan
             fprintf('Channel %d: \n', ichan)
-            [enttmp, scales] = compute_mfe(EEG.data(chanIdx(ichan),:), ...
+            [entropy(ichan,:), scales] = compute_mfe(EEG.data(chanIdx(ichan),:), ...
                 m, r, tau, coarseType, nScales, filtData, EEG.srate, n);
             progressbar(ichan/nchan)
-            entropy(ichan,1:length(enttmp)) = enttmp;
+            % entropy(ichan,1:length(enttmp)) = enttmp;
         end
-        toc(t1)
+        % toc(t1)
 
         % Remove NaN scales
         idx = isnan(entropy(1,:));
         entropy(:,idx) = []; 
-        try
-            scales(idx) = []; 
-        catch, end
+        scales(idx) = []; 
         
         % Plot
         if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
@@ -349,12 +335,14 @@ switch entropyType
             [entropy(ichan,:), scales] = compute_rcmfe(EEG.data(chanIdx(ichan),:), ...
                 m, r, tau, coarseType, nScales, filtData, EEG.srate, n);
 %           [entropy(ichan,:), scales] = compute_rcmfe(EEG.data(ichan,:),m,r,tau,coarseType,nScales,filtData,EEG.srate);
+            % entropy(ichan,1:length(enttmp)) = enttmp;
             progressbar(ichan/nchan)
         end
 
         % Remove NaN scales
         idx = isnan(entropy(1,:));
-        entropy(:,idx) = []; scales(idx) = [];
+        entropy(:,idx) = []; 
+        scales(idx) = [];
         
         % Plot
         if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
