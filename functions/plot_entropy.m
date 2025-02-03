@@ -1,7 +1,16 @@
-function plot_entropy(entropyData, chanlocs, scales)
+function plot_entropy(entropyData, chanlocs, entropyType, scales)
 
 chanlabels = {chanlocs.labels};
 load("colormap_rufin.mat");
+% load("colormap_bwr.mat");
+% load("colormap_bgy.mat");
+
+% uniscale or multiscale data
+if size(entropyData,2)>1
+    multiscale = true;
+else
+    multiscale = false;
+end
 
 % % deal with near-0 values
 % idx = entropyData < 0.0001;
@@ -9,7 +18,11 @@ load("colormap_rufin.mat");
 %     entropyData(idx) = 0.0001;
 %     warning(['Channel ' chanlocs(idx).labels ' is probably a bad channel.'])
 % end
-entropyData(entropyData==0) = NaN;
+if ~multiscale
+    entropyData(entropyData==0) = NaN;
+% else
+    % entropyData(entropyData==0,:) = NaN;
+end
 % mymap(1,:) = [.9 .9 .9]; % set NaNs to gray
 
 % Scalp topo
@@ -17,7 +30,7 @@ entropyData(entropyData==0) = NaN;
 plot2 = false;
 
 % mass univariate plot scales (x-axis) x channels (y-axis)
-if exist('scales','var')
+if multiscale
 
     % main plot
     figure('Color','w','InvertHardCopy','off');
@@ -32,45 +45,56 @@ if exist('scales','var')
     [~, peakchan] = max(entropyData); 
 
 
-    plot(xaxis, stats(peakChan,:),'LineWidth',2);
-    chanLabel = chanlocs(peakChan).labels;
-    title(sprintf('Course plot: %s',chanLabel),'FontSize',11,'fontweight','bold')
-    % plot(xaxis,stats(cluster_maxe,:),'LineWidth',2);  % plot peak effect of all clusters superimposed
-    % chanLabel = {chanlocs(cluster_maxe).labels};
-    % legend(chanLabel)
-    grid on; axis tight;
-    ylabel('t-values','FontSize',11,'fontweight','bold'); 
-    xlabel('Frequency (Hz)','FontSize',11,'fontweight','bold')
-
-    % Plot bars of significnace for peak electrode
-    plotSigBar(mask(peakChan,:)~=0,xaxis);
+    % plot(xaxis, stats(peakChan,:),'LineWidth',2);
+    % chanLabel = chanlocs(peakChan).labels;
+    % title(sprintf('Course plot: %s',chanLabel),'FontSize',11,'fontweight','bold')
+    % % plot(xaxis,stats(cluster_maxe,:),'LineWidth',2);  % plot peak effect of all clusters superimposed
+    % % chanLabel = {chanlocs(cluster_maxe).labels};
+    % % legend(chanLabel)
+    % grid on; axis tight;
+    % ylabel('t-values','FontSize',11,'fontweight','bold'); 
+    % xlabel('Frequency (Hz)','FontSize',11,'fontweight','bold')
+    % 
+    % % Plot bars of significnace for peak electrode
+    % plotSigBar(mask(peakChan,:)~=0,xaxis);
 
     % Topography of peak scale
     subplot(3,3,6)
     topoplot(entropyData, chanlocs, 'emarker', {'.','k',15,1},'electrodes','labels');
     clim([min(entropyData) max(entropyData)]);
     c = colorbar; 
-    colormap('hot');
-    % title('Entropy','FontSize',10); 
+    colormap('hot');  % 'hot'
     c.Label.String = 'Entropy';
-    c.Label.FontSize = 11;
-    c.Label.FontWeight = 'bold';
+    % c.Label.FontSize = 11;
+    % c.Label.FontWeight = 'bold';
+
+    title(entropyType); 
+
+    set(gcf,'Name','Multiscale entropy visualization','color','w','Toolbar','none','Menu','none','NumberTitle','Off')
+    set(findall(gcf,'type','axes'),'fontSize',10,'fontweight','bold');
 
 else
     % Topography of uniscale entropy
     figure('Color','w','InvertHardCopy','off');
     topoplot(entropyData, chanlocs, 'emarker', {'.','k',15,1},'electrodes','labels');
+    colormap('hot'); % dmap mymap diverging_bgy 'hot' 'bone' 'winter' 'summer' 'viridis'
+    
+    % clim and colorbar
+    % clim([min(entropyData)*.9 max(entropyData)*1.1]);
+    clim([min(entropyData)*.95 max(entropyData)*1.05]);
     % clim([min(entropyData) max(entropyData)]);
-    clim([0 max(entropyData)]);
-    % clim([-1 1])
+    % clim([0 max(entropyData)]);    
     c = colorbar;
-    % colormap(mymap);  
-    colormap('hot'); % 'hot' 'bone' 'winter' 'summer'
-
-    % title('Entropy','FontSize',10); 
     c.Label.String = 'Entropy';
     c.Label.FontSize = 11;
     c.Label.FontWeight = 'bold';
+    
+    % Title
+    title(entropyType); 
+
+    set(gcf,'Name','Uniscale entropy visualization','color','w','Toolbar','none','Menu','none','NumberTitle','Off')
+    set(findall(gcf,'type','axes'),'fontSize',10,'fontweight','bold');
+
 end
 
 % catch
@@ -144,6 +168,10 @@ if plot2
     
         end
     end
+
+    % set(gcf,'Name','Multiscale entropy visualization','color','w','Toolbar','none','Menu','none','NumberTitle','Off')
+    % set(findall(gcf,'type','axes'),'fontSize',10,'fontweight','bold');
+
 end
 
 

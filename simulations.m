@@ -29,7 +29,7 @@ brown_noise = brown_noise_gen(); % Generate brown noise
 freqs = (0:n-1) / n; % Normalized frequency
 freqs = fftshift(freqs - 0.5); % Center frequencies
 freqs = ifftshift(abs(freqs) + eps); % Avoid division by zero
-spectrum = (1 ./ freqs.^3); % Apply 1/f^3 scaling
+spectrum = 1 ./ (freqs.*100); % Apply 1/f^3 scaling
 spectrum = spectrum .* (randn(size(spectrum)) + 1i*randn(size(spectrum))); % Add random phases
 spectrum = spectrum / max(abs(spectrum)); % Normalize spectrum
 black_noise = real(ifft(spectrum, 'symmetric')); % Inverse FFTblack_noise = black_noise(:); % ensure column vector
@@ -84,8 +84,12 @@ end
 
 % Compare with EEG Data (Placeholder: Replace with actual EEG dataset)
 % Load EEG data (assumed preprocessed, e.g., filtered and downsampled)
-eeg_data = randn(length(t), 1); % Placeholder for EEG data
-eeg_entropy = compute_ae(zscore(eeg_data), m, r * std(eeg_data));
+% eeg_data = randn(length(t), 1); % Placeholder for EEG data
+eeglab; close
+EEG = import_muse('C:\Users\CedricCannard\Documents\eeg_data\muse1\sub-0a291a7fbc_ses-02_task-rest_run-01.csv');
+for iChan = 1
+    eeg_entropy(iChan,:) = compute_ae(zscore(EEG.data(iChan,:)), m, r * std(EEG.data(iChan,:)));
+end
 
 fprintf('EEG Data Entropy: %f\n', eeg_entropy);
 

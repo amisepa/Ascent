@@ -223,7 +223,7 @@ switch entropyType
         end
         if vis
             if nchan>1
-                plot_entropy(entropy, EEG.chanlocs(chanIdx)); 
+                plot_entropy(entropy, EEG.chanlocs(chanIdx), entropyType, []); 
             else
                 disp("Sorry, you need to select more than 1 EEG channel to plot the scalp topography")
             end
@@ -240,7 +240,7 @@ switch entropyType
                 fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
                 progressbar(ichan/nchan)
             end
-            if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
+            if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx, entropyType, []); end
 
         else
             disp('Large continuous data detected, computing sample entropy using fast method from Physionet...')
@@ -252,7 +252,13 @@ switch entropyType
                 progressbar(ichan/nchan)
             end
         end
-        if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
+        if vis
+            if nchan>1
+                plot_entropy(entropy, EEG.chanlocs(chanIdx), entropyType, []); 
+            else
+                disp("Sorry, you need to select more than 1 EEG channel to plot the scalp topography")
+            end
+        end
 
     case 'Fuzzy entropy'
         disp('Computing fuzzy entropy...')
@@ -273,7 +279,13 @@ switch entropyType
             fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
             progressbar(ichan/nchan)
         end
-        if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
+        if vis
+            if nchan>1
+                plot_entropy(entropy, EEG.chanlocs(chanIdx), entropyType, []); 
+            else
+                disp("Sorry, you need to select more than 1 EEG channel to plot the scalp topography")
+            end
+        end
 
     % case 'Spectral entropy'
     %     disp('Computing spectral entropy...')
@@ -285,7 +297,13 @@ switch entropyType
     %         fprintf('   %s: %6.3f \n', EEG.chanlocs(ichan).labels, entropy(ichan,:))
     %         progressbar(ichan/nchan)
     %     end
-    %     if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
+        if vis
+            if nchan>1
+                plot_entropy(entropy, EEG.chanlocs(chanIdx), entropyType, []); 
+            else
+                disp("Sorry, you need to select more than 1 EEG channel to plot the scalp topography")
+            end
+        end
     
     case 'Multiscale entropy'
         disp('Computing multiscale entropy...')
@@ -304,7 +322,13 @@ switch entropyType
         scales(idx) = [];
         
         % Plot
-        if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx); end
+        if vis
+            if nchan>1
+                plot_entropy(entropy, EEG.chanlocs(chanIdx), entropyType, scales); 
+            else
+                disp("Sorry, you need to select more than 1 EEG channel to plot the scalp topography")
+            end
+        end
 
     case 'Multiscale fuzzy entropy'
         disp('Computing multiscale fuzzy entropy...')
