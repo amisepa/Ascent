@@ -1,7 +1,7 @@
 function plot_entropy(entropyData, chanlocs, entropyType, scales)
 
-chanlabels = {chanlocs.labels};
-load("colormap_rufin.mat");
+% chanlabels = {chanlocs.labels};
+% load("colormap_rufin.mat");
 % load("colormap_bwr.mat");
 % load("colormap_bgy.mat");
 
@@ -35,10 +35,34 @@ if multiscale
     % main plot
     figure('Color','w','InvertHardCopy','off');
     hold on
-    subplot(3,3,[1 2 4 5 7 8]);
+    subplot(3,3,[1 2 3 4 5 6 7]);
     nScales = 1:size(entropyData,2);
     nChan = 1:size(entropyData,1);
     imagesc(nScales, nChan, entropyData);
+    colormap("parula"); c = colorbar;
+    % clim([-min(entropyData,[],'all') max(entropyData,[],'all')])
+    
+    % EEG channels y-ticks
+    Yticks = {chanlocs.labels};
+    newticks = 1:2:length(Yticks);
+    newticks = unique(newticks);
+    Yticks  = Yticks(newticks);
+    set(gca,'YTick',newticks,'YTickLabel', Yticks,'FontWeight','normal');
+
+    % Scales x-ticks
+    Yticks = scales;
+    newticks = 1:2:length(Yticks);
+    newticks = unique(newticks);
+    Yticks  = Yticks(newticks);
+    set(gca,'YTick',newticks,'YTickLabel', Yticks,'FontWeight','normal');
+
+    ylabel(c, 'Entropy','FontWeight','bold','FontSize',9)
+    axis tight
+    xlabel('Scales'); ylabel('EEG channels'); 
+    title('Correlation matrix (time domain)')
+    set(findall(gcf,'type','axes'),'fontSize',9,'fontweight','bold');
+
+
 
     % time series of peak channel
     subplot(3,4,6)

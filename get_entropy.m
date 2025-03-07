@@ -264,7 +264,7 @@ switch entropyType
         disp('Computing fuzzy entropy...')
         progressbar('Channels')
         for ichan = 1:nchan
-            entropy(ichan,:) = compute_fe(EEG.data(chanIdx(ichan),:), m, r, n, tau);
+            entropy(ichan,:) = compute_fe( zscore(EEG.data(chanIdx(ichan),:)), m, r, n, tau);
             % entropy(ichan,1:length(enttmp)) = enttmp;
             fprintf('   %s: %g \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
             progressbar(ichan/nchan)
