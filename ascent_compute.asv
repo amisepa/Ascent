@@ -1,4 +1,4 @@
-%% EEGLAB plugin to compute entropy-based measures on MEEG data.
+%% EEGLAB plugin to compute entropy-based measures on M/EEG data.
 % Also works on other types of biosignals (e.g., ECG, HRV).
 % Founded on code developed by Costa et al. (2002) and Azami and Escudero
 % (2017). 
@@ -240,8 +240,8 @@ switch entropyType
                 fprintf('   %s: %6.3f \n', EEG.chanlocs(chanIdx(ichan)).labels, entropy(ichan,:))
                 progressbar(ichan/nchan)
             end
-            if vis, plot_entropy(entropy, EEG.chanlocs, chanIdx, entropyType, []); end
-
+            if vis, plot_entropy(entropy, EEG.chanlocs, entropyType, []); end
+            
         else
             disp('Large continuous data detected, computing sample entropy using fast method from Physionet...')
             progressbar('Channels')

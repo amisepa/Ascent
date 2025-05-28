@@ -20,16 +20,15 @@
 function vers = eegplugin_entropy(fig,try_strings,catch_strings)
 
 % Plugin version
-vers = '1.1';
+vers = '1.2';
 
 % Add paths to subfolders
-p = fileparts(which('eegplugin_entropy.m'));
+p = fileparts(which('eegplugin_Ascent.m'));
 addpath(p);
 addpath(fullfile(p,'functions'))
 
-cmd = [ try_strings.check_data '[EEG,LASTCOM] = get_entropy(EEG);' ...
+cmd = [ try_strings.check_data '[EEG,LASTCOM] = ascent_compute(EEG);' ...
         catch_strings.new_and_hist ];
-
 
 % create menu
 toolsmenu = findobj(fig, 'tag', 'tools');

@@ -63,11 +63,9 @@ if multiscale
     set(findall(gcf,'type','axes'),'fontSize',9,'fontweight','bold');
 
 
-
     % time series of peak channel
     subplot(3,4,6)
     [~, peakchan] = max(entropyData); 
-
 
     % plot(xaxis, stats(peakChan,:),'LineWidth',2);
     % chanLabel = chanlocs(peakChan).labels;
