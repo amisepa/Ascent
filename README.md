@@ -1,21 +1,23 @@
-# get_entropy()
+# Aperiodic Signal Complexity Estimation for Neurophysiological Time series (ASCENT)
 
-EEGLAB plugin to compute different types of entropy measures from electrophysiology time series (e.g., EEG, MEG, ECG, HRV).
+This EEGLAB plugin computes complexity, entropy measures from MEG, EEG, or HRV data. 
 
-See our preprint here for more detail: https://psyarxiv.com/xwmyk/
+## Entropy measures available
 
-## Entropy measures
-
-- Approximate entropy
-- Sample entropy
+Uniscale:
+- Approximate / Sample entropy
 - Fuzzy entropy
+
+Multiscale:
 - Multiscale entropy
 - Multiscale fuzzy entropy
-- Refined composite multiscale fuzzy entropy (default; Azami and Escudero, 2017)
+- Refined composite multiscale fuzzy entropy (RCMFE)
 
 ## Requirements
 
-MATLAB, EEGLAB, some biosignal data
+- MATLAB
+- EEGLAB
+
 
 ## Features
 
@@ -71,8 +73,12 @@ You can rotate the 3D image if some channels are hard to see and click on the ch
 https://user-images.githubusercontent.com/58382227/202819448-dc521f09-1229-4271-8eb3-662214597fec.mp4
 
 
+## Please cite 
 
-## References
+https://psyarxiv.com/xwmyk/
+
+
+## Other references
 
 Costa, Goldberger, and Peng (2005). Multiscale entropy analysis of biological signals. Phys. Rev. E 71, 021906.
 
@@ -80,6 +86,4 @@ Azami and Escudero (2017). Refined Multiscale Fuzzy Entropy based on Standard De
 
 Kosciessa, Kloosterman, & Garrett (2020). Standard multiscale entropy reflects neural dynamics at mismatched temporal scales: What’s signal irregularity got to do with it? PLoS computational biology, 16(5), e1007885.
 
-## Copyright 
 
-Cedric Cannard, 2022
