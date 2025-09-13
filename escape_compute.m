@@ -244,34 +244,45 @@ switch entropyType
 
     % Sample Entropy (SampEn)
     case 'SampEn'
-        tic
         entropy = compute_SampEn(data, 'm', m, 'tau', tau, 'Parallel', parallelComp);
-        toc
         
     % Fuzzy Entropy (FuzzEn)
     case 'FuzzEn'
-        
-        % Compute fuzzy entropy per channel
         kernel_meth = 'exponential'; % 'exponential' (default) or 'gaussian'
         entropy = compute_FuzzEn(data, 'm', m, 'tau', tau, 'n', n, ...
             'Kernel', kernel_meth, 'Parallel', parallelComp);
-        toc
 
+    % Extrema-Segmented Entropy (ExSEnt)    
+    case 'ExSEnt'
+        [HD, HA, HDA, info] = compute_ExSEnt(data, 'm', m, ...
+            'alpha', 0.20, 'lambda', 0.01, 'Plot', false, ...  % add these options to GUI/command?
+            'Parallel', parallelComp);
 
     % Fractal Dimension (FracDim)
     case 'FracDim'
-        entropy = fractal_volatility(data);
+        progressbar('Computing fractal dimension on all channels')
+        % for iChan = 1:nChan
+        %     [entropy(iChan,:), sd] = fractal_volatility(data(iChan,:)');
+        %     progressbar(iChan / nChan);
+        % end
+        [entropy, SD, info] = compute_FracDim(data, ...
+            'RejectBursts', true, 'WinFrac', 0.02, 'ZThresh', 6, ...
+            'RobustFit', 'ols', ... %  'theilsen' | 'ols'
+            'ScaleTrimIQR', true, 'MinJ', [], 'MaxJ', [], ...
+            'Parallel', parallelComp, 'Verbose', true);
 
     case 'MSE'
-        % [entropy, scales, info] = compute_mse(data, fs, m, r, tau, coarseType, nScales, filtData);
 
-        %   'FilterMode'       : 'lowpass' (default) | 'highpass' | 'bandpass' | 'bandstop' | 'none'
-        [entropy, scales, info] = compute_mse(data, fs, ...
-            m, r, tau, coarseType, nScales, filtData, ...
-            'FilterMode','bandpass', 'BandMode','annuli', ...   % <- for non-overlapping rings
-            'CoarseMethod','skip', ...                          % <- true filt-skip (optional)
-            'Parallel', parallelComp, 'Progress',true, 'ProgressStyle','waitbar');
+          % Kosciessa-style narrowband MSE (default): annuli passbands + filter-skip
+          % [entropy, scales, info] = compute_mse(EEG, 'Fs', fs, 'nScales', nScales, ...
+          %     'Parallel', parallelComp, 'Verbose', true, 'Progress', true);
 
+          % no filtering (classic MSE pipeline)
+          [entropy, scales] = compute_mse(EEG, 'Fs', fs, 'm', m, 'tau', tau, ...
+              'FilterMode', 'none', 'CoarseType', coarseType, 'nScales', nScales, ...
+              'Parallel', parallelComp, 'Progress', true);
+
+          
         % % Classic mode
         % [entropy, scales, info] = compute_mse(data, fs, ...
         %     m, r, tau, coarseType, nScales, true, ...
@@ -340,21 +351,33 @@ end
 % Visualize
 if vis
     if nChan>1
-        escape_plot(entropy, chanlocs, entropyType, scales);
+        if strcmpi(entropyType, 'ExSEnt')
+            escape_plot(HD, chanlocs, 'SampEn of durations', scales);
+            escape_plot(HA, chanlocs, 'SampEn of amplitudes', scales);
+            escape_plot(HDA, chanlocs, 'Joint SampEn of durations & amplitudes', scales);
+        else
+            escape_plot(entropy, chanlocs, entropyType, scales);
+        end
     else
         disp("Sorry, you need more than 1 EEG channel for visualization.")
     end
 end
 
-% save outputs in EEG structure
-EEG.escape.(entropyType).data = entropy;
+% outputs to export in EEG structure
+if strcmpi(entropyType, 'ExSEnt')
+    EEG.escape.(entropyType).data.HD = HD;
+    EEG.escape.(entropyType).data.HA = HA;
+    EEG.escape.(entropyType).data.HDA = HDA;
+else
+    EEG.escape.(entropyType).data = entropy;
+end
 EEG.escape.(entropyType).electrode_labels = chanLabels;
 EEG.escape.(entropyType).electrode_locations = chanlocs;
 if contains(lower(entropyType), {'mse' 'mfe' 'rcmfe'})
     EEG.escape.(entropyType).scales = scales;
 end
 
-%%%%%% ADD PARAMETERS USED IN STRUCTURE OUTPUT %%%%%%%%%%
+% ADD PARAMETERS USED IN STRUCTURE OUTPUT 
 
 
 % Command history (TO FIX)

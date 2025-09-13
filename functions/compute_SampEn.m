@@ -1,103 +1,154 @@
 function SampEn = compute_SampEn(data, varargin)
 % compute_SampEn  Computes Sample Entropy (SampEn) across multichannel data.
 %
-%   SampEn = compute_SampEn(data, 'm', 2, 'tau', 1, 'Parallel', false)
+%   SampEn = compute_SampEn(data, 'm', 2, 'tau', 1, 'Parallel', false, 'Progress', false)
 %
-%   Inputs:
-%     - data      : EEG data matrix [n_channels x n_samples]
-%     - 'm'       : embedding dimension (default = 2)
-%     - 'tau'     : time lag (default = 1; used in fallback only)
-%     - 'Parallel': parallel computing turned ON (true; default) or not (false)
+% Inputs:
+%   data        : EEG data matrix [n_channels x n_samples]
+%   'm'         : embedding dimension (default = 2)
+%   'tau'       : time lag (default = 1)
+%   'Parallel'  : logical true/false to enable parfor over channels (default = false)
+%   'Progress'  : logical true/false to show progress
+%                 • If Parallel==true  and Progress==true → text only (parfor-safe)
+%                 • If Parallel==false and Progress==true → text + waitbar (fallback to text if headless)
 %
-%   Output:
-%     - SampEn : Sample Entropy vector [n_channels x 1]
+% Output:
+%   SampEn      : [n_channels x 1] Sample Entropy per channel
 %
-%   Improvements:
-%     - Supports multichannel input (vectorized where possible)
-%     - Computes r and z-score internally per channel
-%     - Automatically handles parfor for large datasets
-%     - Tracks progress using command line + progressbar
-%
-%   Copyright (C) Cedric Cannard, 2022–2025
-%   Part of the ASCENT EEGLAB plugin (https://github.com/cedriccannard/ascent)
+% Notes:
+%   • Data is z-scored per channel; r = 0.15 * std(z) per channel (Azami).
+%   • Printing inside parfor may appear out of order (expected).
 
-
-% Parse inputs
+% ---------------- Parse inputs ----------------
 p = inputParser;
 p.addRequired('data', @(x) isnumeric(x) && ndims(x) == 2);
-p.addParameter('m', 2, @(x) isnumeric(x) && isscalar(x) && x > 0);
+p.addParameter('m', 2,   @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('tau', 1, @(x) isnumeric(x) && isscalar(x) && x > 0);
-p.addParameter('Parallel', false, @(x) ismember(lower(x), [false,true]));
+p.addParameter('Parallel', false, @(x) islogical(x) && isscalar(x));
+p.addParameter('Progress', false, @(x) islogical(x) && isscalar(x));
 p.parse(data, varargin{:});
 
-m = p.Results.m;
-tau = p.Results.tau;
+m            = p.Results.m;
+tau          = p.Results.tau;
 parallelMode = p.Results.Parallel;
+showProgress = p.Results.Progress;
 
+% ---------------- Shape & normalize ----------------
 if size(data,1) > size(data,2)
-    data = data';  % [n_channels x n_samples]
+    data = data.';  % force [n_channels x n_samples]
+end
+[nchan, ~] = size(data);
+
+% z-score across time (per channel) and compute r per Azami
+data_z = normalize(data, 2);       % each row z-scored
+r_vals = 0.15 * std(data_z, 0, 2); % per-channel r (absolute epsilon on z-scored data)
+
+SampEn = nan(nchan, 1);
+
+% ---------------- Progress headers ----------------
+if showProgress
+    if parallelMode
+        fprintf('SampEn: %d channel(s) | m=%g, tau=%g | parallel=on (text only)\n', nchan, m, tau);
+    else
+        fprintf('SampEn: %d channel(s) | m=%g, tau=%g | parallel=off (text + waitbar)\n', nchan, m, tau);
+    end
 end
 
-[nchan, ~] = size(data);
-SampEn = nan(nchan, 1);
-data_z = normalize(data, 2);             % z-score across time
-r_vals = 0.15 * std(data_z, 0, 2);        % per channel
-
-fprintf('Computing sample entropy (SampEn) on %g EEG channels...\n', nchan);
-
-if parallelMode
+% ---------------- Compute per channel ----------------
+if parallelMode && ~isempty(ver('parallel'))
+    % PARFOR (text-only progress if requested)
+    if showProgress, fprintf('Progress:\n'); end
     parfor iChan = 1:nchan
         SampEn(iChan) = compute_SampEn_single(data_z(iChan,:), m, r_vals(iChan), tau);
-        fprintf('SampEn for channel %3d/%3d : %6.3f\n', iChan, nchan, SampEn(iChan));  
+        if showProgress
+            % Minimal single-line prints to reduce interleaving noise
+            fprintf('  ch %3d/%3d: %.6f\n', iChan, nchan, SampEn(iChan));
+        end
     end
 else
-    progressbar('Computing SampEn on all channels (serial mode)')
+    % SERIAL (text + waitbar if requested and desktop available)
+    useWB = showProgress && usejava('desktop');
+    hWB = [];
+    if useWB
+        try, hWB = waitbar(0,'Computing Sample Entropy...','Name','compute_SampEn'); catch, hWB = []; end
+    end
     for iChan = 1:nchan
         SampEn(iChan) = compute_SampEn_single(data_z(iChan,:), m, r_vals(iChan), tau);
-        progressbar(iChan / nchan)
-        fprintf('SampEn for channel %3d/%3d : %6.3f\n', iChan, nchan, SampEn(iChan));
+        if showProgress
+            fprintf('  ch %3d/%3d: %.6f\n', iChan, nchan, SampEn(iChan));
+            if ~isempty(hWB) && isvalid(hWB)
+                try, waitbar(iChan/nchan, hWB, sprintf('Computing Sample Entropy... (%d/%d)', iChan, nchan)); end
+            end
+        end
     end
+    if ~isempty(hWB) && isvalid(hWB), try, close(hWB); end, end
 end
 end
 
-function SampEn = compute_SampEn_single(signal, m, r, tau)
-signal = signal(:)';
+
+% =========================================================================
+function se = try_fast_or_fallback(signal, m, r, tau)
+N = length(signal);
+if N <= m + 1
+    se = NaN;
+    return
+end
 
 try
-    N = length(signal);
-    if N <= m + 1, SampEn = NaN; return; end
+    Xm  = buffer(signal, m,  m-1, 'nodelay')';
+    Xm1 = buffer(signal, m+1, m,   'nodelay')';
 
-    X_m  = buffer(signal, m,  m-1, 'nodelay')';
-    X_m1 = buffer(signal, m+1, m,   'nodelay')';
+    Dm  = pdist(Xm,  'chebychev');
+    Dm1 = pdist(Xm1, 'chebychev');
 
-    D_m  = pdist(X_m,  'chebychev');
+    A = mean(Dm  < r);
+    B = mean(Dm1 < r);
+
+    if A > 0 && B > 0
+        se = -log(B / A);
+    else
+        se = NaN;
+    end
+catch
+    se = fallback_SampEn(signal, m, r, tau);
+end
+end
+
+
+function SampEn = compute_SampEn_single(signal, m, r, tau)
+
+signal = signal(:)';
+try N = length(signal);
+    if N <= m + 1, SampEn = NaN;
+        return;
+    end
+    X_m = buffer(signal, m, m-1, 'nodelay')';
+    X_m1 = buffer(signal, m+1, m, 'nodelay')';
+    D_m = pdist(X_m, 'chebychev');
     D_m1 = pdist(X_m1, 'chebychev');
-
-    A = mean(D_m  < r);
+    A = mean(D_m < r);
     B = mean(D_m1 < r);
-
     if A > 0 && B > 0
         SampEn = -log(B / A);
     else
         SampEn = NaN;
     end
-
 catch
     warning('Optimized SampEn failed. Trying fallback method.');
     SampEn = fallback_SampEn(signal, m, r, tau);
 end
 end
 
+
 function SampEn = fallback_SampEn(signal, m, r, tau)
-if tau > 1, signal = signal(1:tau:end); end
+if tau > 1
+    signal = signal(1:tau:end);
+end
 n = length(signal);
 p = zeros(1,2);
 sMat = zeros(m+1,n-m);
-
-for i = 1:m+1
-    sMat(i,:) = signal(i:n-m+i-1);
+for i = 1:m+1 sMat(i,:) = signal(i:n-m+i-1);
 end
-
 for k = m:m+1
     count = zeros(1,n-m);
     tempMat = sMat(1:k,:);
@@ -107,7 +158,6 @@ for k = m:m+1
     end
     p(k-m+1) = sum(count)/(n-m);
 end
-
 if any(p == 0)
     SampEn = NaN;
 else
