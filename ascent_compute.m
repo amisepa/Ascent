@@ -175,10 +175,10 @@ if contains(lower(measure), {'mse' 'mmse' 'mfe' 'rcmfe' })
         num_scales = 30;
     end
     if ~exist('filter_mode','var') || isempty(filter_mode)
-        filter_mode = 'none';
-        disp("Filtering each scale factor (from Kosciessa et al. 2017) set to: OFF.")
-    else
+        filter_mode = 'narrowband';
         disp("Filtering each scale factor (from Kosciessa et al. 2017) set to: ON.")
+    else
+        disp("Filtering each scale factor (from Kosciessa et al. 2017) set to: OFF.")
     end
     if ~exist('TimeWin','var') || ~exist('TimeStep','var') || isempty(TimeWin) || isempty(TimeStep)
         TimeWin = [];

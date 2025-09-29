@@ -1,6 +1,12 @@
-%% Tutorial for the ESCAPE EEGLAB plugin.
+%% Tutorial for the ASCENT EEGLAB plugin.
 % 
-% Copyright (C) - ESCAPE EEGLAB PLUGIN - Cedric Cannard, 2021-2025
+% Aperiodic Signal Complexity Estimation for Neurophysiological Time series
+% 
+% Please cite when using this plugin or algorithms:
+%   Cannard, C., & Delorme, A. (2022). An open-source EEGLAB plugin for 
+%   computing entropy-based measures on MEEG signals.
+% 
+% Copyright (C) - ASCENT EEGLAB PLUGIN - Cedric Cannard, 2021-2025
 
 clear; close all; clc
 
@@ -16,9 +22,13 @@ eeglab; close;
 
 % Load provided sample EEG data from the tutorial directory 
 % (2 minutes of resting state eyes-closed, 64-channel Biosemi):
-pluginPath = fileparts(which('eegplugin_escape.m'));
+pluginPath = fileparts(which('eegplugin_ascent.m'));
 cd(pluginPath)
-EEG = pop_loadset('filename','sample_data.set','filepath',fullfile(pluginPath,'tutorial'));
+cd '/Users/cedriccannard/Documents/MATLAB/Ascent'
+EEG = pop_loadset('filename','ascent_sample_data.set','filepath',fullfile(pluginPath));
+
+disp("Are you ready for your 1st ascent?!")
+disp("Run each cell below one by one by clicking in the cell and then pressing CTRL + ENTER")
 
 %% Sample Entropy (SampEn) via GUI
 
@@ -109,3 +119,13 @@ EEG = escape_compute(EEG, 'measure', 'RCMFE', ...
     'n', 2, ...                 % fuzzy power (default = 2)
     'parallel', true, 'progress', true);
 
+
+
+%% Plot all of them together for comparison
+
+
+EEG = escape_compute(EEG, 'measure', 'SampEn');
+EEG = escape_compute(EEG, 'measure', 'FupEn');
+EEG = escape_compute(EEG, 'measure', 'SampEn');
+EEG = escape_compute(EEG, 'measure', 'SampEn');
+EEG = escape_compute(EEG, 'measure', 'SampEn');
