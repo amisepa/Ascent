@@ -1,6 +1,6 @@
 % eegplugin_ascent()
 %
-%  ASCENT: Aperiodic Signal Complexity Estimation for Neurophysiological Time series
+% ASCENT: Aperiodic Signal Complexity Estimation for Neurophysiological Time series
 %
 % Copyright (C) - EEGLAB, Cedric Cannard, August 2022-2025
 %
