@@ -40,7 +40,8 @@ Time to compute everything with 32 GB of RAM and 10 CPU cores (parallel computin
 
 ### Multiscale measures
 
-<img width="3125" height="2282" alt="multiscale_std" src="https://github.com/user-attachments/assets/e2cd47eb-1d77-4f82-b530-dff8a15c5984" />
+<img width="3245" height="2378" alt="multiscale_std" src="https://github.com/user-attachments/assets/00c40380-c46e-4bd6-b9db-7a0b8fae8f40" />
+
 
 
 
