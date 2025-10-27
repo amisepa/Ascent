@@ -41,7 +41,7 @@ Time to compute everything with 32 GB of RAM and 10 CPU cores (parallel computin
 
 ### Multiscale measures
 
-<img width="3245" height="1847" alt="multiscale_std" src="https://github.com/amisepa/Ascent/blob/main/figures/multiscales_std.png" />
+<img width="3245" height="1847" alt="multiscale_std" src="https://github.com/amisepa/Ascent/blob/main/figures/multiscale_std.png" />
 
-<img width="3240" height="1727" alt="multiscale_median" src="https://github.com/amisepa/Ascent/blob/main/figures/multiscales_median.png" />
+<img width="3240" height="1727" alt="multiscale_median" src="https://github.com/amisepa/Ascent/blob/main/figures/multiscale_median.png" />
 
