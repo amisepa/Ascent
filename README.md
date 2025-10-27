@@ -36,12 +36,13 @@ Time to compute everything with 32 GB of RAM and 10 CPU cores (parallel computin
 
 ### Uniscale measures
 
-<img width="3357" height="2025" alt="uniscales" src="https://github.com/user-attachments/assets/e0bba492-75d2-4096-b2c1-ee1f20992e85" />
+<img width="2310" height="1824" alt="uniscales" src="https://github.com/user-attachments/assets/fe66bcdc-a5c1-487d-94ae-ffc778de5567" />
 
 ### Multiscale measures
 
 <img width="3245" height="2378" alt="multiscale_std" src="https://github.com/user-attachments/assets/00c40380-c46e-4bd6-b9db-7a0b8fae8f40" />
 
+<img width="3245" height="2323" alt="multiscale_median" src="https://github.com/user-attachments/assets/2f3968c9-36f2-4adc-b2c0-b0673b22c3f6" />
 
 
 
