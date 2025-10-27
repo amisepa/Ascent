@@ -1,0 +1,373 @@
+% ascent_group_analysis
+clear; close all; clc
+
+data_path = '/Users/cedriccannard/Downloads/biosemi_data';
+cd(data_path)
+plugin_path = '/Users/cedriccannard/Documents/MATLAB/Ascent';
+addpath(genpath(plugin_path))
+eeglab; close
+
+%%%%%%%%%%%%%%%%%%%%%%%%%% parameters %%%%%%%%%%%%%%%%%%%%%%%%%%
+num_scales = 30;
+num_chan = 64;
+coarsing = 'std';
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Compute on whole group - Eyes closed (EC) condition
+
+cd(fullfile(data_path, 'eyes_closed'))
+filenames = {dir('*.bdf').name}';
+num_files = length(filenames);
+
+SampEn = nan(num_chan, num_files);
+ExSEnt = nan(num_chan, num_files);
+FuzzEn = nan(num_chan, num_files);
+FracDim = nan(num_chan, num_files);
+MSE = nan(num_chan, num_scales, num_files);
+mMSE = nan(num_chan, num_scales, num_files);
+MFE = nan(num_chan, num_scales, num_files);
+RCMFE = nan(num_chan, num_scales, num_files);
+for iFile = 1:num_files
+    EEG = pop_biosig(filenames{iFile});
+    EEG = pop_resample(EEG, 256);
+    EEG = pop_select( EEG, 'chantype',{'EEG'});
+    EEG = pop_chanedit(EEG, {'lookup','standard_1005.elc'});
+    EEG = ref_infinity(EEG);
+    
+    EEG = pop_eegfiltnew(EEG, 'locutoff',0.5,'usefftfilt',1);
+    EEG = pop_eegfiltnew(EEG, 'locutoff',59,'hicutoff',61,'revfilt',1,'usefftfilt',1);
+
+    EEG = ascent_compute(EEG, 'measure', 'SampEn', 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'FuzzEn', 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'FracDim', 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'MSE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'mMSE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'ExSEnt', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'MFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'RCMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+
+    SampEn(:,iFile) = EEG.ascent.SampEn.data;
+    ExSEnt(:,iFile) = EEG.ascent.ExSEnt.data.HDA;
+    FuzzEn(:,iFile) = EEG.ascent.FuzzEn.data;
+    FracDim(:,iFile) = EEG.ascent.FracDim.data;
+    MSE(:,:,iFile) = EEG.ascent.MSE.data;
+    mMSE(:,:,iFile) = EEG.ascent.mMSE.data;
+    MFE(:,:,iFile) = EEG.ascent.MFE.data;
+    RCMFE(:,:,iFile) = EEG.ascent.MSE.data;
+
+    chanlocs = EEG.chanlocs;
+    scales = EEG.ascent.MSE.scales;
+    scales_bounds = EEG.ascent.mMSE.scales;
+
+    save(fullfile(data_path, sprintf('ascent_outputs_EC_%s.mat', coarsing)), ...
+        "SampEn", "ExSEnt", "FuzzEn", "FracDim", ...
+        "MSE", "MFE", "mMSE", "RCMFE", ...
+        'chanlocs', 'scales', 'scales_bounds')
+
+end
+disp("Done computing on the whole group for eyes-closed condition!")
+
+
+% Compute on whole group - Eyes opened (EO) condition
+cd(fullfile(data_path, 'eyes_open'))
+filenames = {dir('*.bdf').name}';
+num_files = length(filenames);
+
+SampEn = nan(num_chan, num_files);
+ExSEnt = nan(num_chan, num_files);
+FuzzEn = nan(num_chan, num_files);
+FracDim = nan(num_chan, num_files);
+MSE = nan(num_chan, num_scales, num_files);
+mMSE = nan(num_chan, num_scales, num_files);
+MFE = nan(num_chan, num_scales, num_files);
+RCMFE = nan(num_chan, num_scales, num_files);
+for iFile = 1:num_files
+
+    fprintf('--------------------------------------------------------\n')
+    fprintf('                        FILE %g/%g \n', iFile, num_files)
+    fprintf('--------------------------------------------------------\n')
+
+    EEG = pop_biosig(filenames{iFile});
+    EEG = pop_resample(EEG, 256);
+    EEG = pop_select( EEG, 'chantype',{'EEG'});
+    EEG = pop_chanedit(EEG, {'lookup','standard_1005.elc'});
+    EEG = ref_infinity(EEG);
+    
+    EEG = pop_eegfiltnew(EEG, 'locutoff',0.5,'usefftfilt',1);
+    EEG = pop_eegfiltnew(EEG, 'locutoff',59,'hicutoff',61,'revfilt',1,'usefftfilt',1);
+
+    EEG = ascent_compute(EEG, 'measure', 'SampEn', 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'FuzzEn', 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'FracDim', 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'MSE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'mMSE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'ExSEnt', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'MFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'RCMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+
+    SampEn(:,iFile) = EEG.ascent.SampEn.data;
+    ExSEnt(:,iFile) = EEG.ascent.ExSEnt.data.HDA;
+    FuzzEn(:,iFile) = EEG.ascent.FuzzEn.data;
+    FracDim(:,iFile) = EEG.ascent.FracDim.data;
+    MSE(:,:,iFile) = EEG.ascent.MSE.data;
+    mMSE(:,:,iFile) = EEG.ascent.mMSE.data;
+    MFE(:,:,iFile) = EEG.ascent.MFE.data;
+    RCMFE(:,:,iFile) = EEG.ascent.MSE.data;
+
+    chanlocs = EEG.chanlocs;
+    scales = EEG.ascent.MSE.scales;
+    scales_bounds = EEG.ascent.mMSE.scales;
+
+    save(fullfile(data_path, sprintf('ascent_outputs_EO_%s.mat', coarsing)), ...
+        "SampEn", "ExSEnt", "FuzzEn", "FracDim", ...
+        "MSE", "MFE", "mMSE", "RCMFE", ...
+        'chanlocs', 'scales', 'scales_bounds')
+
+end
+
+disp("Done computing on the whole group for eyes-open condition!")
+
+
+%% Load, separate the data by condition, & reorganize electrodes
+
+% Load chanlocs only 
+load(fullfile(data_path, sprintf('ascent_outputs_EC_%s.mat', coarsing)), 'chanlocs')
+cd(data_path)
+
+% Front-to-back target order
+desired_order = {
+    'Fp1','FPz','FP2', ...
+    'AF7','AF3','AFz','AF4','AF8', ...
+    'F7','F5','F3','F1','Fz','F2','F4','F6','F8', ...
+    'FT7','FT8', ...
+    'FC5','FC3','FC1','FCz','FC2','FC4','FC6', ...
+    'T7','T8', ...
+    'C5','C3','C1','Cz','C2','C4','C6', ...
+    'TP7','TP8', ...
+    'CP5','CP3','CP1','CPz','CP2','CP4','CP6', ...
+    'P9','P7','P5','P3','P1','Pz','P2','P4','P6','P8','P10', ...
+    'PO7','PO3','POz','PO4','PO8', ...
+    'O1','Oz','Iz','O2'
+};
+
+% Map current labels -> desired positions, then sort
+current_labels = {chanlocs.labels};
+[found, loc_in_desired] = ismember(lower(current_labels), lower(desired_order));
+if ~all(found)
+    missing = current_labels(~found);
+    error('Missing in desired_order: %s', strjoin(missing, ', '));
+end
+[~, order_idx] = sort(loc_in_desired, 'ascend');
+
+% Reorder chanlocs
+chanlocs = chanlocs(order_idx);
+
+% Load EC metrics and reorder
+load(fullfile(data_path, sprintf('ascent_outputs_EC_%s.mat', coarsing)), ...
+     'SampEn','FuzzEn','ExSEnt','FracDim','MSE','MFE','mMSE','RCMFE')
+SampEn1  = SampEn(order_idx, :);
+FuzzEn1  = FuzzEn(order_idx, :);
+ExSEnt1  = ExSEnt(order_idx, :);
+FracDim1 = FracDim(order_idx, :);
+MSE1     = MSE(order_idx, :, :);
+MFE1     = MFE(order_idx, :, :);
+mMSE1    = mMSE(order_idx, :, :);
+RCMFE1   = RCMFE(order_idx, :, :);
+
+% Load EO metrics and reorder
+load(fullfile(data_path, sprintf('ascent_outputs_EO_%s.mat', coarsing)), ...
+     'SampEn','FuzzEn','ExSEnt','FracDim','MSE','MFE','mMSE','RCMFE')
+SampEn2  = SampEn(order_idx, :);
+FuzzEn2  = FuzzEn(order_idx, :);
+ExSEnt2  = ExSEnt(order_idx, :);
+FracDim2 = FracDim(order_idx, :);
+MSE2     = MSE(order_idx, :, :);
+MFE2     = MFE(order_idx, :, :);
+mMSE2    = mMSE(order_idx, :, :);
+RCMFE2   = RCMFE(order_idx, :, :);
+
+% Check first 12 labels
+disp({chanlocs.labels}')
+
+%% Stats
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+coarsing = 'median';
+nPerm = 1000;           % number of permutations for H0
+alpha = 0.05;           % NaN to show maps of p-values
+ct = 'mean';    % central tendency method ('mean' for normal t-test, 'trimmed mean' for Yuen t-test)
+grp_type = 'dpt';       % groupe is dependent ('dpt') or independent ('idpt')
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+outputs_path = fullfile(plugin_path, 'figures'); mkdir(outputs_path)
+
+load colormap_bwr.mat; dmap(1,:) = [0.9 0.9 0.9]; % set NaNs to grey
+
+
+%%%%%%%%%%%%%%%%%%%%% UNISCALES %%%%%%%%%%%%%%%%%%%%%
+
+figure('Color','w'); 
+mcc_type = 1;   % 0 = uncorrected; 1 = t-max; 2 = cluster; 3 = TFCE
+
+% SampEn
+nexttile
+% figure('color','w'); 
+% subplot(2,1,1); title('Mean across channels')
+% load('colorbrewer.mat'); colormap = colorbrewer.qual.Set3{12}./255; colormap(8,:) = [];
+% rm_raincloud({trimmean(SampEn1,20,1) trimmean(SampEn2,20,1)}, colormap([5 4],:)); 
+% legend('EC','','EO',''); xlabel('SampEn') % title('SampEn')
+% subplot(2,1,2); title('Mean across subjects')
+% rm_raincloud({trimmean(SampEn1,20,2) trimmean(SampEn2,20,2)}, colormap([5 4],:)); 
+% legend('EC','','EO',''); xlabel('SampEn') % title('SampEn')
+% set(findall(gcf,'type','axes'),'fontSize',10,'fontweight','bold');
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(SampEn1, SampEn2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(SampEn1, SampEn2, nPerm, ct, grp_type);
+mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
+% [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
+if any(mask)
+    topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
+             'verbose','off','whitebk','on');
+    c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
+    % title(sprintf("SampEn (coarse: %s)", coarsing));   
+    title("SampEn")
+end
+
+% FuzzEn
+nexttile
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(FuzzEn1, FuzzEn2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(FuzzEn1, FuzzEn2, nPerm, ct, grp_type);
+mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
+% [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
+if any(mask)
+    topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
+             'verbose','off','whitebk','on');
+    c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
+    % title(sprintf("FuzzEn (coarse: %s)", coarsing));  
+    title("FuzzEn")
+end
+
+% ExSEnt
+nexttile
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(ExSEnt1, ExSEnt2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(ExSEnt1, ExSEnt2, nPerm, ct, grp_type);
+mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
+% [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
+if any(mask)
+    topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
+        'verbose','off','whitebk','on');
+    c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
+    % title(sprintf("ExSEnt (coarse: %s)", coarsing));
+    title("ExSEnt")
+end
+
+% FracDim
+nexttile
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(FracDim1, FracDim2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(FracDim1, FracDim2, nPerm, ct, grp_type);
+mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
+% [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
+if any(mask)
+    topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
+             'verbose','off','whitebk','on');
+    c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
+    % title(sprintf("FracDim (coarse: %s)", coarsing));   
+    title("FracDim")
+end
+
+saveas(gcf, fullfile(outputs_path, sprintf('uniscales_%s_perm_tmax.fig', coarsing)));
+print(gcf, fullfile(outputs_path, sprintf('uniscales_%s_perm_tmax.png', coarsing)), '-dpng', '-r300');
+
+
+%%%%%%%%%%%%%%%%%%%%% MULTISCALES %%%%%%%%%%%%%%%%%%%%%
+
+mcc_type = 3;   % 0 = uncorrected; 1 = t-max; 2 = cluster; 3 = TFCE
+
+% MSE
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(MSE1, MSE2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(MSE1, MSE2, nPerm, ct, grp_type);
+mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
+[mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
+    'nonlinear', grp_type, {size(MSE1,3) size(MSE2,3)},  2, 1, [], 'cohen-d');
+plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
+saveas(gcf, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_main.fig', coarsing)));
+print(gcf, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
+if ~isempty(mask_clusters)
+    writetable(summary_tbl, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_summary.csv', coarsing)));
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, MSE1-MSE2, scales, chanlocs, ...
+        'MSE', 'DataType', 'scalp', 'LineNoiseHz', []);
+    for i = 1:numel(hs.curve)
+        saveas(hs.topo{i}, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_cluster-%g_topo.fig', coarsing, i)));
+        print(hs.topo{i}, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
+        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_cluster-%g_curve.fig', coarsing, i)));
+        print(hs.curve{i}, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_cluster-%g_curve.png', coarsing, i)),'-dpng','-r300');
+    end
+    % close([hs.topo{:} hs.curve{:}]) % to close figures 
+end
+
+% mMSE
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(MSE1, MSE2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(mMSE1, mMSE2, nPerm, ct, grp_type);
+mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
+[mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
+    'nonlinear', grp_type, {size(mMSE1,3) size(mMSE2,3)}, [], [], [], 'cohen-d', scales_bounds);
+plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
+saveas(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_main.fig', coarsing)));
+print(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
+if ~isempty(mask_clusters)
+    writetable(summary_tbl, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_summary.csv', coarsing)));
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, mMSE1-mMSE2, scales_bounds, chanlocs, ...
+        'mMSE', 'DataType', 'scalp', 'LineNoiseHz', []);
+    for i = 1:numel(hs.curve)
+        saveas(hs.topo{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_cluster-%g_topo.fig', coarsing, i)));
+        print(hs.topo{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
+        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_cluster-%g_curve.fig', coarsing, i)));
+        print(hs.curve{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_cluster-%g_curve.png', coarsing, i)),'-dpng','-r300');
+    end
+    % close([hs.topo{:} hs.curve{:}]) % to close figures 
+end
+
+% MFE
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(MFE1, MFE2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(MFE1, MFE2, nPerm, ct, grp_type);
+mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
+[mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
+    'nonlinear', grp_type, {size(MFE1,3) size(MFE2,3)}, [], [], [], 'cohen-d');
+plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
+saveas(gcf, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_main.fig', coarsing)));
+print(gcf, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
+if ~isempty(mask_clusters)
+    writetable(summary_tbl, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_summary.csv', coarsing)));
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, MFE1-MFE2, scales, chanlocs, ...
+        'MFE', 'DataType', 'scalp', 'LineNoiseHz', []);
+    for i = 1:numel(hs.curve)
+        saveas(hs.topo{i}, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_cluster-%g_topo.fig', coarsing, i)));
+        print(hs.topo{i}, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
+        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_cluster-%g_curve.fig', coarsing, i)));
+        print(hs.curve{i}, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_cluster-%g_curve.png', coarsing, i)),'-dpng','-r300');
+    end
+    % close([hs.topo{:} hs.curve{:}]) % to close figures 
+end
+
+
+% RCMFE
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(RCMFE1, RCMFE2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(RCMFE1, RCMFE2, nPerm, ct, grp_type);
+[mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
+    'nonlinear', grp_type, {size(RCMFE1,3) size(RCMFE2,3)}, [], [], [], 'cohen-d');
+plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
+saveas(gcf, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_main.fig', coarsing)));
+print(gcf, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
+if ~isempty(mask_clusters)
+    writetable(summary_tbl, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_summary.csv', coarsing)));
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, RCMFE1-RCMFE2, scales, chanlocs, ...
+        'RCMFE', 'DataType', 'scalp', 'LineNoiseHz', []);
+    for i = 1:numel(hs.curve)
+        saveas(hs.topo{i}, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_cluster-%g_topo.fig', coarsing, i)));
+        print(hs.topo{i}, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
+        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_cluster-%g_curve.fig', coarsing, i)));
+        print(hs.curve{i}, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_cluster-%g_curve.png', coarsing, i)),'-dpng','-r300');
+    end
+    % close([hs.topo{:} hs.curve{:}]) % to close figures 
+end
+
