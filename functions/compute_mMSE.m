@@ -52,7 +52,7 @@ function [mse, scales, info] = compute_mMSE(data, varargin)
 %   'r'               : tolerance **fraction of SD** for SampEn (default 0.15)
 %   'num_scales'      : requested scales; infeasible scales are dropped (default 20)
 %   'coarsing'        : 'mean' | 'std' | 'variance' | 'median' (default 'std')
-%   'filter_mode'     : 'none' | 'narrowband' | 'lowpass' | 'highpass' (default 'none')
+%   'filter_mode'     : 'none' | 'narrowband' | 'lowpass' | 'highpass' (default 'narrowband')
 %   'FilterDesign'    : 'fir' | 'iir' (default 'fir'; auto IIR for very narrow bands)
 %   'TransWidth'      : FIR transition width in Hz (default [], auto heuristic)
 %   'FIRMaxOrder'     : max FIR order (default 2000)
@@ -140,7 +140,7 @@ p.addParameter('tau', 1, @(x) isnumeric(x) && isscalar(x) && x>=1);
 p.addParameter('r', .15, @(x) isnumeric(x) && isscalar(x) && x>0 && x<1);
 p.addParameter('num_scales', 20, @(x) isnumeric(x) && isscalar(x) && x>=1);
 p.addParameter('coarsing', 'std');
-p.addParameter('filter_mode', 'none');      % 'narrowband' | 'lowpass' | 'highpass' | 'none'
+p.addParameter('filter_mode', 'narrowband');      % 'narrowband' | 'lowpass' | 'highpass' | 'none'
 p.addParameter('FilterDesign', 'fir');            % 'fir' | 'iir'
 p.addParameter('TransWidth', []);                 % FIR desired transition (Hz); auto if empty
 p.addParameter('FIRMaxOrder', 2000);

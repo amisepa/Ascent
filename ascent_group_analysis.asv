@@ -130,8 +130,6 @@ disp("Done computing on the whole group for eyes-open condition!")
 
 %% Load, separate the data by condition, & reorganize electrodes
 
-coarsing = 'median';
-
 % Load chanlocs only 
 load(fullfile(data_path, sprintf('ascent_outputs_EC_%s.mat', coarsing)), 'chanlocs')
 cd(data_path)
@@ -195,9 +193,10 @@ disp({chanlocs.labels}')
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-nPerm = 5000;           % number of permutations for H0
+coarsing = 'median';
+nPerm = 1000;           % number of permutations for H0
 alpha = 0.05;           % NaN to show maps of p-values
-ct = 'trimmed mean';    % central tendency method ('mean' for normal t-test, 'trimmed mean' for Yuen t-test)
+ct = 'mean';    % central tendency method ('mean' for normal t-test, 'trimmed mean' for Yuen t-test)
 grp_type = 'dpt';       % groupe is dependent ('dpt') or independent ('idpt')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -276,8 +275,8 @@ if any(mask)
     title("FracDim")
 end
 
-saveas(gcf, fullfile(outputs_path, 'uniscales.fig'));
-print(gcf, fullfile(outputs_path, 'uniscales.png'), '-dpng', '-r300');
+saveas(gcf, fullfile(outputs_path, sprintf('uniscales_%s_perm_tmax.fig', coarsing)));
+print(gcf, fullfile(outputs_path, sprintf('uniscales_%s_perm_tmax.png', coarsing)), '-dpng', '-r300');
 
 
 %%%%%%%%%%%%%%%%%%%%% MULTISCALES %%%%%%%%%%%%%%%%%%%%%
@@ -291,7 +290,6 @@ mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
     'nonlinear', grp_type, {size(MSE1,3) size(MSE2,3)},  2, 1, [], 'cohen-d');
 plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-title("MSE")
 saveas(gcf, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_main.fig', coarsing)));
 print(gcf, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
 if ~isempty(mask_clusters)
@@ -312,15 +310,14 @@ end
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(mMSE1, mMSE2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
-    'nonlinear', grp_type, {size(mMSE1,3) size(mMSE2,3)}, [], [], [], 'cohen-d');
+    'nonlinear', grp_type, {size(mMSE1,3) size(mMSE2,3)}, [], [], [], 'cohen-d', scales_bounds);
 plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-title("mMSE")
 saveas(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_main.fig', coarsing)));
 print(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
 if ~isempty(mask_clusters)
     writetable(summary_tbl, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_summary.csv', coarsing)));
-    hs = plot_clusters(summary_tbl, mask_clusters, tvals, mMSE1-mMSE2, scales, chanlocs, ...
-        'mMSE', 'DataType', 'scalp', 'LineNoiseHz', [], 'XTickLabels', scales_bounds);
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, mMSE1-mMSE2, scales_bounds, chanlocs, ...
+        'mMSE', 'DataType', 'scalp', 'LineNoiseHz', []);
     for i = 1:numel(hs.curve)
         saveas(hs.topo{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_cluster-%g_topo.fig', coarsing, i)));
         print(hs.topo{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
@@ -337,7 +334,6 @@ mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
     'nonlinear', grp_type, {size(MFE1,3) size(MFE2,3)}, [], [], [], 'cohen-d');
 plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-title("MFE")
 saveas(gcf, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_main.fig', coarsing)));
 print(gcf, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
 if ~isempty(mask_clusters)
@@ -360,7 +356,6 @@ end
 [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
     'nonlinear', grp_type, {size(RCMFE1,3) size(RCMFE2,3)}, [], [], [], 'cohen-d');
 plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-title("RCMFE")
 saveas(gcf, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_main.fig', coarsing)));
 print(gcf, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
 if ~isempty(mask_clusters)
