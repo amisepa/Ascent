@@ -305,8 +305,7 @@ switch measure
                 'Parallel', paraComp, 'Progress', trackProg);
 
     case 'RCmvMFE'
-        % original (optimized by Cedric on Dec 17, 2025 otherwise algo
-        % takes forever or crashes)
+        % original (optimized by Ce
         % tic
         % entropy1 = compute_RCmvMFE(data, m, r, n, tau, num_scales, coarsing, ...
         %     trackProg);
