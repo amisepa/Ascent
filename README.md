@@ -30,13 +30,15 @@ https://psyarxiv.com/xwmyk/
 ## Illustration 
 
 Here, we computed all available complexity measures from two conditions of 64-channel Biosemi data: eyes-open vs eyes-closed resting state.
-We then perform (1,000 iterations) bootstrap statistics to identify the significant differences under the null hypothesis (H0; α = 0.05), and apply threshold-free cluster enhancement (TFCE) correction to control for the family-wise-error (FWE; i.e. Type 1 error), highlighting the significant spatioemporal clusters. 
-For the multiscale measures, This for two coarsing methods (standard deviation and median)  to clearly visualize how they capture different types of complexity information. 
-Time to compute everything with 32 GB of RAM and 10 CPU cores (parallel computing ON): ~11 hours. 
+We then perform (5,000 iterations) bootstrap statistics to identify the significant differences under the null hypothesis (H0; α = 0.05), and apply threshold-free cluster enhancement (TFCE) correction to control for the family-wise-error (FWE; Type 1 error), highlighting the significant spatiotemporal clusters. 
+For the multiscale measures, group analysis was performed using two different coarsening methods (standard deviation and median) to visualize how they capture different types of complexity information clearly. 
+Time to compute everything with 32 GB of RAM and 10 cores with parallel computing: ~11 hours. 
 
 ### Uniscale measures
 
 <img width="2310" height="1824" alt="uniscales" src="https://github.com/amisepa/Ascent/blob/main/figures/uniscales.png" />
+
+<img width="2310" height="1824" alt="uniscales" src="https://github.com/amisepa/Ascent/blob/main/figures/ExSent_plots.jpg" />
 
 
 ### Multiscale measures
