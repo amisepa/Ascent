@@ -265,6 +265,12 @@ switch measure
             'Kernel', kernel_meth, 'BlockSize',blocksize, ...
             'Parallel', paraComp, 'Progress', trackProg);
 
+    %  Multivariate Fuzzy Entropy (mvFuzzEn)
+    case 'mvFuzzEn'
+        [entropy, phi_m, phi_m1] = compute_mvFuzzEn(data, 'm', m, 'tau', tau, 'n', n, 'r', r, ...
+            'Kernel', kernel_meth, 'BlockSize',blocksize, ...
+            'Parallel', paraComp, 'Progress', trackProg);
+
     % Extrema-Segmented Entropy (ExSEnt)    
     case 'ExSEnt'
         [HD, HA, HDA, info] = compute_ExSEnt2(data, 'm', m, 'r', r, ...
@@ -395,7 +401,7 @@ chanLabels = insertAfter(chanLabels," ", "'");
 com = sprintf('EEG = ascent_compute(''%s'', {''%s''}, %d, %d, %s, %d, %d, %s, %d);', ...
     measure,chanLabels,tau,m,coarsing,num_scales,filt_scales,'[]',vis);
 
-disp('Done computing with Ascent! Outputs can be found in the EEG.ascent structure.')
 fprintf('Time to compute: %.2f minutes. \n', toc(tstart)/60)
+disp('Done computing with Ascent! Outputs can be found in the EEG.ascent structure.')
 
 

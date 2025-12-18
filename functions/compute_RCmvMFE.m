@@ -45,6 +45,10 @@ showProg    = p.Results.progress;
 blockSize   = p.Results.blockSize;
 pdistMaxGB  = p.Results.pdistMaxGB;
 
+if num_scales < 5
+    error("Multiscale entropy cannot be computed with less than 5 scales.")
+end
+
 % 2. Coerce data
 if isstruct(data)
     X = double(data.data);
@@ -82,12 +86,12 @@ end
 % Parallel only helps when there are enough offsets; otherwise overhead dominates
 parMinOffsets = 6;
 
-% 8. Compute: scales serial, offsets optionally parallel (no prints in workers)
-for iScale = 1:num_scales
-
-    if iScale == 1
-        disp("NOTE: the 1st scale factor takes much longer than the rest of the scales.")
-    end
+% Compute: scales serial, offsets optionally parallel (no prints in workers)
+if showProg
+    progressbar('Computing RCmvMFE for each scale factor')
+end
+disp("NOTE: the lower scale factors take much longer than the higher ones.")
+for iScale = num_scales:-1:2
 
     if showProg
         fprintf('  computing scale %d/%d...\n', iScale, num_scales);
@@ -97,17 +101,23 @@ for iScale = 1:num_scales
     fi_m1_vec = zeros(1, iScale);
     fi_m2_vec = zeros(1, iScale);
 
+    % 1. Precompute coarse-grained series on the client to avoid broadcasting X inside parfor
+    XsCell = cell(iScale, 1);
+    for offset = 1:iScale
+        XsCell{offset} = coarsegrain_original(X(:, offset:end), iScale, coarseType);
+    end
+
     if doPar && iScale >= parMinOffsets
         parfor offset = 1:iScale
-            Xs = coarsegrain_original(X(:, offset:end), iScale, coarseType);
-            [~, fi_m1, fi_m2] = compute_mvFE_exact_originalN(Xs, M, r, n_exp, Tau, blockSize, pdistMaxGB);
+            Xs = XsCell{offset};
+            [~, fi_m1, fi_m2] = compute_mvFE(Xs, M, r, n_exp, Tau, blockSize, pdistMaxGB);
             fi_m1_vec(offset) = fi_m1;
             fi_m2_vec(offset) = fi_m2;
         end
     else
         for offset = 1:iScale
-            Xs = coarsegrain_original(X(:, offset:end), iScale, coarseType);
-            [~, fi_m1, fi_m2] = compute_mvFE_exact_originalN(Xs, M, r, n_exp, Tau, blockSize, pdistMaxGB);
+            Xs = XsCell{offset};
+            [~, fi_m1, fi_m2] = compute_mvFE(Xs, M, r, n_exp, Tau, blockSize, pdistMaxGB);
             fi_m1_vec(offset) = fi_m1;
             fi_m2_vec(offset) = fi_m2;
         end
@@ -124,10 +134,13 @@ for iScale = 1:num_scales
 
     if showProg
         fprintf('     --> finished scale %d/%d (%.1fs)\n', iScale, num_scales, toc(tScale));
+        progressbar(iScale / num_scales)
     end
-end
 
-end
+end % scales
+end % main function
+
+
 
 % =====================================================================
 function Y = coarsegrain_original(Data, S, method)
@@ -156,7 +169,7 @@ end
 end
 
 % =====================================================================
-function [mvFE_Out, fi_m1, fi_m2] = compute_mvFE_exact_originalN(X, M, r, n, tau, blockSize, pdistMaxGB)
+function [mvFE_Out, fi_m1, fi_m2] = compute_mvFE(X, M, r, n, tau, blockSize, pdistMaxGB)
 % Exact mvFE, respecting original assumption that N is the same in m and m+1 normalizations:
 % N = nsamp - max(M)*max(tau)
 % Uses exact pairwise Chebyshev distances, computed via pdist when safe, else exact blocked sum.
@@ -164,13 +177,13 @@ function [mvFE_Out, fi_m1, fi_m2] = compute_mvFE_exact_originalN(X, M, r, n, tau
 if iscolumn(M),   M   = M.';   end
 if iscolumn(tau), tau = tau.'; end
 
-[nvar, nsamp] = size(X);
+[nChan, nSamp] = size(X);
 
 max_M   = max(M);
 max_tau = max(tau);
 nn      = max_M * max_tau;
 
-N = nsamp - nn;
+N = nSamp - nn;
 if N < 2
     mvFE_Out = NaN; fi_m1 = NaN; fi_m2 = NaN;
     return
@@ -183,12 +196,12 @@ A = embdN_fast(M, tau, X, N);
 fi_m1 = fuzzy_pairmean_cheby_exact(A, r, n, blockSize, pdistMaxGB);
 
 % m+1 embeddings across subspaces, each with exactly N rows, then concatenate
-M2 = repmat(M, nvar, 1) + eye(nvar);
+M2 = repmat(M, nChan, 1) + eye(nChan);
 dim2 = sum(M) + 1;
 
-B = zeros(nvar*N, dim2, 'double');
+B = zeros(nChan*N, dim2, 'double');
 row0 = 0;
-for h = 1:nvar
+for h = 1:nChan
     Bh = embdN_fast(M2(h,:), tau, X, N);
     B(row0 + (1:N), :) = Bh;
     row0 = row0 + N;
