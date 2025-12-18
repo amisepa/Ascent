@@ -166,8 +166,8 @@ for s = 1:S
         % Scale 1 = FuzzyEn of original (z-scored) signal
         % v(1) = compute_FuzzEn(sig, m, r, n_exp, tau);
         FuzzEn = compute_FuzzEn(data, 'm', 2, 'n', 2, 'tau', 1, 'r', .15, ...
-                          'Kernel','exponential', 'BlockSize', 256, 
-                          'Parallel', false, 'Progress', false)
+                          'Kernel','exponential', 'BlockSize', 256, ...
+                          'Parallel', false, 'Progress', false);
         continue
     end
 
