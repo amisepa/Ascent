@@ -120,7 +120,7 @@ if multiscale && multiChan
             if isfinite(lo) && isfinite(hi) && lo < hi, clim([lo hi]); end
             colormap('parula');
             title(sprintf('%s @ scale %s', entropyType, sclabel), 'Interpreter','none');
-        catch 
+        catch
             warning('topoplot failed: %s. Falling back to bar chart.');
             bar(vals); xlim([0 numel(vals)+1]); box on;
             title(sprintf('Bar topography @ scale %s', sclabel), 'Interpreter','none');
@@ -167,15 +167,16 @@ elseif ~multiscale && multiChan
     end
     set(gcf,'Name','Uniscale entropy visualization','Color','w','Toolbar','none','Menu','none','NumberTitle','Off');
     set(findall(gcf,'type','axes'),'FontSize',10,'FontWeight','bold');
-elseif ~multiscale && ~multiChan
+elseif multiscale && ~multiChan
 
-        figure('Color','w','InvertHardCopy','off');
-        box on;
-        plot(scales, entropyData, 'LineWidth', 2);
-        ylabel('Entropy'); xlabel("Scales")
-        title(entropyType);
-        axis tight
-        set(findall(gcf,'type','axes'),'FontSize',10,'FontWeight','bold');
-
+    figure('Color','w','InvertHardCopy','off');
+    box on;
+    plot(scales, entropyData, 'LineWidth', 2);
+    ylabel('Entropy'); xlabel("Scales")
+    title(entropyType);
+    axis tight
+    set(findall(gcf,'type','axes'),'FontSize',10,'FontWeight','bold');
+else
+    error("Failed to plot entropy outputs. Data format not recognized.")
 end
 end
