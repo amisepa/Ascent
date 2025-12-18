@@ -1,16 +1,16 @@
 % ascent_group_analysis
 clear; close all; clc
 
-data_path = '/Users/cedriccannard/Downloads/biosemi_data';
-cd(data_path)
-plugin_path = '/Users/cedriccannard/Documents/MATLAB/Ascent';
-addpath(genpath(plugin_path))
+data_path = 'C:\Users\ccann\Documents\biosemi_data';
+pluginPath = fileparts(which('eegplugin_ascent.m'));
+addpath(genpath(pluginPath))
+cd(pluginPath)
 eeglab; close
 
 %%%%%%%%%%%%%%%%%%%%%%%%%% parameters %%%%%%%%%%%%%%%%%%%%%%%%%%
-num_scales = 30;
+num_scales = 50;
 num_chan = 64;
-coarsing = 'std';
+coarsing = 'mean';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Compute on whole group - Eyes closed (EC) condition
@@ -20,13 +20,16 @@ filenames = {dir('*.bdf').name}';
 num_files = length(filenames);
 
 SampEn = nan(num_chan, num_files);
-ExSEnt = nan(num_chan, num_files);
+ExSEnt1 = nan(num_chan, num_files);
+ExSEnt2 = nan(num_chan, num_files);
+ExSEnt3 = nan(num_chan, num_files);
 FuzzEn = nan(num_chan, num_files);
 FracDim = nan(num_chan, num_files);
 MSE = nan(num_chan, num_scales, num_files);
 mMSE = nan(num_chan, num_scales, num_files);
 MFE = nan(num_chan, num_scales, num_files);
 RCMFE = nan(num_chan, num_scales, num_files);
+RCmvMFE = nan(num_chan, num_scales, num_files);
 for iFile = 1:num_files
     EEG = pop_biosig(filenames{iFile});
     EEG = pop_resample(EEG, 256);
@@ -47,13 +50,15 @@ for iFile = 1:num_files
     EEG = ascent_compute(EEG, 'measure', 'RCMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
 
     SampEn(:,iFile) = EEG.ascent.SampEn.data;
-    ExSEnt(:,iFile) = EEG.ascent.ExSEnt.data.HDA;
+    ExSEnt1(:,iFile) = EEG.ascent.ExSEnt.data.HD;
+    ExSEnt2(:,iFile) = EEG.ascent.ExSEnt.data.HA;
+    ExSEnt3(:,iFile) = EEG.ascent.ExSEnt.data.HDA;
     FuzzEn(:,iFile) = EEG.ascent.FuzzEn.data;
     FracDim(:,iFile) = EEG.ascent.FracDim.data;
     MSE(:,:,iFile) = EEG.ascent.MSE.data;
     mMSE(:,:,iFile) = EEG.ascent.mMSE.data;
     MFE(:,:,iFile) = EEG.ascent.MFE.data;
-    RCMFE(:,:,iFile) = EEG.ascent.MSE.data;
+    RCMFE(:,:,iFile) = EEG.ascent.RCMFE.data;
 
     chanlocs = EEG.chanlocs;
     scales = EEG.ascent.MSE.scales;
@@ -61,7 +66,7 @@ for iFile = 1:num_files
 
     save(fullfile(data_path, sprintf('ascent_outputs_EC_%s.mat', coarsing)), ...
         "SampEn", "ExSEnt", "FuzzEn", "FracDim", ...
-        "MSE", "MFE", "mMSE", "RCMFE", ...
+        "MSE", "MFE", "mMSE", "RCMFE", "RCmvMFE", ...
         'chanlocs', 'scales', 'scales_bounds')
 
 end
@@ -74,13 +79,16 @@ filenames = {dir('*.bdf').name}';
 num_files = length(filenames);
 
 SampEn = nan(num_chan, num_files);
-ExSEnt = nan(num_chan, num_files);
+ExSEnt1 = nan(num_chan, num_files);
+ExSEnt2 = nan(num_chan, num_files);
+ExSEnt3 = nan(num_chan, num_files);
 FuzzEn = nan(num_chan, num_files);
 FracDim = nan(num_chan, num_files);
 MSE = nan(num_chan, num_scales, num_files);
 mMSE = nan(num_chan, num_scales, num_files);
 MFE = nan(num_chan, num_scales, num_files);
 RCMFE = nan(num_chan, num_scales, num_files);
+RCmvMFE = nan(num_chan, num_scales, num_files);
 for iFile = 1:num_files
 
     fprintf('--------------------------------------------------------\n')
@@ -104,15 +112,19 @@ for iFile = 1:num_files
     EEG = ascent_compute(EEG, 'measure', 'ExSEnt', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
     EEG = ascent_compute(EEG, 'measure', 'MFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
     EEG = ascent_compute(EEG, 'measure', 'RCMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'RCmvMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
 
     SampEn(:,iFile) = EEG.ascent.SampEn.data;
-    ExSEnt(:,iFile) = EEG.ascent.ExSEnt.data.HDA;
+    ExSEnt1(:,iFile) = EEG.ascent.ExSEnt.data.HD;
+    ExSEnt2(:,iFile) = EEG.ascent.ExSEnt.data.HA;
+    ExSEnt3(:,iFile) = EEG.ascent.ExSEnt.data.HDA;
     FuzzEn(:,iFile) = EEG.ascent.FuzzEn.data;
     FracDim(:,iFile) = EEG.ascent.FracDim.data;
     MSE(:,:,iFile) = EEG.ascent.MSE.data;
     mMSE(:,:,iFile) = EEG.ascent.mMSE.data;
     MFE(:,:,iFile) = EEG.ascent.MFE.data;
-    RCMFE(:,:,iFile) = EEG.ascent.MSE.data;
+    RCMFE(:,:,iFile) = EEG.ascent.RCMFE.data;
+    RCmvMFE(:,:,iFile) = EEG.ascent.RCmvMFE.data;
 
     chanlocs = EEG.chanlocs;
     scales = EEG.ascent.MSE.scales;
@@ -120,7 +132,7 @@ for iFile = 1:num_files
 
     save(fullfile(data_path, sprintf('ascent_outputs_EO_%s.mat', coarsing)), ...
         "SampEn", "ExSEnt", "FuzzEn", "FracDim", ...
-        "MSE", "MFE", "mMSE", "RCMFE", ...
+        "MSE", "MFE", "mMSE", "RCMFE", "RCmvMFE", ...
         'chanlocs', 'scales', 'scales_bounds')
 
 end
@@ -166,33 +178,38 @@ chanlocs = chanlocs(order_idx);
 
 % Load EC metrics and reorder
 load(fullfile(data_path, sprintf('ascent_outputs_EC_%s.mat', coarsing)), ...
-     'SampEn','FuzzEn','ExSEnt','FracDim','MSE','MFE','mMSE','RCMFE')
+     'SampEn','FuzzEn','ExSEnt1','ExSEnt2','ExSEnt3''FracDim','MSE','MFE','mMSE','RCMFE','RCmvMFE')
 SampEn1  = SampEn(order_idx, :);
 FuzzEn1  = FuzzEn(order_idx, :);
-ExSEnt1  = ExSEnt(order_idx, :);
+ExSEnt1_1  = ExSEnt1(order_idx, :);
+ExSEnt1_2  = ExSEnt2(order_idx, :);
+ExSEnt1_3  = ExSEnt3(order_idx, :);
 FracDim1 = FracDim(order_idx, :);
 MSE1     = MSE(order_idx, :, :);
 MFE1     = MFE(order_idx, :, :);
 mMSE1    = mMSE(order_idx, :, :);
 RCMFE1   = RCMFE(order_idx, :, :);
+RCmvMFE1   = RCmvMFE(order_idx, :, :);
 
 % Load EO metrics and reorder
 load(fullfile(data_path, sprintf('ascent_outputs_EO_%s.mat', coarsing)), ...
-     'SampEn','FuzzEn','ExSEnt','FracDim','MSE','MFE','mMSE','RCMFE')
+     'SampEn','FuzzEn','ExSEnt1','ExSEnt2','ExSEnt3','FracDim','MSE','MFE','mMSE','RCMFE','RCmvMFE')
 SampEn2  = SampEn(order_idx, :);
 FuzzEn2  = FuzzEn(order_idx, :);
-ExSEnt2  = ExSEnt(order_idx, :);
+ExSEnt2_1  = ExSEnt1(order_idx, :);
+ExSEnt2_2  = ExSEnt2(order_idx, :);
+ExSEnt2_3  = ExSEnt3(order_idx, :);
 FracDim2 = FracDim(order_idx, :);
 MSE2     = MSE(order_idx, :, :);
 MFE2     = MFE(order_idx, :, :);
 mMSE2    = mMSE(order_idx, :, :);
 RCMFE2   = RCMFE(order_idx, :, :);
+RCmvMFE2   = RCmvMFE(order_idx, :, :);
 
 % Check first 12 labels
 disp({chanlocs.labels}')
 
 %% Stats
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 nPerm = 5000;           % number of permutations for H0
@@ -248,10 +265,10 @@ if any(mask)
     title("FuzzEn")
 end
 
-% ExSEnt
+% ExSEnt1
 nexttile
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(ExSEnt1, ExSEnt2, nPerm, ct, grp_type);
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(ExSEnt1, ExSEnt2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(ExSEnt1_1, ExSEnt2_1, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
@@ -259,7 +276,35 @@ if any(mask)
         'verbose','off','whitebk','on');
     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
     % title(sprintf("ExSEnt (coarse: %s)", coarsing));
-    title("ExSEnt")
+    title("ExSEnt (duration)")
+end
+
+% ExSEnt2
+nexttile
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(ExSEnt1, ExSEnt2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(ExSEnt1_2, ExSEnt2_2, nPerm, ct, grp_type);
+mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
+% [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
+if any(mask)
+    topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
+        'verbose','off','whitebk','on');
+    c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
+    % title(sprintf("ExSEnt (coarse: %s)", coarsing));
+    title("ExSEnt (amplitude)")
+end
+
+% ExSEnt3
+nexttile
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(ExSEnt1, ExSEnt2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(ExSEnt1_3, ExSEnt2_3, nPerm, ct, grp_type);
+mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
+% [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
+if any(mask)
+    topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
+        'verbose','off','whitebk','on');
+    c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
+    % title(sprintf("ExSEnt (coarse: %s)", coarsing));
+    title("ExSEnt (amp + dur)")
 end
 
 % FracDim
@@ -376,3 +421,24 @@ if ~isempty(mask_clusters)
     % close([hs.topo{:} hs.curve{:}]) % to close figures 
 end
 
+% RCmvMFE
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(RCmvMFE1, RCmvMFE2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(RCmvMFE1, RCmvMFE2, nPerm, ct, grp_type);
+[mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
+    'nonlinear', grp_type, {size(RCmvMFE1,3) size(RCmvMFE2,3)}, [], [], [], 'cohen-d');
+plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
+title("RCmvMFE")
+saveas(gcf, fullfile(outputs_path, sprintf('RCmvMFE_%s_perm_tfce_main.fig', coarsing)));
+print(gcf, fullfile(outputs_path, sprintf('RCmvMFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
+if ~isempty(mask_clusters)
+    writetable(summary_tbl, fullfile(outputs_path, sprintf('RCmvMFE_%s_perm_tfce_summary.csv', coarsing)));
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, RCmvMFE1-RCmvMFE2, scales, chanlocs, ...
+        'RCmvMFE', 'DataType', 'scalp', 'LineNoiseHz', []);
+    for i = 1:numel(hs.curve)
+        saveas(hs.topo{i}, fullfile(outputs_path, sprintf('RCmvMFE_%s_perm_tfce_cluster-%g_topo.fig', coarsing, i)));
+        print(hs.topo{i}, fullfile(outputs_path, sprintf('RCmvMFE_%s_perm_tfce_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
+        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('RCmvMFE_%s_perm_tfce_cluster-%g_curve.fig', coarsing, i)));
+        print(hs.curve{i}, fullfile(outputs_path, sprintf('RCmvMFE_%s_perm_tfce_cluster-%g_curve.png', coarsing, i)),'-dpng','-r300');
+    end
+    % close([hs.topo{:} hs.curve{:}]) % to close figures 
+end

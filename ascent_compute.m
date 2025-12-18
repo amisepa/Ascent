@@ -16,6 +16,10 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %       broadband spectral bias (see Kosciessa et al. 2020 for more detail).
 %   vis - visualize entropy outputs (1, default) or not (0)
 %
+% OUTPUTS:
+%  EEG.ascent   - structure with Ascent's preprocessing parameters and 
+%                  complexity outputs
+% 
 % USAGE:
 %   1) Import EEG data into EEGLAB
 %   2) Preprocess as necessary (e.g., reference, clean data with ASR, etc.)
@@ -33,7 +37,7 @@ plugin_path = fileparts(which('eegplugin_ascent.m'));
 addpath(genpath(plugin_path));
 
 % Basic checks and warnings (unchanged)
-if nargin < 1, help pop_entropy; return; end
+if nargin < 1, help ascent_compute; return; end
 if isempty(EEG.data), error('Empty dataset.'); end
 if isempty(EEG.chanlocs(1).labels), error('No channel labels.'); end
 if ~isfield(EEG.chanlocs, 'X') || isempty(EEG.chanlocs(1).X)
@@ -62,11 +66,12 @@ vis         = true;
 paraComp    = false;
 
 % -----------------------------
-% Get params: GUI if none, else name–value pairs
+% Get parameters: GUI if none, else name–value pairs
 % -----------------------------
 if nargin == 1 || (nargin == 2 && isempty(varargin{1}))
     [measure, chanlist, tau, m, coarsing, num_scales, filt_scales, n, vis, paraComp] = ...
         ascent_compute_gui(EEG);
+
 else
     if mod(numel(varargin),2) ~= 0
         error('Options must be provided as name–value pairs.');
@@ -136,8 +141,8 @@ if ~exist('chanlist','var') || isempty(chanlist)
     chanlist = {EEG.chanlocs.labels}';
 end
 if ~exist('measure','var') || isempty(measure)
-    disp('No entropy type selected: selecting Refined composite multiscale fuzzy entropy (default)')
-    measure = 'Refined composite multiscale fuzzy entropy';
+    disp('No complexity measure selected: selecting fuzzy entropy (FuzzEn) by default')
+    measure = 'FuzzEn';
 end
 if ~exist('tau','var') || isempty(tau)
     disp('No time lag selected: selecting tau = 1 (default).')
@@ -168,7 +173,7 @@ end
 if contains(lower(measure), {'mse' 'mmse' 'mfe' 'rcmfe' })
     if ~exist('coarsing','var') || isempty(coarsing)
         disp('No coarse graining method selected: selecting standard deviation (default).')
-        coarsing = 'std';
+        coarsing = 'var'; % set variance as default
     end
     if ~exist('num_scales','var') || isempty(num_scales)
         disp('Number of scale factors not selected: selecting num_scales = 30 (default).')
@@ -282,7 +287,7 @@ switch measure
 
         [entropy, scales, info] = compute_mMSE(data, 'm', m, 'tau', tau, 'r', r, ...
               'coarsing', coarsing, 'num_scales', num_scales, ...
-              'Parallel', paraComp, 'Progress', true, ...
+              'Parallel', paraComp, 'Progress', trackProg, ...
               'filter_mode', filter_mode, 'fs', fs, ...
               'TimeWin', TimeWin, 'TimeStep', TimeStep); % for time-resolved version
 
@@ -291,13 +296,26 @@ switch measure
 
          [entropy, scales] = compute_MFE(data, 'm', m, ...
              'tau', tau, 'r', r, 'coarsing', coarsing, 'num_scales', num_scales, ...
-              'Parallel', paraComp, 'Progress', true);
+              'Parallel', paraComp, 'Progress', trackProg);
 
     % Refined Composite Multiscale Fuzzy Entropy (RCMFE)
     case 'RCMFE'
             [entropy, scales] = compute_RCMFE(data, 'm', m, 'tau', tau, ...
                 'r', r, 'n', n, 'coarsing', coarsing, 'num_scales', num_scales, ...
-                'Parallel', paraComp, 'Progress', true);
+                'Parallel', paraComp, 'Progress', trackProg);
+
+    case 'RCmvMFE'
+        % original (optimized by Cedric on Dec 17, 2025 otherwise algo
+        % takes forever or crashes)
+        % tic
+        % entropy1 = compute_RCmvMFE(data, m, r, n, tau, num_scales, coarsing, ...
+        %     trackProg);
+        % toc
+
+        [entropy, scales] = compute_RCmvMFE_new(data,'m', m, 'tau', tau, 'r', r, ...
+            'coarsing', coarsing, 'num_scales', num_scales, ...
+             'Parallel', paraComp, 'Progress', trackProg);
+
 
     % % Spectral entropy (SpecEn) - Over time
     % case 'SpecEn' 
@@ -374,4 +392,5 @@ com = sprintf('EEG = ascent_compute(''%s'', {''%s''}, %d, %d, %s, %d, %d, %s, %d
 
 disp('Done computing with Ascent! Outputs can be found in the EEG.ascent structure.')
 fprintf('Time to compute: %.2f minutes. \n', toc(tstart)/60)
+
 

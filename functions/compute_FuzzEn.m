@@ -79,9 +79,6 @@ for c = 1:nchan
 end
 
 
-
-FuzzEn = nan(nchan, 1);
-
 %  Progress headers 
 if showProgress
     if parallelMode
@@ -96,6 +93,7 @@ end
 
 
 %  Compute per channel 
+FuzzEn = nan(nchan, 1);
 if parallelMode && ~isempty(ver('parallel'))
     parfor iChan = 1:nchan
         FuzzEn(iChan) = fuzz_blockwise(data_z(iChan,:), m, r, n_exp, tau, kernelType, blk);

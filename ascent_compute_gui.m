@@ -6,7 +6,7 @@ coarseType = []; nScales = []; filtData = []; n = [];
 vis = true; parallelComp = false;
 
 % --- GUI #1: type + channels + tau + m + plot
-meas = {'SampEn' 'FuzzEn' 'ExSEnt' 'FracDim' 'MSE' 'mMSE' 'MFE' 'RCMFE'};
+meas = {'SampEn' 'FuzzEn' 'ExSEnt' 'FracDim' 'MSE' 'mMSE' 'MFE' 'RCMFE' 'RCmvMFE'};
 uigeom = { [.5 .9] .5 [.5 .4 .2] .5 [.5 .1] .5 [.5 .1] .5 .5};
 uilist = {
     {'style' 'text' 'string' 'Measure to compute:' 'fontweight' 'bold'}
@@ -39,11 +39,11 @@ vis  = logical(param{5});
 
 % --- GUI #2: coarse + nScales + filter (only for multiscale)
 if contains(lower(measType), {'mse' 'mfe' 'rcmfe'})
-    cTypes = {'Mean' 'Median (default)' 'Std' 'Variance'};
+    cTypes = {'Mean' 'Median' 'Std' 'Variance (default)'};
     uigeom = { [.5 .6] .5 [.9 .3] .5 .5 };
     uilist = {
         {'style' 'text' 'string' 'Coarse graining method:'}
-        {'style' 'popupmenu' 'string' cTypes 'tag' 'stype' 'value' 2}
+        {'style' 'popupmenu' 'string' cTypes 'tag' 'stype' 'value' 4}
         {}
         {'style' 'text' 'string' 'Number of scale factors:' }
         {'style' 'edit' 'string' '20' 'tag' 'n'}
@@ -53,13 +53,16 @@ if contains(lower(measType), {'mse' 'mfe' 'rcmfe'})
     param = inputgui(uigeom, uilist, 'pophelp(''ascent_compute'')','Ascent EEGLAB plugin', EEG);
     if ~isempty(param)
         coarseType = cTypes{param{1}};
+        if contains(lower(coarseType), 'var')
+            coarseType = 'var';
+        end  
         nScales    = str2double(param{2});
         filtData   = logical(param{3});
     end
 end
 
 % --- GUI #3: fuzzy power (only for fuzzy variants)
-if contains(lower(measType), {'fe' 'mfe'})
+if contains(lower(measType), {'fuzzen' 'mfe'})
     uigeom = { [.9 .3] };
     uilist = { {'style' 'text' 'string' 'Fuzzy power:' }
                {'style' 'edit' 'string' '2' 'tag' 'n'}  };

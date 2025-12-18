@@ -164,7 +164,10 @@ v = nan(1, S);
 for s = 1:S
     if s == 1
         % Scale 1 = FuzzyEn of original (z-scored) signal
-        v(1) = fe_safe(sig, m, r, n_exp, tau);
+        % v(1) = compute_FuzzEn(sig, m, r, n_exp, tau);
+        FuzzEn = compute_FuzzEn(data, 'm', 2, 'n', 2, 'tau', 1, 'r', .15, ...
+                          'Kernel','exponential', 'BlockSize', 256, 
+                          'Parallel', false, 'Progress', false)
         continue
     end
 
@@ -206,7 +209,7 @@ for s = 1:S
             cg = std(y, 0, 1, 'omitnan');
     end
     cg = cg(:).';
-    v(s) = fe_safe(cg, m, r, n_exp, tau);
+    v(s) = compute_FuzzEn(cg, m, r, n_exp, tau);
 end
 
 if showProgress
@@ -214,29 +217,6 @@ if showProgress
 end
 end
 
-% ========================================================================
-function val = fe_safe(x, m, r, n_exp, tau)
-% Try compute_fe / compute_FE / FuzzEn-style functions; no internal parallel/progress flags
-try
-    val = compute_fe(x, m, r, n_exp, tau);
-catch
-    try
-        val = compute_FE(x, m, r, n_exp, tau);
-    catch
-        try
-            % if a single-channel FuzzyEn function exists (e.g., fuzz), try it
-            val = fuzz(x, m, r, n_exp, tau);
-        catch
-            try
-                % fall back to a blockwise fuzzy entropy if available
-                val = fuzz_blockwise(x, m, r, n_exp, tau, 'exponential', 256);
-            catch
-                error('compute_MFE: Fuzzy entropy function not found (compute_fe / compute_FE / fuzz[_blockwise]).');
-            end
-        end
-    end
-end
-end
 
 % ========================================================================
 function s = upperLabel(coarseType)
