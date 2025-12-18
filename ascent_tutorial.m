@@ -61,9 +61,13 @@ EEG = ascent_compute(EEG, 'measure', 'FuzzEn');
 % Fine-tuning parameters (for demonstration only)
 EEG = ascent_compute(EEG, 'measure', 'FuzzEn', ...
     'n', 2, ...
-    'kernel','gaussian', ...
-    'blocksize', 128);
+    'kernel','gaussian', ...    % default: exponential
+    'blocksize', 128);          % default: 256
 
+%% Multivariate Fuzzy entropy (mvFuzzEn)
+
+% default parameters
+EEG = ascent_compute(EEG, 'measure', 'mvFuzzEn');
 
 %% Extrema-Segmented Entropy (ExSEnt)
 
@@ -122,9 +126,13 @@ EEG = ascent_compute(EEG, 'measure', 'RCMFE', ...
 
 %% Refined Composite Multivariate Generalized Multiscale Fuzzy Entropy (RCmvMFE)
 
-EEG = ascent_compute(EEG, 'measure', 'RCmvMFE',  'chanlist', 'Fz F1 F2 Cz C1 C3 Pz Oz', ...
-    'coarsing', 'mean', ...     % 'median' (default) 'mean' 'trimmed mean' 'std' 'var'
-    'num_scales', 8, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
-    'n', 2, ...                 % fuzzy power (default = 2)
-    'parallel', true, 'progress', true);
+% EEG = ascent_compute(EEG, 'measure', 'RCmvMFE', 'chanlist', 'Fz F1 F2 Cz C1 C3 Pz Oz', ...
+%     'coarsing', 'var', ...     % 'median' (default) 'mean' 'trimmed mean' 'std' 'var'
+%     'num_scales', 5, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
+%     'n', 2, ...                % fuzzy power (default = 2)
+%     'parallel', false, 'progress', true);
 
+EEG = ascent_compute(EEG, 'measure', 'RCmvMFE', ...
+    'coarsing', 'var', ...     % 'median' (default) 'mean' 'trimmed mean' 'std' 'var'
+    'num_scales', 30, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
+    'parallel', true, 'progress', true);
