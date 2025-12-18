@@ -165,8 +165,7 @@ for s = 1:S
     if s == 1
         % Scale 1 = FuzzyEn of original (z-scored) signal
         % v(1) = compute_FuzzEn(sig, m, r, n_exp, tau);
-        FuzzEn = compute_FuzzEn(data, 'm', 2, 'n', 2, 'tau', 1, 'r', .15, ...
-                          'Kernel','exponential', 'BlockSize', 256, ...
+        v(1) = compute_FuzzEn(sig, 'm', m, 'n', n_exp, 'tau', tau, 'r', r, ...
                           'Parallel', false, 'Progress', false);
         continue
     end
@@ -189,7 +188,7 @@ for s = 1:S
         case 'median'
             cg = median(y, 1, 'omitnan');
         case {'trimmed mean','trimmed','tmean','trim20'}
-            pct = 0.20;
+            pct = 0.20; %default 20% trimmed mean 
             if exist('trimmean','file')==2 && all(isfinite(y(:)))
                 cg = trimmean(y, pct*100);
             else
@@ -209,7 +208,8 @@ for s = 1:S
             cg = std(y, 0, 1, 'omitnan');
     end
     cg = cg(:).';
-    v(s) = compute_FuzzEn(cg, m, r, n_exp, tau);
+    v(1) = compute_FuzzEn(cg, 'm', m, 'n', n_exp, 'tau', tau, 'r', r, ...
+        'Parallel', false, 'Progress', false);
 end
 
 if showProgress
