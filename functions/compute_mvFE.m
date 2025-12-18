@@ -1,6 +1,5 @@
 function [mvFE_Out,fi_m1,fi_m2]=compute_mvFE(X,M,r,n,tau)
-%
-% This function calculates multivariate fuzzy entropy (mvFE) of a multivariate signal
+% Calculates multivariate fuzzy entropy (mvFE) of a multivariate signal
 %
 % Inputs:
 %

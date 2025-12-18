@@ -21,7 +21,14 @@ if ~multiscale
     entropyData(entropyData==0) = NaN;  % handle 0-artifacts
 end
 
-if multiscale
+nChan = size(entropyData,1);
+if nChan == 1
+    multiChan = false;
+else
+    multiChan = true;
+end
+
+if multiscale && multiChan
     % ===== Multiscale heatmap + per-channel curve + topo (+ optional time) =====
     figure('Color','w','InvertHardCopy','off');
     % Main heatmap occupies left 2 columns (all rows)
@@ -99,7 +106,6 @@ if multiscale
     title(sprintf('Channel %s', chanlocs(peak_channel).labels), 'Interpreter','none');
 
     % ---- Topography at peak scale ----
-    subplot(3,3,3);
     vals = entropyData(:,peak_scale);
     finiteVals = vals(isfinite(vals));
     if isempty(finiteVals)
@@ -108,6 +114,7 @@ if multiscale
             'HorizontalAlignment','center','VerticalAlignment','middle','FontWeight','bold');
     else
         try
+            subplot(3,3,3);
             topoplot(vals, chanlocs, 'emarker',{'.','k',8,1}, 'electrodes','on');
             lo = min(finiteVals); hi = max(finiteVals);
             if isfinite(lo) && isfinite(hi) && lo < hi, clim([lo hi]); end
@@ -143,8 +150,8 @@ if multiscale
 
     set(gcf,'Name','Multiscale entropy visualization','Color','w','Toolbar','none','Menu','none','NumberTitle','Off');
 
-else
-    % ===== Uniscale topography =====
+elseif ~multiscale && multiChan
+    % ===== Uniscale scalp topography =====
     figure('Color','w','InvertHardCopy','off');
     vals = entropyData(:);
     finiteVals = vals(isfinite(vals));
@@ -160,5 +167,15 @@ else
     end
     set(gcf,'Name','Uniscale entropy visualization','Color','w','Toolbar','none','Menu','none','NumberTitle','Off');
     set(findall(gcf,'type','axes'),'FontSize',10,'FontWeight','bold');
+elseif ~multiscale && ~multiChan
+
+        figure('Color','w','InvertHardCopy','off');
+        box on;
+        plot(scales, entropyData, 'LineWidth', 2);
+        ylabel('Entropy'); xlabel("Scales")
+        title(entropyType);
+        axis tight
+        set(findall(gcf,'type','axes'),'FontSize',10,'FontWeight','bold');
+
 end
 end

@@ -48,6 +48,7 @@ for iFile = 1:num_files
     EEG = ascent_compute(EEG, 'measure', 'ExSEnt', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
     EEG = ascent_compute(EEG, 'measure', 'MFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
     EEG = ascent_compute(EEG, 'measure', 'RCMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'RCmvMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
 
     SampEn(:,iFile) = EEG.ascent.SampEn.data;
     ExSEnt1(:,iFile) = EEG.ascent.ExSEnt.data.HD;
@@ -59,6 +60,7 @@ for iFile = 1:num_files
     mMSE(:,:,iFile) = EEG.ascent.mMSE.data;
     MFE(:,:,iFile) = EEG.ascent.MFE.data;
     RCMFE(:,:,iFile) = EEG.ascent.RCMFE.data;
+    RCmvMFE(:,:,iFile) = EEG.ascent.RCmvMFE.data;
 
     chanlocs = EEG.chanlocs;
     scales = EEG.ascent.MSE.scales;

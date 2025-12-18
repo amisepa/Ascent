@@ -160,11 +160,11 @@ if ~exist('vis','var') || isempty(vis)
     disp('No plotting option not selected: turning plotting ON (default).')
     vis = true;
 end
-if ~exist('progress','var') || isempty(trackProg)
+if ~exist('trackProg','var') || isempty(trackProg)
     disp('No progress tracking defined: setting it to ON (default).')
     trackProg = true;
 end
-if ~exist('parallel','var') || isempty(paraComp)
+if ~exist('paraComp','var') || isempty(paraComp)
     disp('Computing method not selected: turning parallel computing ON (default).')
     paraComp = true;
 end
@@ -180,8 +180,13 @@ if contains(lower(measure), {'mse' 'mmse' 'mfe' 'rcmfe' })
         num_scales = 30;
     end
     if ~exist('filter_mode','var') || isempty(filter_mode)
-        filter_mode = 'narrowband';
-        disp("Filtering each scale factor (from Kosciessa et al. 2017) set to: ON.")
+        if strcmpi(lower(measure), 'mmse') % if mMSE selected, default to narrowband
+            filter_mode = 'narrowband'; % 'none' | 'narrowband' | 'lowpass' | 'highpass' (default 'narrowband')
+            disp("Filtering each scale factor set to: narrowband (from Kosciessa et al. 2017)")
+        else % for other measures, no filtering is default
+            filter_mode = 'none'; % 'none' | 'narrowband' | 'lowpass' | 'highpass' (default 'narrowband')
+            disp("Filtering each scale factor set to: OFF")
+        end
     else
         disp("Filtering each scale factor (from Kosciessa et al. 2017) set to: OFF.")
     end
@@ -308,11 +313,11 @@ switch measure
         % original (optimized by Cedric on Dec 17, 2025 otherwise algo
         % takes forever or crashes)
         % tic
-        % entropy1 = compute_RCmvMFE(data, m, r, n, tau, num_scales, coarsing, ...
+        % entropy1 = compute_RCmvMFE_ori(data, m, r, n, tau, num_scales, coarsing, ...
         %     trackProg);
         % toc
 
-        [entropy, scales] = compute_RCmvMFE_new(data,'m', m, 'tau', tau, 'r', r, ...
+        [entropy, scales] = compute_RCmvMFE(data,'m', m, 'tau', tau, 'r', r, ...
             'coarsing', coarsing, 'num_scales', num_scales, ...
              'Parallel', paraComp, 'Progress', trackProg);
 
