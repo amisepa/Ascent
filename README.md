@@ -1,7 +1,7 @@
 # ASCENT EEGLAB plugin: Aperiodic Signal Complexity Estimation for Neurophysiological Time series
 
 <p align="center" width="100%">
-  <img width="30%" alt="BrainBeats logo"
+  <img width="50%" alt="BrainBeats logo"
        src="https://raw.githubusercontent.com/amisepa/Ascent/main/ascent_ai_img2.png">
 </p>
 
