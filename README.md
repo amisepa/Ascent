@@ -1,6 +1,12 @@
 # ASCENT EEGLAB plugin: Aperiodic Signal Complexity Estimation for Neurophysiological Time series
 
-Compute entropy and complexity measures from multidimensional M/EEG data (or any other time series).
+<p align="center" width="100%">
+  <img width="30%" alt="BrainBeats logo"
+       src="https://raw.githubusercontent.com/amisepa/Ascent/main/ascent_ai_img2.png">
+</p>
+
+
+The ASCENT EEGLAB plugin computes entropy and complexity measures from multidimensional M/EEG data (or any other time series).
 
 ## Measures supported
 
