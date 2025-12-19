@@ -21,7 +21,7 @@
 function vers = eegplugin_ascent(fig,try_strings,catch_strings)
 
 % Plugin version
-vers = '1.2';
+vers = '2.1';
 
 % Add paths to subfolders
 p = fileparts(which('eegplugin_ascent.m'));
