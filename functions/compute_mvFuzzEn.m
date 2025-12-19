@@ -178,7 +178,14 @@ sum_mu = 0;
 num_p  = 0;
 nDim   = size(X,2);
 
+t0 = tic;
+lastPrint = 0;
 for i1 = 1:blk:nVec
+    if toc(t0) - lastPrint > 5
+        fprintf('    pairs progress: block start %d/%d (%.1f%%)\n', i1, nVec, 100*i1/nVec);
+        lastPrint = toc(t0);
+    end
+    
     i2 = min(i1+blk-1, nVec);
     Xi = X(i1:i2,:);  bi = size(Xi,1);
 
