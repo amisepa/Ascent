@@ -28,12 +28,26 @@ p = fileparts(which('eegplugin_ascent.m'));
 addpath(p);
 addpath(fullfile(p,'functions'))
 
-cmd = [ try_strings.check_data '[EEG,LASTCOM] = ascent_compute(EEG);' ...
-        catch_strings.new_and_hist ];
+% --- define callbacks
+cb_compute = [ try_strings.check_data '[EEG,LASTCOM] = ascent_compute(EEG);' catch_strings.new_and_hist ];
+% cb_compute = [ try_strings.no_check '[EEG,LASTCOM] = ascent_compute(EEG);' catch_strings.new_and_hist ];
 
-% create menu
-toolsmenu = findobj(fig, 'tag', 'tools');
-uimenu(toolsmenu, 'label', 'Compute entropy/complexity measures', 'userdata', 'startup:off;epoch:off;study:off', ...
-    'callback', cmd, 'position', 15);
+% % create new option in Tools
+% toolsmenu = findobj(fig, 'tag', 'tools');
+% uimenu(toolsmenu, 'label', 'Compute entropy/complexity measures', 'userdata', 'startup:off;epoch:off;study:off', ...
+%     'callback', cb_compute, 'position', 15);
+
+% create a new top-level Tab on the EEGLAB menubar
+menu_root = uimenu(fig, ...
+    'Label',     'ASCENT', ...
+    'Tag',       'menu_ascent', ...
+    'Separator', 'on', ...
+    'Position',  8);  % adjust position to place it where you like
+
+% add items
+uimenu(menu_root, 'Label', 'Compute entropy/complexity measures', 'Callback', cb_compute);
 
 end
+
+
+
