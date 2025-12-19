@@ -1,8 +1,8 @@
 # ASCENT EEGLAB plugin: Aperiodic Signal Complexity Estimation for Neurophysiological Time series
 
-The Escape EEGLAB plugin computes entropy and complexity measures from multidimensional M/EEG data (or any other time series).
+Compute entropy and complexity measures from multidimensional M/EEG data (or any other time series).
 
-## Entropy measures available
+## Measures supported
 
 Uniscale measures:
 - Sample entropy (SampEn)
@@ -15,6 +15,8 @@ Multiscale measures:
 - Modified Multiscale entropy (mMSE; enhanced version of Kloosterman 2020 and Kosciessa 2020)
 - Multiscale fuzzy entropy (MFE; enhanced version of Azami 2017)
 - Refined composite multiscale fuzzy entropy (RCMFE; enhanced version of Azami 2017)
+
+All algorithms were modified to significantly increase computation speed while preserving the integrity of the complexity estimates via vectorization, matrix operations, parallel computing, and blockwise bounded-memory blockwise distance calculations to avoid full pairwise matrix allocation. 
 
 
 ## Requirements
@@ -29,8 +31,8 @@ https://psyarxiv.com/xwmyk/
 
 ## Illustration 
 
-Here, we computed all available complexity measures from two conditions of 64-channel Biosemi data: eyes-open vs eyes-closed resting state.
-We then perform (5,000 iterations) bootstrap statistics to identify the significant differences under the null hypothesis (H0; α = 0.05), and apply threshold-free cluster enhancement (TFCE) correction to control for the family-wise-error (FWE; Type 1 error), highlighting the significant spatiotemporal clusters. 
+We computed all of ASCENT's measures for two conditions of 64-channel Biosemi data: eyes-open vs eyes-closed resting state.
+We then performed (5,000 iterations) bootstrap statistics to identify the significant differences under the null hypothesis (H0; α = 0.05), and apply threshold-free cluster enhancement (TFCE) correction to control for the family-wise-error (FWE; Type 1 error), highlighting the significant spatiotemporal clusters. 
 For the multiscale measures, group analysis was performed using two different coarsening methods (standard deviation and median) to visualize how they capture different types of complexity information clearly. 
 Time to compute everything with 32 GB of RAM and 10 cores with parallel computing: ~11 hours. 
 
