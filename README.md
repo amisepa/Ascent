@@ -1,4 +1,3 @@
-# ASCENT EEGLAB plugin: Aperiodic Signal Complexity Estimation for Neurophysiological Time series
 
 <p align="center" width="100%">
   <img width="50%" alt="BrainBeats logo"
