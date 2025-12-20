@@ -10,7 +10,7 @@ eeglab; close
 %%%%%%%%%%%%%%%%%%%%%%%%%% parameters %%%%%%%%%%%%%%%%%%%%%%%%%%
 num_scales = 50;
 num_chan = 64;
-coarsing = 'mean';
+coarsing = 'var';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Compute on whole group - Eyes closed (EC) condition
@@ -138,13 +138,13 @@ for iFile = 1:num_files
         'chanlocs', 'scales', 'scales_bounds')
 
 end
-
+gong
 disp("Done computing on the whole group for eyes-open condition!")
 
 
 %% Load, separate the data by condition, & reorganize electrodes
 
-coarsing = 'mean';
+% coarsing = 'mean';
 
 % Load chanlocs only 
 load(fullfile(data_path, sprintf('ascent_outputs_EC_%s.mat', coarsing)), 'chanlocs')
@@ -214,13 +214,13 @@ disp({chanlocs.labels}')
 %% Stats
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-nPerm = 5000;           % number of permutations for H0
+nPerm = 1000;           % number of permutations for H0
 alpha = 0.05;           % NaN to show maps of p-values
 ct = 'trimmed mean';    % central tendency method ('mean' for normal t-test, 'trimmed mean' for Yuen t-test)
 grp_type = 'dpt';       % groupe is dependent ('dpt') or independent ('idpt')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-outputs_path = fullfile(plugin_path, 'figures'); mkdir(outputs_path)
+outputs_path = fullfile(pluginPath, 'figures'); mkdir(outputs_path)
 
 load colormap_bwr.mat; dmap(1,:) = [0.9 0.9 0.9]; % set NaNs to grey
 
@@ -423,24 +423,3 @@ if ~isempty(mask_clusters)
     % close([hs.topo{:} hs.curve{:}]) % to close figures 
 end
 
-% % RCmvMFE
-% % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(RCmvMFE1, RCmvMFE2, nPerm, ct, grp_type);
-% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(RCmvMFE1, RCmvMFE2, nPerm, ct, grp_type);
-% [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
-%     'nonlinear', grp_type, {size(RCmvMFE1,3) size(RCmvMFE2,3)}, [], [], [], 'cohen-d');
-% plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-% title("RCmvMFE")
-% saveas(gcf, fullfile(outputs_path, sprintf('RCmvMFE_%s_perm_tfce_main.fig', coarsing)));
-% print(gcf, fullfile(outputs_path, sprintf('RCmvMFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
-% if ~isempty(mask_clusters)
-%     writetable(summary_tbl, fullfile(outputs_path, sprintf('RCmvMFE_%s_perm_tfce_summary.csv', coarsing)));
-%     hs = plot_clusters(summary_tbl, mask_clusters, tvals, RCmvMFE1-RCmvMFE2, scales, chanlocs, ...
-%         'RCmvMFE', 'DataType', 'scalp', 'LineNoiseHz', []);
-%     for i = 1:numel(hs.curve)
-%         saveas(hs.topo{i}, fullfile(outputs_path, sprintf('RCmvMFE_%s_perm_tfce_cluster-%g_topo.fig', coarsing, i)));
-%         print(hs.topo{i}, fullfile(outputs_path, sprintf('RCmvMFE_%s_perm_tfce_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
-%         saveas(hs.curve{i}, fullfile(outputs_path, sprintf('RCmvMFE_%s_perm_tfce_cluster-%g_curve.fig', coarsing, i)));
-%         print(hs.curve{i}, fullfile(outputs_path, sprintf('RCmvMFE_%s_perm_tfce_cluster-%g_curve.png', coarsing, i)),'-dpng','-r300');
-%     end
-%     % close([hs.topo{:} hs.curve{:}]) % to close figures 
-% end

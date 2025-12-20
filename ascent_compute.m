@@ -47,12 +47,12 @@ if isempty(EEG.ref)
     warning('EEG data not referenced! Referencing is highly recommended (e.g., average-reference)!');
 end
 
-% Continuous/epoched data (unchanged)
-if length(size(EEG.data)) == 2
-    continuous = true;
-else
-    continuous = false; %%%%%%%%%%%%% ADD OPTION TO RUN ON EPOCHED DATA %%%%%%%%%
-end
+% % Continuous/epoched data (unchanged)
+% if length(size(EEG.data)) == 2
+%     continuous = true;
+% else
+%     continuous = false; %%%%%%%%%%%%% ADD OPTION TO RUN ON EPOCHED DATA %%%%%%%%%
+% end
 
 measure     = [];
 chanlist    = [];
