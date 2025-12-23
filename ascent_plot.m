@@ -31,6 +31,8 @@ end
 if multiscale && multiChan
     % ===== Multiscale heatmap + per-channel curve + topo (+ optional time) =====
     figure('Color','w','InvertHardCopy','off');
+    try icadefs; set(gcf, 'color', BACKCOLOR); catch; end  % eeglab color
+
     % Main heatmap occupies left 2 columns (all rows)
     subplot(3,3,[1 2 4 5 7 8]); hold on;
 
@@ -153,6 +155,8 @@ if multiscale && multiChan
 elseif ~multiscale && multiChan
     % ===== Uniscale scalp topography =====
     figure('Color','w','InvertHardCopy','off');
+    try icadefs; set(gcf, 'color', BACKCOLOR); catch; end  % eeglab color
+
     vals = entropyData(:);
     finiteVals = vals(isfinite(vals));
     if isempty(finiteVals)
@@ -170,6 +174,7 @@ elseif ~multiscale && multiChan
 elseif multiscale && ~multiChan
 
     figure('Color','w','InvertHardCopy','off');
+    try icadefs; set(gcf, 'color', BACKCOLOR); catch; end  % eeglab color
     box on;
     plot(scales, entropyData, 'LineWidth', 2);
     ylabel('Entropy'); xlabel("Scales")
