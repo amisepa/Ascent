@@ -47,30 +47,43 @@ if isempty(EEG.ref)
     warning('EEG data not referenced! Referencing is highly recommended (e.g., average-reference)!');
 end
 
-% % Continuous/epoched data (unchanged)
-% if length(size(EEG.data)) == 2
-%     continuous = true;
-% else
-%     continuous = false; %%%%%%%%%%%%% ADD OPTION TO RUN ON EPOCHED DATA %%%%%%%%%
-% end
-
+% -----------------------------
+% Init (so defaults logic works)
+% -----------------------------
 measure     = [];
 chanlist    = [];
 tau         = [];
 m           = [];
+r           = [];
 coarsing    = [];
 num_scales  = [];
-filt_scales = [];
+filt_scales = [];      % kept for backward compatibility, but not used
+filter_mode = [];
 n           = [];
-vis         = true;
-paraComp    = false;
+vis         = [];      % let defaults decide if not set
+paraComp    = [];      % let defaults decide if not set
+trackProg   = [];      % let defaults decide if not set
+
+% optional fuzzy / multiscale extras
+kernel_meth = [];
+blocksize   = [];
+TimeWin     = [];
+TimeStep    = [];
 
 % -----------------------------
 % Get parameters: GUI if none, else name–value pairs
 % -----------------------------
 if nargin == 1 || (nargin == 2 && isempty(varargin{1}))
-    [measure, chanlist, tau, m, coarsing, num_scales, filt_scales, n, vis, paraComp] = ...
-        ascent_compute_gui(EEG);
+
+    [measure, chanlist, tau, m, coarsing, num_scales, ~, n, vis, paraComp, trackProg] = ascent_compute_gui(EEG);
+
+
+    % % Critical mapping to your pipeline variable names
+    % paraComp  = logical(parallelComp);
+    % trackProg = logical(progressTrack);
+
+    % Debug once (remove after you confirm)
+    disp(['GUI paraComp = ' num2str(paraComp) ', trackProg = ' num2str(trackProg)])
 
 else
     if mod(numel(varargin),2) ~= 0
@@ -82,9 +95,9 @@ else
         switch key
             case 'measure'
                 measure = val;
+
             case 'chanlist'
                 if ischar(val) || isstring(val)
-                    % allow "all" or space/comma-separated labels (same behavior as GUI)
                     if strcmpi(string(val),'all')
                         chanlist = {EEG.chanlocs.labels}';
                     else
@@ -95,36 +108,53 @@ else
                 else
                     error('Channels must be ''all'', a string list, or a cellstr.');
                 end
+
             case 'tau'
                 tau = double(val);
+
             case 'm'
                 m = double(val);
+
             case 'r'
                 r = double(val);
+
             case 'coarsing'
                 coarsing = val;
+
             case 'num_scales'
                 num_scales = double(val);
-            case 'filt'
+
+            % Deprecated: keep accepting but ignore (filter removed from UI)
+            case {'filt','filt_scales','filtscales'}
                 filt_scales = logical(val);
+
             case 'n'
                 n = double(val);
+
             case 'vis'
                 vis = logical(val);
-            case 'parallel'
+
+            case {'parallel','paracomp'}
                 paraComp = logical(val);
-            case 'progress'
+
+            case {'progress','trackprog'}
                 trackProg = logical(val);
+
             case 'kernel'
                 kernel_meth = val;
+
             case 'blocksize'
                 blocksize = double(val);
+
             case 'filter_mode'
                 filter_mode = val;
+
             case 'timewin'
                 TimeWin = double(val);
+
             case 'timestep'
                 TimeStep = double(val);
+
             otherwise
                 error('Unknown option: %s', key);
         end
@@ -136,61 +166,71 @@ end
 % --------
 
 % general parameters
-if ~exist('chanlist','var') || isempty(chanlist)
+if isempty(chanlist)
     disp('No channels were selected: selecting all channels (default)')
     chanlist = {EEG.chanlocs.labels}';
 end
-if ~exist('measure','var') || isempty(measure)
-    disp('No complexity measure selected: selecting fuzzy entropy (FuzzEn) by default')
-    measure = 'FuzzEn';
+
+if isempty(measure)
+    disp('No complexity measure selected: selecting RCMFE (default).')
+    measure = 'RCMFE';
 end
-if ~exist('tau','var') || isempty(tau)
+
+if isempty(tau)
     disp('No time lag selected: selecting tau = 1 (default).')
     tau = 1;
 end
-if ~exist('m','var') || isempty(m)
+
+if isempty(m)
     disp('No embedding dimension selected: selecting m = 2 (default).')
     m = 2;
 end
-if ~exist('r','var') || isempty(r)
+
+if isempty(r)
     disp('No similarity bound selected: selecting r = .15 (default).')
     r = .15;
 end
-if ~exist('vis','var') || isempty(vis)
-    disp('No plotting option not selected: turning plotting ON (default).')
+
+if isempty(vis)
+    disp('No plotting option selected: turning plotting ON (default).')
     vis = true;
 end
-if ~exist('trackProg','var') || isempty(trackProg)
+
+if isempty(trackProg)
     disp('No progress tracking defined: setting it to ON (default).')
     trackProg = true;
 end
-if ~exist('paraComp','var') || isempty(paraComp)
+
+if isempty(paraComp)
     disp('Computing method not selected: turning parallel computing ON (default).')
     paraComp = true;
 end
 
 % multiscale parameters
-if contains(lower(measure), {'mse' 'mmse' 'mfe' 'rcmfe' })
-    if ~exist('coarsing','var') || isempty(coarsing)
-        disp('No coarse graining method selected: selecting standard deviation (default).')
-        coarsing = 'var'; % set variance as default
+if contains(lower(measure), {'mse','mmse','mfe','rcmfe','rcmvmfe'})
+    if isempty(coarsing)
+        disp('No coarse graining method selected: selecting variance (default).')
+        coarsing = 'var';
     end
-    if ~exist('num_scales','var') || isempty(num_scales)
+    if isempty(num_scales)
         disp('Number of scale factors not selected: selecting num_scales = 30 (default).')
         num_scales = 30;
     end
-    if ~exist('filter_mode','var') || isempty(filter_mode)
-        if strcmpi(lower(measure), 'mmse') % if mMSE selected, default to narrowband
-            filter_mode = 'narrowband'; % 'none' | 'narrowband' | 'lowpass' | 'highpass' (default 'narrowband')
+
+    % Filtering: UI removed, keep logic via filter_mode only
+    if isempty(filter_mode)
+        if strcmpi(lower(measure), 'mmse')
+            filter_mode = 'narrowband';
             disp("Filtering each scale factor set to: narrowband (from Kosciessa et al. 2017)")
-        else % for other measures, no filtering is default
-            filter_mode = 'none'; % 'none' | 'narrowband' | 'lowpass' | 'highpass' (default 'narrowband')
+        else
+            filter_mode = 'none';
             disp("Filtering each scale factor set to: OFF")
         end
     else
-        disp("Filtering each scale factor (from Kosciessa et al. 2017) set to: OFF.")
+        disp("Filtering each scale factor mode set to: " + string(filter_mode))
     end
-    if ~exist('TimeWin','var') || ~exist('TimeStep','var') || isempty(TimeWin) || isempty(TimeStep)
+
+    if isempty(TimeWin) || isempty(TimeStep)
         TimeWin = [];
         TimeStep = [];
         disp("mMSE time-resolved mode set to: OFF.")
@@ -200,21 +240,20 @@ if contains(lower(measure), {'mse' 'mmse' 'mfe' 'rcmfe' })
 end
 
 % Fuzzy parameters
-if contains(lower(measure), {'fuzzen' 'mfe' 'rcmfe'})
-    if ~exist('n','var') || isempty(n)
+if contains(lower(measure), {'fuzzen','mfe','rcmfe','rcmvmfe'})
+    if isempty(n)
         disp('No fuzzy power selected: using n = 2 (default).')
         n = 2;
     end
-    if ~exist('kernel','var') || isempty(kernel_meth)
+    if isempty(kernel_meth)
         disp('Kernel method not selected: using exponential kernel (default).')
         kernel_meth = 'exponential';
     end
-    if ~exist('blocksize','var') || isempty(blocksize)
+    if isempty(blocksize)
         disp('BlockSize not specified: using blocksize = 256 (default).')
         blocksize = 256;
     end
 end
-
 
 %% Compute entropy depending on choices
 
@@ -285,17 +324,14 @@ switch measure
             'ScaleTrimIQR', true, ...
             'Parallel', paraComp, 'Progress', trackProg);
 
-    % Multiscale Entropy (MSE)
+    % Classic Multiscale Entropy (MSE) from Costa but enhanced
     case 'MSE'
-        
-        % Classic (enhanced) Costa MSE
         [entropy, scales] = compute_MSE(data, 'm', m, 'tau', tau, ...
             'coarsing', coarsing, 'num_scales', num_scales, ...
             'Parallel', paraComp, 'Progress', trackProg);
 
     % Modified Multiscale Entropy (mMSE; from Kloosterman and Kosciessa, implemented in Fieldtrip)
     case 'mMSE'
-
         [entropy, scales, info] = compute_mMSE(data, 'm', m, 'tau', tau, 'r', r, ...
               'coarsing', coarsing, 'num_scales', num_scales, ...
               'Parallel', paraComp, 'Progress', trackProg, ...
@@ -304,7 +340,6 @@ switch measure
 
     % Multiscale Fuzzy Entropy (MFE)
     case 'MFE'
-
          [entropy, scales] = compute_MFE(data, 'm', m, ...
              'tau', tau, 'r', r, 'coarsing', coarsing, 'num_scales', num_scales, ...
               'Parallel', paraComp, 'Progress', trackProg);

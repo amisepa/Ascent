@@ -32,7 +32,7 @@ disp("Run each cell below one by one by clicking in the cell and then pressing C
 
 %% Sample Entropy (SampEn) via GUI
 
-EEG = ascent_compute(EEG);  % or Tools > Compute entropy
+EEG = ascent_compute(EEG);  % or Tools > Compute entrop y
 
 %% SampEn via command line with default parameters
 

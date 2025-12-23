@@ -208,8 +208,10 @@ for s = 1:S
             cg = std(y, 0, 1, 'omitnan');
     end
     cg = cg(:).';
-    v(1) = compute_FuzzEn(cg, 'm', m, 'n', n_exp, 'tau', tau, 'r', r, ...
-        'Parallel', false, 'Progress', false);
+
+    v(s) = compute_FuzzEn(cg, 'm', m, 'n', n_exp, 'tau', tau, 'r', r, ...
+    'Parallel', false, 'Progress', false);
+
 end
 
 if showProgress
