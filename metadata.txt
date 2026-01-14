@@ -1,18 +1,31 @@
 {
   "DatasetName": "ASCENT Demonstration EEG Dataset",
-  "Description": "Single-subject EEG dataset used to demonstrate the ASCENT toolbox for entropy- and complexity-based analysis of neurophysiological time series.",
+  "Description": "Single-subject EEG dataset (subject 01) extracted from a larger 40-participant Biosemi EEG dataset. This file is used to illustrate individual-level entropy and complexity analyses in the manuscript, while group-level analyses are performed on the full cohort, which is publicly available on OSF.",
   "SourceStudy": {
     "Citation": "Cannard, C., Wahbeh, H., & Delorme, A. (2021). Validating the wearable MUSE headset for EEG spectral analysis and frontal alpha asymmetry. IEEE International Conference on Bioinformatics and Biomedicine (BIBM), 3603–3610.",
-    "DOI": "10.1109/BIBM52615.2021.9669612"
+    "DOI": "10.1109/BIBM52615.2021.9669778"
   },
+  "RelatedDatasets": [
+    {
+      "Description": "Full group-level raw EEG dataset (40 participants, Biosemi ActiveTwo, eyes open and eyes closed) used for all group analyses in the manuscript.",
+      "Repository": "OSF",
+      "URL": "https://osf.io/2w3n6/"
+    }
+  ],
   "Participant": {
     "ID": "sub-01",
-    "Anonymized": true
+    "Anonymized": true,
+    "CohortSize": 40
   },
   "Modality": "EEG",
   "RecordingDevice": {
-    "Name": "Muse",
-    "Type": "Wearable EEG headset"
+    "Name": "Biosemi ActiveTwo",
+    "Type": "Research-grade 64-channel EEG system"
+  },
+  "RecordingConditions": {
+    "RestingState": true,
+    "EyesOpen": true,
+    "EyesClosed": true
   },
   "SamplingFrequencyHz": 128,
   "Units": "microvolts",
@@ -35,21 +48,21 @@
       }
     },
     "ElectrodeLocations": {
-      "Method": "BEM-based montage",
-      "Loaded": true
+      "Method": "10-20 system",
+      "Fiducials": ["nasion", "inion", "left preauricular", "right preauricular"]
     }
   },
   "DataIncluded": [
-    "Processed EEG data in EEGLAB .set format"
+    "Processed EEG data in EEGLAB .set format (single subject)"
   ],
-  "IntendedUse": "Demonstration and reproducibility of entropy-based analyses presented in the accompanying manuscript.",
+  "IntendedUse": "Demonstration of individual-level analyses and reproducibility of group-level entropy and complexity results reported in the manuscript.",
   "CodeAvailability": {
     "Repository": "https://github.com/amisepa/Ascent",
-    "Description": "ASCENT toolbox implementing all entropy and complexity measures used in the study."
+    "Description": "ASCENT toolbox implementing all entropy and complexity measures used in the manuscript."
   },
   "EthicsAndPrivacy": {
     "PersonallyIdentifiableInformation": false,
     "Restrictions": "None"
   },
-  "Notes": "This dataset represents a minimal example provided to support verification of the analysis pipeline and figures."
+  "Notes": "This repository includes only a single representative subject for illustration. All group-level results in the manuscript are based on the full 40-participant Biosemi dataset released separately on OSF."
 }
