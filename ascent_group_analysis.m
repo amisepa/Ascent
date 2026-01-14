@@ -31,12 +31,18 @@ MFE = nan(num_chan, num_scales, num_files);
 RCMFE = nan(num_chan, num_scales, num_files);
 % RCmvMFE = nan(num_chan, num_scales, num_files);
 for iFile = 1:num_files
+
+    disp('')
+    fprintf('--------------------------------------------------------\n')
+    fprintf('                        SUBJECT %g/%g \n', iFile, num_files)
+    fprintf('--------------------------------------------------------\n')
+    disp('')
+
     EEG = pop_biosig(filenames{iFile});
     EEG = pop_resample(EEG, 256);
     EEG = pop_select( EEG, 'chantype',{'EEG'});
     EEG = pop_chanedit(EEG, {'lookup','standard_1005.elc'});
     EEG = ref_infinity(EEG);
-    
     EEG = pop_eegfiltnew(EEG, 'locutoff',0.5,'usefftfilt',1);
     EEG = pop_eegfiltnew(EEG, 'locutoff',59,'hicutoff',61,'revfilt',1,'usefftfilt',1);
 
@@ -74,6 +80,14 @@ for iFile = 1:num_files
 end
 disp("Done computing on the whole group for eyes-closed condition!")
 
+% Check there are no subjects with NaNs
+nan_subject = any(squeeze(any(isnan(MFE), 1)));  % [50 x 40] logical (scale x subject)
+if any(nan_subject)
+    error("some subjects have NaNs! Check data!")
+    disp(nan_subject)
+end
+
+
 % Compute on whole group - Eyes opened (EO) condition
 cd(fullfile(data_path, 'eyes_open'))
 filenames = {dir('*.bdf').name}';
@@ -91,17 +105,17 @@ MFE = nan(num_chan, num_scales, num_files);
 RCMFE = nan(num_chan, num_scales, num_files);
 % RCmvMFE = nan(num_chan, num_scales, num_files);
 for iFile = 1:num_files
-
+    disp('')
     fprintf('--------------------------------------------------------\n')
-    fprintf('                        FILE %g/%g \n', iFile, num_files)
+    fprintf('                        SUBJECT %g/%g \n', iFile, num_files)
     fprintf('--------------------------------------------------------\n')
+    disp('')
 
     EEG = pop_biosig(filenames{iFile});
     EEG = pop_resample(EEG, 256);
-    EEG = pop_select( EEG, 'chantype',{'EEG'});
+    EEG = pop_select(EEG, 'chantype',{'EEG'});
     EEG = pop_chanedit(EEG, {'lookup','standard_1005.elc'});
     EEG = ref_infinity(EEG);
-    
     EEG = pop_eegfiltnew(EEG, 'locutoff',0.5,'usefftfilt',1);
     EEG = pop_eegfiltnew(EEG, 'locutoff',59,'hicutoff',61,'revfilt',1,'usefftfilt',1);
 
@@ -137,13 +151,20 @@ for iFile = 1:num_files
         'chanlocs', 'scales', 'scales_bounds')
 
 end
-gong
 disp("Done computing on the whole group for eyes-open condition!")
 
+% Check there are no subjects with NaNs
+nan_subject = any(squeeze(any(isnan(MFE), 1)));  % [50 x 40] logical (scale x subject)
+if any(nan_subject)
+    error("some subjects have NaNs! Check data!")
+    disp(nan_subject)
+end
+
+gong
 
 %% Load, separate the data by condition, & reorganize electrodes
 
-coarsing = 'var';
+coarsing = 'mean';
 
 % Load chanlocs only 
 load(fullfile(data_path, sprintf('ascent_outputs_EC_%s.mat', coarsing)), 'chanlocs')
@@ -176,7 +197,7 @@ end
 
 % Reorder chanlocs
 chanlocs = chanlocs(order_idx);
-save(fullfile(data_path, 'chanlocs_reorganized.mat'), 'chanlocs')
+% save(fullfile(data_path, 'chanlocs_reorganized.mat'), 'chanlocs')
 disp({chanlocs.labels}')
 
 % Load EC metrics and reorder
@@ -349,7 +370,7 @@ print(gcf, fullfile(outputs_path, 'fig3.png'), '-dpng', '-r300');
 
 %% %%%%%%%%%%%%%%%%%%%% MULTISCALES %%%%%%%%%%%%%%%%%%%%%
 
-coarsing = 'var';
+coarsing = 'mean';
 mcc_type = 3;   % 0 = uncorrected; 1 = t-max; 2 = cluster; 3 = TFCE
 
 % MSE

@@ -1,0 +1,55 @@
+{
+  "DatasetName": "ASCENT Demonstration EEG Dataset",
+  "Description": "Single-subject EEG dataset used to demonstrate the ASCENT toolbox for entropy- and complexity-based analysis of neurophysiological time series.",
+  "SourceStudy": {
+    "Citation": "Cannard, C., Wahbeh, H., & Delorme, A. (2021). Validating the wearable MUSE headset for EEG spectral analysis and frontal alpha asymmetry. IEEE International Conference on Bioinformatics and Biomedicine (BIBM), 3603–3610.",
+    "DOI": "10.1109/BIBM52615.2021.9669612"
+  },
+  "Participant": {
+    "ID": "sub-01",
+    "Anonymized": true
+  },
+  "Modality": "EEG",
+  "RecordingDevice": {
+    "Name": "Muse",
+    "Type": "Wearable EEG headset"
+  },
+  "SamplingFrequencyHz": 128,
+  "Units": "microvolts",
+  "Preprocessing": {
+    "Downsampling": {
+      "Applied": true,
+      "TargetFrequencyHz": 128
+    },
+    "Referencing": {
+      "Method": "REST",
+      "Description": "Reference Electrode Standardization Technique"
+    },
+    "Filtering": {
+      "Highpass": {
+        "CutoffHz": 0.5
+      },
+      "Notch": {
+        "CutoffHz": [59, 61],
+        "Purpose": "Line noise removal"
+      }
+    },
+    "ElectrodeLocations": {
+      "Method": "BEM-based montage",
+      "Loaded": true
+    }
+  },
+  "DataIncluded": [
+    "Processed EEG data in EEGLAB .set format"
+  ],
+  "IntendedUse": "Demonstration and reproducibility of entropy-based analyses presented in the accompanying manuscript.",
+  "CodeAvailability": {
+    "Repository": "https://github.com/amisepa/Ascent",
+    "Description": "ASCENT toolbox implementing all entropy and complexity measures used in the study."
+  },
+  "EthicsAndPrivacy": {
+    "PersonallyIdentifiableInformation": false,
+    "Restrictions": "None"
+  },
+  "Notes": "This dataset represents a minimal example provided to support verification of the analysis pipeline and figures."
+}
