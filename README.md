@@ -36,9 +36,11 @@ https://psyarxiv.com/xwmyk/
 
 ## Illustration 
 
-We computed all of ASCENT's measures for two conditions of 64-channel Biosemi data: eyes-open vs eyes-closed resting state.
-We then performed (5,000 iterations) bootstrap statistics to identify the significant differences under the null hypothesis (H0; α = 0.05), and apply threshold-free cluster enhancement (TFCE) correction to control for the family-wise-error (FWE; Type 1 error), highlighting the significant spatiotemporal clusters. 
+We computed all of ASCENT's measures for two conditions of 64-channel Biosemi data: eyes-open vs eyes-closed resting state (N = 40).
+We then performed (5,000 iterations) bootstrap statistics to identify the significant differences under the null hypothesis (H0; α = 0.05), and applied threshold-free cluster enhancement (TFCE) correction to control for the family-wise-error (FWE; Type 1 error), highlighting the significant spatiotemporal clusters. 
+
 For the multiscale measures, group analysis was performed using two different coarsening methods (standard deviation and median) to visualize how they capture different types of complexity information clearly. 
+
 Time to compute everything with 32 GB of RAM and 10 cores with parallel computing: ~11 hours. 
 
 ### Uniscale measures
@@ -48,7 +50,7 @@ Time to compute everything with 32 GB of RAM and 10 cores with parallel computin
 
 ### Multiscale measures
 
-<img width="3245" height="1847" alt="multiscale_std" src="https://github.com/amisepa/Ascent/blob/main/figures/multiscale_std.png" />
+<img width="3245" height="1847" alt="multiscale_std" src="https://github.com/amisepa/Ascent/blob/main/figures/fig3.png" />
 
-<img width="3240" height="1727" alt="multiscale_median" src="https://github.com/amisepa/Ascent/blob/main/figures/multiscale_median.png" />
+<img width="3240" height="1727" alt="multiscale_median" src="https://github.com/amisepa/Ascent/blob/main/figures/fig4.png" />
 
