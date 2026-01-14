@@ -43,7 +43,7 @@ Time to compute everything with 32 GB of RAM and 10 cores with parallel computin
 
 ### Uniscale measures
 
-<img width="2310" height="1824" alt="uniscales" src="https://github.com/amisepa/Ascent/blob/main/figures/uniscales.png" />
+<img width="2310" height="1824" alt="uniscales" src="https://github.com/amisepa/Ascent/main/figures/fig2.png" />
 
 <img width="2310" height="1824" alt="uniscales" src="https://github.com/amisepa/Ascent/blob/main/figures/ExSent_plots.jpg" />
 
