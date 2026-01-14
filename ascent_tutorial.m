@@ -21,7 +21,12 @@ eeglab; close;
 % or donwload the github repo and unzip it in the EEGLAB plugins folder
 
 % Load provided sample EEG data from the tutorial directory 
-% (2 minutes of resting state eyes-closed, 64-channel Biosemi):
+% (2 minutes of resting state eyes-closed, 64-channel Biosemi).
+% Dataset source: 
+%   Cannard, C., Wahbeh, H., & Delorme, A. (2021, December).
+%   Validating the wearable MUSE headset for EEG spectral analysis and Frontal 
+%   Alpha Asymmetry. In 2021 IEEE International Conference on Bioinformatics
+%   and Biomedicine (BIBM) (pp. 3603-3610). IEEE.
 pluginPath = fileparts(which('eegplugin_ascent.m'));
 addpath(genpath(pluginPath))
 cd(pluginPath)
