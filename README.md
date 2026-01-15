@@ -52,6 +52,6 @@ Time to compute everything with 32 GB of RAM and 10 cores with parallel computin
 
 ### Multiscale measures
 
-
+<img width="3240" height="1727" alt="multiscale_median" src="https://github.com/amisepa/Ascent/blob/main/figures/fig4.png" />
 
 
