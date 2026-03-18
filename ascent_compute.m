@@ -77,11 +77,6 @@ if nargin == 1 || (nargin == 2 && isempty(varargin{1}))
 
     [measure, chanlist, tau, m, coarsing, num_scales, ~, n, vis, paraComp, trackProg] = ascent_compute_gui(EEG);
 
-
-    % % Critical mapping to your pipeline variable names
-    % paraComp  = logical(parallelComp);
-    % trackProg = logical(progressTrack);
-
     % Debug once (remove after you confirm)
     disp(['GUI paraComp = ' num2str(paraComp) ', trackProg = ' num2str(trackProg)])
 
@@ -204,6 +199,7 @@ end
 if isempty(paraComp)
     disp('Computing method not selected: turning parallel computing ON (default).')
     paraComp = true;
+    parpool
 end
 
 % multiscale parameters
@@ -295,14 +291,26 @@ switch measure
 
     % Sample Entropy (SampEn)
     case 'SampEn'
+        tic
         entropy = compute_SampEn(data, 'm', m, 'r', r, ...
             'parallel', paraComp, 'Progress', trackProg);
+        toc
         
     % Fuzzy Entropy (FuzzEn)
     case 'FuzzEn'
         entropy = compute_FuzzEn(data, 'm', m, 'tau', tau, 'n', n, 'r', r, ...
             'Kernel', kernel_meth, 'BlockSize',blocksize, ...
             'Parallel', paraComp, 'Progress', trackProg);
+
+        % % Original from Azami (2019) is actually faster
+        % entropy = nan(nChan,1);
+        % for iChan = 1:EEG.nbchan
+        %     entropy(iChan,:) = compute_FuzzEn_azami(data(iChan,:), m, kernel_meth, [r n], 0, tau); % (ts, m, mf, rn, local,tau)
+            % if trackProg
+            %    fprintf('  ch %3d/%3d: %.3f\n', iChan, EEG.nbchan, entropy(iChan,:));
+            % end
+        % end            
+
 
     %  Multivariate Fuzzy Entropy (mvFuzzEn)
     case 'mvFuzzEn'
@@ -312,26 +320,44 @@ switch measure
 
     % Extrema-Segmented Entropy (ExSEnt)    
     case 'ExSEnt'
-        [HD, HA, HDA, info] = compute_ExSEnt2(data, 'm', m, 'r', r, ...
+        [HD, HA, HDA, info] = compute_ExSEnt(data, 'm', m, 'r', r, ...
             'lambda', 0.001, 'Plot', false, ...
             'Parallel', paraComp, 'Progress', trackProg);
 
     % Fractal Dimension (FracDim)
     case 'FracDim'
-        [entropy, SD, info] = compute_FracDim(data, ...
-            'RejectBursts', true, 'WinFrac', 0.02, 'ZThresh', 6, ...
-            'RobustFit', 'theilsen', ... %  'theilsen' (default) or 'ols'
-            'ScaleTrimIQR', true, ...
-            'Parallel', paraComp, 'Progress', trackProg);
 
-    % Classic Multiscale Entropy (MSE) from Costa but enhanced
+        % Box-counting version
+        % [entropy, SD, info] = compute_FracDim(data, ...
+        %     'RejectBursts', true, 'WinFrac', 0.02, 'ZThresh', 6, ...
+        %     'RobustFit', 'theilsen', ... %  'theilsen' (default) or 'ols'
+        %     'ScaleTrimIQR', true, ...
+        %     'Parallel', paraComp, 'Progress', trackProg);
+    
+        % Higushi 
+        [entropy, SD, info] = compute_HigFracDim(data);
+
+    case 'Aperiodic'
+        % Compute PSD first (Welch)
+        [psd, freqs] = spectopo(EEG.data, 0, EEG.srate, 'plot','off');
+        psd = 10.^(psd/10);   % spectopo returns dB → convert back to linear
+
+        % Compute aperiodic slope and offset
+        [exponent, offset, info] = compute_AperiodicFit(freqs, psd, ...
+            'FreqRange', [1 40], 'MaxPeaks', 6);
+
+
+    % Multiscale Entropy (MSE) 
     case 'MSE'
+        % classic algo from Costa but optimized
         [entropy, scales] = compute_MSE(data, 'm', m, 'tau', tau, ...
             'coarsing', coarsing, 'num_scales', num_scales, ...
             'Parallel', paraComp, 'Progress', trackProg);
 
-    % Modified Multiscale Entropy (mMSE; from Kloosterman and Kosciessa, implemented in Fieldtrip)
+    % Modified Multiscale Entropy (mMSE)
     case 'mMSE'
+        % from Kloosterman and Kosciessa, implemented in Fieldtrip) 
+        % controling for spectral leakage
         [entropy, scales, info] = compute_mMSE(data, 'm', m, 'tau', tau, 'r', r, ...
               'coarsing', coarsing, 'num_scales', num_scales, ...
               'Parallel', paraComp, 'Progress', trackProg, ...
@@ -350,6 +376,7 @@ switch measure
                 'r', r, 'n', n, 'coarsing', coarsing, 'num_scales', num_scales, ...
                 'Parallel', paraComp, 'Progress', trackProg);
 
+    % Refined Composite Multivariate Multiscale Fuzzy Entropy (RCmvMFE)
     case 'RCmvMFE'
         % original (optimized by Cedric on Dec 17, 2025 otherwise algo
         % takes forever or crashes)

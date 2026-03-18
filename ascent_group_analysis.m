@@ -118,6 +118,7 @@ for iFile = 1:num_files
     EEG = ref_infinity(EEG);
     EEG = pop_eegfiltnew(EEG, 'locutoff',0.5,'usefftfilt',1);
     EEG = pop_eegfiltnew(EEG, 'locutoff',59,'hicutoff',61,'revfilt',1,'usefftfilt',1);
+    pop_eegplot(EEG,1,1,1);
 
     EEG = ascent_compute(EEG, 'measure', 'SampEn', 'vis', false);
     EEG = ascent_compute(EEG, 'measure', 'FuzzEn', 'vis', false);

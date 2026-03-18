@@ -80,7 +80,7 @@ if parallelMode && ~isempty(ver('parallel'))
         SampEn(iChan) = compute_SampEn_single(data_z(iChan,:), m, r, tau);
         if showProgress
             % Minimal single-line prints to reduce interleaving noise
-            fprintf('  ch %3d/%3d: %.6f\n', iChan, nchan, SampEn(iChan));
+            fprintf('  ch %3d/%3d: %.3f\n', iChan, nchan, SampEn(iChan));
         end
     end
 else
@@ -93,7 +93,7 @@ else
     for iChan = 1:nchan
         SampEn(iChan) = compute_SampEn_single(data_z(iChan,:), m, r, tau);
         if showProgress
-            fprintf('  ch %3d/%3d: %.6f\n', iChan, nchan, SampEn(iChan));
+            fprintf('  ch %3d/%3d: %.3f\n', iChan, nchan, SampEn(iChan));
             if ~isempty(hWB) && isvalid(hWB)
                 try waitbar(iChan/nchan, hWB, sprintf('Computing Sample Entropy... (%d/%d)', iChan, nchan)); catch; end
             end
