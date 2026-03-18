@@ -6,7 +6,7 @@ function [D, SD, info] = compute_FracDim(data, varargin)
 %       'RobustFit', 'theilsen', 'ScaleTrimIQR', true, ...
 %       'MinBoxesPerCol', 1, 'MinJ', [], 'MaxJ', [], ...
 %       'Parallel', true, 'Progress', true, 'MinScales', 6)
-%
+
 % Inputs
 %   data            : [n_channels x n_samples] (vector → 1 channel)
 %   Name-Value pairs:
@@ -30,6 +30,14 @@ function [D, SD, info] = compute_FracDim(data, varargin)
 %   info: diagnostics (fields per-channel: .r, .n, .validScales, .usedX, .usedY,
 %         .cleanMask, .Jvec, .fitMethod, .nUsedScales, .flags; plus .params)
 %
+% References:
+%   Kirkby, M. J. (1983). The fractal geometry of nature. Earth Surface 
+%       Processes and Landforms.
+%   Esteller, R., Vachtsevanos, G., Echauz, J., & Litt, B. (2002). A 
+%       comparison of waveform fractal dimension algorithms. IEEE 
+%       Transactions on Circuits and Systems I: Fundamental Theory and 
+%       Applications, 48(2), 177-183.
+% 
 % -------------------------------------------------------------------------
 % Copyright (C) 2025
 % EEGLAB Ascent Plugin — Author: Cedric Cannard

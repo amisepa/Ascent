@@ -339,25 +339,20 @@ switch measure
 
     case 'Aperiodic'
         % Compute PSD first (Welch)
-        [psd, freqs] = spectopo(EEG.data, 0, EEG.srate, 'plot','off');
-        psd = 10.^(psd/10);   % spectopo returns dB → convert back to linear
+[psd, freqs] = spectopo(EEG.data, 0, EEG.srate, 'plot','off');
+psd_lin = 10.^(psd/10);   % spectopo returns dB → convert to linear
 
-        % Compute aperiodic slope and offset
-        [exponent, offset, info] = compute_AperiodicFit(freqs, psd, ...
-            'FreqRange', [1 40], 'MaxPeaks', 6);
+[exponent, offset, info] = compute_AperiodicFit(freqs, psd_lin, ...
+    'FreqRange', [1 40], 'MaxPeaks', 6);
 
-
-    % Multiscale Entropy (MSE) 
+    % Classic Multiscale Entropy (MSE) from Costa but enhanced
     case 'MSE'
-        % classic algo from Costa but optimized
         [entropy, scales] = compute_MSE(data, 'm', m, 'tau', tau, ...
             'coarsing', coarsing, 'num_scales', num_scales, ...
             'Parallel', paraComp, 'Progress', trackProg);
 
-    % Modified Multiscale Entropy (mMSE)
+    % Modified Multiscale Entropy (mMSE; from Kloosterman and Kosciessa, implemented in Fieldtrip)
     case 'mMSE'
-        % from Kloosterman and Kosciessa, implemented in Fieldtrip) 
-        % controling for spectral leakage
         [entropy, scales, info] = compute_mMSE(data, 'm', m, 'tau', tau, 'r', r, ...
               'coarsing', coarsing, 'num_scales', num_scales, ...
               'Parallel', paraComp, 'Progress', trackProg, ...
