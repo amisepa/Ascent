@@ -283,11 +283,9 @@ for ch = 1:nChan
     end
 end
 
-
-% -------- Scales loop
 % -------- Scales loop (parallel across SCALES if enabled)
 if useParScales
-    parfor s = 1:S
+    parfor s = 2:S
         feff = o.Fs / s;
         Y    = dat;           % local copy for worker
         band = bands{s};
@@ -396,7 +394,7 @@ if useParScales
     end
 else
     % -------- Serial loop with per-scale print + waitbar
-    for s = 1:S
+    for s = 2:S
         if o.Progress
             fprintf('  scale %2d/%2d\n', s, S);
             if ~isempty(hWB) && isvalid(hWB)
@@ -493,7 +491,6 @@ end
 
 % Close waitbar (serial mode only)
 if ~isempty(hWB) && isvalid(hWB), try close(hWB); catch, end, end
-
 
 if doTime
     info.mse_time = mse_time;          % chan x scale x time

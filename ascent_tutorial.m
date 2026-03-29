@@ -16,7 +16,6 @@ eeglab; close;
 
 % if you haven'installed the plugin yet, either go to File > Manage EEGLAB
 % extensions > search ascent_compute > Install
-% 
 % or clone the github directory in the EEGLAB plugins folder
 % or donwload the github repo and unzip it in the EEGLAB plugins folder
 
@@ -37,7 +36,7 @@ disp("Run each cell below one by one by clicking in the cell and then pressing C
 
 %% Sample Entropy (SampEn) via GUI
 
-EEG = ascent_compute(EEG);  % or Tools > Compute entrop y
+EEG = ascent_compute(EEG);  % or Tools > Compute entropy
 
 %% SampEn via command line with default parameters
 
@@ -53,7 +52,7 @@ EEG = ascent_compute(EEG, 'measure', 'SampEn');
     'chanlist', 'Cz Fz F3 F4 Pz Oz O1 O2', ...   % channel selection
     'tau', 2, ...
     'm', 3, ...
-    'r', .5, ...
+    'r', .3, ...
     'parallel', false, ...
     'progress', true, ...
     'vis', true);
@@ -74,9 +73,14 @@ EEG = ascent_compute(EEG, 'measure', 'FuzzEn', ...
 
 EEG = ascent_compute(EEG, 'measure', 'ExSEnt', 'r', .15);
 
-%% Fractal dimension (votality)
 
-EEG = ascent_compute(EEG, 'measure', 'FracDim');
+%% Fractal dimension
+
+EEG = ascent_compute(EEG, 'measure', 'HigFracDim');  % 'HigFracDim' = Higushi version; 'FracDim' = box-counting version
+
+%% Aperiodic exponent (i.e. slope) and offset
+
+EEG = ascent_compute(EEG, 'measure', 'Aperiodic');
 
 %% Multiscale entropy (MSE)
 
@@ -119,8 +123,8 @@ EEG = ascent_compute(EEG, 'measure', 'MFE', ...
 %% Refined Composite Multiscale Fuzzy Entropy (RCMFE)
 
 EEG = ascent_compute(EEG, 'measure', 'RCMFE', ...
-    'coarsing', 'std', ...     % 'median' (default) 'mean' 'trimmed mean' 'std' 'var'
-    'num_scales', 10, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
+    'coarsing', 'mean', ...     % 'median' (default) 'mean' 'trimmed mean' 'std' 'var'
+    'num_scales', 50, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
     'n', 2, ...                 % fuzzy power (default = 2)
     'parallel', true, 'progress', true);
 
@@ -144,3 +148,46 @@ EEG = ascent_compute(EEG, 'measure', 'RCmvMFE', 'chanlist', 'Fz FCz FPz Cz Pz Iz
     'n', 2, ...                % fuzzy power (default = 2)
     'parallel', true, 'progress', true);
 
+%% Multiscale entropy on indepent components (ICs) instead of 
+% scalp channel signals. note: ICA was precomputed on the sample dataset.
+
+if isempty(EE)
+    EEG.icaact = EEG.icaweights * EEG.icasphere * EEG.data; % sometimes not saved on disk to save space
+end
+
+[entropy, scales] = compute_MSE(EEG.icaact, 'coarsing', 'variance', 'num_scales', 10);
+
+ascent_plot(entropy, EEG.chanlocs, 'MSE', scales, ...
+    'ICA', true, 'icawinv', EEG.icawinv);
+
+%% Aperiodic parametrization on indepent components (ICs) instead of 
+% scalp channel signals. note: ICA was precomputed on the sample dataset.
+
+% Compute Welch PSD (linear)
+[psd, freqs] = compute_psd(EEG.icaact, EEG.srate);
+
+% Fit aperiodic model
+%     'aperiodicmode'    - Aperiodic fit mode: 'fixed' (default) or 'knee'
+%     'maxpeaks'         - Max number of spectral peaks to fit (default: 6)
+%     'minpeakheight'    - Min peak height above aperiodic (default: 0.05)
+%     'peakthreshold'    - Peak detection threshold in SDs (default: 2.0)
+%     'peakwidthlimits'  - [min max] peak width in Hz (default: [1 12])
+%     'correctaperiodic' - Subtract aperiodic model from PSD, logical (default: true)
+[exponent, offset, info] = compute_AperiodicFit(freqs, psd);
+
+% subtract aperiodic model from PSD
+log_freqs = log10(freqs);
+psd_corrected = nan(size(psd));
+for iChan = 1:size(psd,1)
+    ap_model = offset(iChan) - exponent(iChan) .* log_freqs;
+    psd_corrected(iChan,:) = 10.^(log10(psd(iChan,:)) - ap_model);
+end
+
+% fallback plot with bar graph instead of topos (and EEG channels instead
+% of components)
+ascent_plot(exponent, EEG.chanlocs, 'mfe', scales);
+
+% Plot with back-projected IC topographies
+ascent_plot(exponent, EEG.chanlocs, 'aperiodic', [], ...
+    offset, freqs, psd, psd_corrected, ...
+    'ICA', true, 'icawinv', EEG.icawinv);

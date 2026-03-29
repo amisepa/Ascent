@@ -23,7 +23,7 @@ function [exponent, offset, info] = compute_AperiodicFit(freqs, psd, varargin)
 %     'PeakThreshold'   : peak detection threshold in units of SD of the
 %                         flattened spectrum (default 2.0; FOOOF default = 2.0)
 %     'PeakWidthLimits' : [min max] peak width in Hz; width = 2*sigma
-%                         (default [0.5 12])
+%                         (default [1 12])
 %     'Parallel'        : true|false, parfor over channels (default true)
 %     'Progress'        : true|false, print per-channel output (default true)
 %
@@ -85,7 +85,7 @@ p.addParameter('AperiodicMode',   'fixed',     @(s) ischar(s) || isstring(s));
 p.addParameter('MaxPeaks',        6,           @(x) isnumeric(x) && isscalar(x) && x >= 0);
 p.addParameter('MinPeakHeight',   0.05,        @(x) isnumeric(x) && isscalar(x) && x >= 0);
 p.addParameter('PeakThreshold',   2.0,         @(x) isnumeric(x) && isscalar(x) && x > 0);
-p.addParameter('PeakWidthLimits', [0.5 12],    @(x) isnumeric(x) && numel(x)==2);
+p.addParameter('PeakWidthLimits', [1 12],     @(x) isnumeric(x) && numel(x)==2);
 p.addParameter('Parallel',        true,        @(x) islogical(x) && isscalar(x));
 p.addParameter('Progress',        true,        @(x) islogical(x) && isscalar(x));
 p.parse(freqs, psd, varargin{:});

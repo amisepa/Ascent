@@ -161,14 +161,14 @@ function v = mfe_one_channel(sig, m, r, n_exp, tau, coarseType, S, minBinsAll, m
 % Compute MFE across scales (no filtering)
 
 v = nan(1, S);
-for s = 1:S
-    if s == 1
-        % Scale 1 = FuzzyEn of original (z-scored) signal
-        % v(1) = compute_FuzzEn(sig, m, r, n_exp, tau);
-        v(1) = compute_FuzzEn(sig, 'm', m, 'n', n_exp, 'tau', tau, 'r', r, ...
-                          'Parallel', false, 'Progress', false);
-        continue
-    end
+for s = 2:S
+    % if s == 1
+    %     % Scale 1 = FuzzyEn of original (z-scored) signal
+    %     % v(1) = compute_FuzzEn(sig, m, r, n_exp, tau);
+    %     v(1) = compute_FuzzEn(sig, 'm', m, 'n', n_exp, 'tau', tau, 'r', r, ...
+    %                       'Parallel', false, 'Progress', false);
+    %     continue
+    % end
 
     L = floor(numel(sig)/s)*s;
     nBins = L / s;

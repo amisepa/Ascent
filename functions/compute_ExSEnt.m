@@ -1,4 +1,4 @@
-function [HD, HA, HDA, info] = compute_ExSEnt2(data, varargin)
+function [HD, HA, HDA, info] = compute_ExSEnt(data, varargin)
 % compute_ExSEnt  Extrema-Segmented Entropy (ExSEnt) for multichannel data.
 %
 %   [HD, HA, HDA, info] = compute_ExSEnt(data, 'm', 2, ...
@@ -15,7 +15,12 @@ function [HD, HA, HDA, info] = compute_ExSEnt2(data, varargin)
 %   'Progress'  : logical true/false to show progress (default = true)
 %                 • If Parallel==true  and Progress==true → text only (parfor-safe)
 %                 • If Parallel==false and Progress==true → text + waitbar (fallback to text if headless)
-%   'Plot'      : validation plot for the FIRST channel (default = false)
+%   'Plot'      : plot mode (default = false)
+%                 false / 'none'      → no plot
+%                 true / 'validation' → signal + D/A sequences for channel 1
+%                                       (use during lambda tuning on new data)
+%                 'bifurcation'       → bifurcation-style scatter across all
+%                                       channels, coloured by H_DA
 %
 % Outputs:
 %   HD, HA, HDA : [n_channels x 1] entropies (duration, amplitude, joint)
@@ -28,9 +33,10 @@ function [HD, HA, HDA, info] = compute_ExSEnt2(data, varargin)
 %   • Uses the SAME SampEn backend as compute_SampEn (embed_tau + Chebyshev).
 %
 % Example:
-%   [HD,HA,HDA,info] = compute_ExSEnt(EEG, 'm', 2, 'r', 0.2, ...
+%   [HD,HA,HDA,info] = compute_ExSEnt(EEG.data, 'm', 2, 'r', 0.2, ...
 %                                     'lambda', 0.01, 'Parallel', true, ...
-%                                     'Progress', true, 'Plot', true);
+%                                     'Progress', true, 'Plot', 'bifurcation', ...
+%                                     'ChanLabels', {EEG.chanlocs.labels});
 %
 % Reference:
 %   Kamali, S., Baroni, F., & Varona, P. (2025). ExSEnt: Extrema-Segmented
@@ -50,15 +56,24 @@ p.addParameter('r', 0.20, @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('lambda', 0.01, @(x) isnumeric(x) && isscalar(x) && x >= 0);
 p.addParameter('Parallel', true, @(x) islogical(x) && isscalar(x));
 p.addParameter('Progress', true, @(x) islogical(x) && isscalar(x));
-p.addParameter('Plot', false, @(x) islogical(x) && isscalar(x));
+p.addParameter('Plot', false);                % logical | 'none' | 'validation' | 'bifurcation'
+p.addParameter('ChanLabels', {}, @iscell);   % optional channel label cell array for bifurcation plot
 p.parse(data, varargin{:});
 
 m            = p.Results.m;
-r        = p.Results.r;
+r            = p.Results.r;
 lambda       = p.Results.lambda;
 parallelMode = p.Results.Parallel;
 showProgress = p.Results.Progress;
-doPlot       = p.Results.Plot;
+plotArg      = p.Results.Plot;
+chanLabels   = p.Results.ChanLabels;
+
+% Normalise plotArg → plotMode string
+if islogical(plotArg) || isnumeric(plotArg)
+    if plotArg, plotMode = 'validation'; else, plotMode = 'none'; end
+else
+    plotMode = lower(char(plotArg));   % 'none' | 'validation' | 'bifurcation'
+end
 
 % ---------------- Shape ----------------
 if size(data,1) > size(data,2)
@@ -113,25 +128,83 @@ else
     if ~isempty(hWB) && isvalid(hWB), try, close(hWB); end, end
 end
 
-% ---------------- Validation plot (first channel) ----------------
-if doPlot && nchan >= 1
-    x = data(1,:);
-    [D_vals, A_vals, segment_idx] = extract_DA(x, lambda);
+% ---------------- Plot ----------------
+switch plotMode
 
-    figure('Name','ExSEnt Validation','Color','w');
-    subplot(2,1,1);
-    plot(x,'k'); hold on;
-    plot(segment_idx, x(segment_idx),'ro','MarkerFaceColor','r');
-    xlabel('Samples'); ylabel('Amplitude');
-    title('Signal with detected extrema');
-    grid on;
+    % ---- (1) Single-channel diagnostic (lambda tuning) ------------------
+    case 'validation'
+        x = data(1,:);
+        [D_vals, A_vals, segment_idx] = extract_DA(x, lambda);
 
-    subplot(2,1,2);
-    yyaxis left;  plot(D_vals,'b-o','LineWidth',1.2); ylabel('Durations (samples)');
-    yyaxis right; plot(A_vals,'r-s','LineWidth',1.2); ylabel('Amplitudes (Δ)');
-    xlabel('Segment index');
-    title('Duration and amplitude sequences (D and A)');
-    grid on;
+        figure('Name','ExSEnt Validation','Color','w');
+        subplot(2,1,1);
+        plot(x,'k'); hold on;
+        plot(segment_idx, x(segment_idx),'ro','MarkerFaceColor','r');
+        xlabel('Samples'); ylabel('Amplitude');
+        title('Signal with detected extrema');
+        grid on;
+
+        subplot(2,1,2);
+        yyaxis left;  plot(D_vals,'b-o','LineWidth',1.2); ylabel('Durations (samples)');
+        yyaxis right; plot(A_vals,'r-s','LineWidth',1.2); ylabel('Amplitudes (Δ)');
+        xlabel('Segment index');
+        title('Duration and amplitude sequences (D and A)');
+        grid on;
+
+    % ---- (2) Bifurcation-style summary across all channels --------------
+    case 'bifurcation'
+
+        if isempty(chanLabels)
+            chanLabels = arrayfun(@(i) sprintf('Ch%d',i), 1:nchan, 'UniformOutput', false);
+        end
+
+        % Collect (channel, signal value, HDA) — one row per sample
+        temp_bif = cell(1, nchan);
+        for ch = 1:nchan
+            sig = data(ch,:);
+            temp_bif{ch} = [repmat(ch, numel(sig), 1), sig(:), repmat(HDA(ch), numel(sig), 1)];
+        end
+        bif_data = vertcat(temp_bif{:});
+        bif_ch   = bif_data(:,1);
+        bif_x    = bif_data(:,2);
+        bif_HDA  = bif_data(:,3);
+
+        % Normalise H_DA for colourmap
+        Hnorm_scatter = (bif_HDA - min(HDA)) ./ (max(HDA) - min(HDA) + eps);
+
+        figure('Color','w','Name','ExSEnt Bifurcation');
+
+        % Top: scatter coloured by H_DA
+        ax1 = axes('Position', [0.10, 0.35, 0.85, 0.60]);
+        scatter(ax1, bif_ch, bif_x, 4, Hnorm_scatter, 'filled');
+        colormap(ax1, jet);
+        cl = colorbar(ax1);
+        cl.Label.String = 'H_{DA} (normalised)';
+        set(ax1, 'XTick', 1:nchan, 'XTickLabel', [], ...
+                 'XLim', [0.5, nchan+0.5], 'FontSize', 22, 'LineWidth', 1.5);
+        ylabel(ax1, 'Amplitude');
+        title(ax1, sprintf('ExSEnt  |  m=%d, r=%.2f, \\lambda=%.3f', m, r, lambda), ...
+            'FontWeight', 'bold', 'FontSize', 13);
+
+        % Bottom: HD, HA, HDA lines per channel
+        ax2 = axes('Position', [0.10, 0.10, 0.85, 0.20]);
+        hold(ax2, 'on');
+        plot(ax2, 1:nchan, HD,  'Color', [0.10, 0.35, 0.65], 'LineWidth', 1.7);
+        plot(ax2, 1:nchan, HA,  'Color', [0.85, 0.20, 0.25], 'LineWidth', 1.7);
+        plot(ax2, 1:nchan, HDA, 'Color', [0.65, 0.20, 0.75], 'LineWidth', 1.7);
+        hold(ax2, 'off');
+        legend(ax2, {'H_D','H_A','H_{DA}'}, 'Location', 'best');
+        ylabel(ax2, 'ExSEnt');
+        xlabel(ax2, 'Channel');
+        set(ax2, 'XTick', 1:nchan, 'XTickLabel', chanLabels, ...
+                 'XTickLabelRotation', 90, 'TickLabelInterpreter', 'none', ...
+                 'XLim', [0.5, nchan+0.5], 'FontSize', 16, 'LineWidth', 1.5);
+
+        linkaxes([ax1, ax2], 'x');
+
+    case 'none'
+        % no plot
+
 end
 end
 

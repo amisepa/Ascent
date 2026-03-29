@@ -1,4 +1,4 @@
-function [ e, A, B ] = compute_MSE_costa( x, m, r, tau, coarsing)
+function [ e, A, B ] = compute_mse_costa( x, m, r, tau, coarsing)
 % MULTISCALE SAMPLE ENTROPY (MSE)
 %
 % Based on "Multiscale entropy analysis of biological signals"

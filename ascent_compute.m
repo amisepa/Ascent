@@ -1,259 +1,157 @@
 function [EEG, com] = ascent_compute(EEG, varargin)
-
-%% EEGLAB plugin to compute brain entropy- and complexity-based measures on M/EEG data.
-% Also works for any types of biosignal time series (e.g., ECG, PPG, RR intervals, etc.).
+% ascent_compute - EEGLAB plugin to compute entropy and complexity measures
+%   on M/EEG or any biosignal time series (ECG, PPG, RR intervals, etc.).
 %
-% INPUTS:
-%   EEG - EEG structure in EEGLAB format
-%   measure - 'SampEn', 'FuzzEn', 'MSE', 'MFE', 'RCMFE (default)'
-%   chanlist - EEG channels of interest (empty will select all channels)
-%   tau - time lag (default = 1)
-%   m - embedding dimension (default = 2)
-%   coarsing - coarse graining method for multiscale entropies: 'Mean',
-%                 'Standard deviation' (default), or 'Variance'
-%   num_scales - number of scale factors (default = 30)
-%   filt_scales - apply band pass filters to each time scale to control for
-%       broadband spectral bias (see Kosciessa et al. 2020 for more detail).
-%   vis - visualize entropy outputs (1, default) or not (0)
+% USAGE:
+%   EEG = ascent_compute(EEG);                        % GUI mode
+%   EEG = ascent_compute(EEG, 'measure', 'RCMFE');    % name-value mode
+%
+% REQUIRED INPUT:
+%   EEG         - EEGLAB EEG structure
+%
+% OPTIONAL NAME-VALUE INPUTS (all have defaults):
+%
+%   General:
+%     'measure'          - Complexity measure to compute. One of:
+%                          'SampEn', 'FuzzEn', 'ExSEnt', 'FracDim',
+%                          'HigFracDim', 'Aperiodic', 'MSE', 'mMSE',
+%                          'MFE', 'RCMFE' (default), 'RCmvMFE'
+%     'chanlist'         - Channel labels, e.g. {'Fz','Cz'} or 'all' (default: all)
+%     'tau'              - Time lag for embedding (default: 1)
+%     'm'                - Embedding dimension (default: 2)
+%     'r'                - Similarity bound as fraction of SD (default: 0.15)
+%     'vis'              - Plot outputs, logical (default: true)
+%     'parallel'         - Use parallel computing, logical (default: true)
+%     'progress'         - Track progress in console, logical (default: true)
+%
+%   Multiscale measures (MSE, mMSE, MFE, RCMFE, RCmvMFE):
+%     'coarsing'         - Coarse-graining method: 'mean', 'std', 'var' (default)
+%     'num_scales'       - Number of scale factors (default: 30)
+%     'filter_mode'      - Scale filtering: 'none' (default) or 'narrowband' (mMSE)
+%     'TimeWin'          - Time window for time-resolved mMSE (default: [])
+%     'TimeStep'         - Time step for time-resolved mMSE (default: [])
+%
+%   Fuzzy measures (FuzzEn, MFE, RCMFE, RCmvMFE):
+%     'n'                - Fuzzy power (default: 2)
+%     'kernel'           - Fuzzy kernel type: 'exponential' (default)
+%     'blocksize'        - Block size for fuzzy computation (default: 256)
+%
+%   Aperiodic (passed automatically from GUI, or set individually):
+%     'aperiodicmode'    - Aperiodic fit mode: 'fixed' (default) or 'knee'
+%     'maxpeaks'         - Max number of spectral peaks to fit (default: 6)
+%     'minpeakheight'    - Min peak height above aperiodic (default: 0.05)
+%     'peakthreshold'    - Peak detection threshold in SDs (default: 2.0)
+%     'peakwidthlimits'  - [min max] peak width in Hz (default: [1 12])
+%     'correctaperiodic' - Subtract aperiodic model from PSD, logical (default: true)
 %
 % OUTPUTS:
-%  EEG.ascent   - structure with Ascent's preprocessing parameters and 
-%                  complexity outputs
-% 
-% USAGE:
-%   1) Import EEG data into EEGLAB
-%   2) Preprocess as necessary (e.g., reference, clean data with ASR, etc.)
-%   3) GUI mode: Tools > Compute entropy
+%   EEG.ascent.(measure).data               - computed measure [channels x scales]
+%   EEG.ascent.(measure).electrode_labels   - channel labels used
+%   EEG.ascent.(measure).electrode_locations- channel locations used
+%   EEG.ascent.(measure).scales             - scale vector (multiscale only)
+%   EEG.ascent.aperiodic.data.exponent      - aperiodic exponent [channels x 1]
+%   EEG.ascent.aperiodic.data.offset        - aperiodic offset [channels x 1]
+%   EEG.ascent.aperiodic.data.psd           - raw PSD [channels x freqs]
+%   EEG.ascent.aperiodic.data.freqs         - frequency vector
+%   EEG.ascent.aperiodic.data.psd_corrected - aperiodic-corrected PSD (if requested)
 %
-%   EEG = ascent_compute(EEG);     % launch GUI mode
+% REFERENCES:
+%   Sample Entropy:
+%     Richman & Moorman (2000). Am J Physiol Heart Circ Physiol, 278(6).
+%   Fuzzy Entropy:
+%     Chen et al. (2009). IEEE Trans Biomed Eng, 56(5).
+%   Multiscale Entropy (MSE):
+%     Costa et al. (2002). Phys Rev Lett, 89(6).
+%   Modified MSE (mMSE):
+%     Kosciessa et al. (2020). NeuroImage, 211.
+%   Multiscale Fuzzy Entropy (MFE / RCMFE):
+%     Azami & Escudero (2016). Entropy, 18(10).
+%   Aperiodic / 1/f parameterization (specparam):
+%     Donoghue et al. (2020). Nature Neuroscience, 23.
+%   Higuchi Fractal Dimension:
+%     Higuchi (1988). Physica D, 31(2).
+%   Fractal Dimension (box-counting):
+%     Esteller et al. (2001). IEEE Trans Circuits Syst, 48(2).
 %
 % Copyright - Ascent EEGLAB plugin, Cedric Cannard, 2022
 
-
+com    = '';
 tstart = tic;
 
-% add path to subfolders
+% Add path to subfolders
 plugin_path = fileparts(which('eegplugin_ascent.m'));
 addpath(genpath(plugin_path));
 
-% Basic checks and warnings (unchanged)
+% ----------------------------
+% Input checks
+% ----------------------------
 if nargin < 1, help ascent_compute; return; end
-if isempty(EEG.data), error('Empty dataset.'); end
-if isempty(EEG.chanlocs(1).labels), error('No channel labels.'); end
-if ~isfield(EEG.chanlocs, 'X') || isempty(EEG.chanlocs(1).X)
-    error("Electrode locations are required. Go to 'Edit > Channel locations' and import coordinates");
+if isempty(EEG.data),              error('Empty dataset.');          end
+if isempty(EEG.chanlocs(1).labels),error('No channel labels.');      end
+if ~isfield(EEG.chanlocs,'X') || isempty(EEG.chanlocs(1).X)
+    error("Electrode locations are required. Go to 'Edit > Channel locations' and import coordinates.");
 end
 if isempty(EEG.ref)
-    warning('EEG data not referenced! Referencing is highly recommended (e.g., average-reference)!');
+    warning('EEG data not referenced. Referencing is strongly recommended (e.g., average-reference).');
 end
 
-% -----------------------------
-% Init (so defaults logic works)
-% -----------------------------
-measure     = [];
-chanlist    = [];
-tau         = [];
-m           = [];
-r           = [];
-coarsing    = [];
-num_scales  = [];
-filt_scales = [];      % kept for backward compatibility, but not used
-filter_mode = [];
-n           = [];
-vis         = [];      % let defaults decide if not set
-paraComp    = [];      % let defaults decide if not set
-trackProg   = [];      % let defaults decide if not set
+% ----------------------------
+% Get and validate all parameters
+% ----------------------------
+p = ascent_get_params(EEG, varargin{:});
+if isempty(p)
+    disp('User abort.');
+    return
+end
 
-% optional fuzzy / multiscale extras
-kernel_meth = [];
-blocksize   = [];
-TimeWin     = [];
-TimeStep    = [];
+% Unpack struct into local variables for readability below
+measure          = p.measure;
+chanlist         = p.chanlist;
+tau              = p.tau;
+m                = p.m;
+r                = p.r;
+vis              = p.vis;
+paraComp         = p.paraComp;
+trackProg        = p.trackProg;
+coarsing         = p.coarsing;
+num_scales       = p.num_scales;
+filter_mode      = p.filter_mode;
+TimeWin          = p.TimeWin;
+TimeStep         = p.TimeStep;
+n                = p.n;
+kernel_meth      = p.kernel_meth;
+blocksize        = p.blocksize;
+freqRange        = p.freqRange;
+winSec           = p.winSec;
+psdOverlap       = p.psdOverlap;
+windowType       = p.windowType;
+aperiodicMode    = p.aperiodicMode;
+fitFreqRange     = p.fitFreqRange;
+maxPeaks         = p.maxPeaks;
+minPeakHeight    = p.minPeakHeight;
+peakThreshold    = p.peakThreshold;
+peakWidthLimits  = p.peakWidthLimits;
+correctAperiodic = p.correctAperiodic;
 
-% -----------------------------
-% Get parameters: GUI if none, else name–value pairs
-% -----------------------------
-if nargin == 1 || (nargin == 2 && isempty(varargin{1}))
-
-    [measure, chanlist, tau, m, coarsing, num_scales, ~, n, vis, paraComp, trackProg] = ascent_compute_gui(EEG);
-
-    % Debug once (remove after you confirm)
-    disp(['GUI paraComp = ' num2str(paraComp) ', trackProg = ' num2str(trackProg)])
-
+% ----------------------------
+% Parpool management
+% ----------------------------
+p = gcp('nocreate');
+if paraComp
+    if isempty(p)
+        disp('Launching parallel pool...');
+        parpool;
+    end
 else
-    if mod(numel(varargin),2) ~= 0
-        error('Options must be provided as name–value pairs.');
-    end
-    for k = 1:2:numel(varargin)
-        key = lower(string(varargin{k}));
-        val = varargin{k+1};
-        switch key
-            case 'measure'
-                measure = val;
-
-            case 'chanlist'
-                if ischar(val) || isstring(val)
-                    if strcmpi(string(val),'all')
-                        chanlist = {EEG.chanlocs.labels}';
-                    else
-                        chanlist = regexp(char(val),'[^,\s]+','match')';
-                    end
-                elseif iscell(val)
-                    chanlist = val(:);
-                else
-                    error('Channels must be ''all'', a string list, or a cellstr.');
-                end
-
-            case 'tau'
-                tau = double(val);
-
-            case 'm'
-                m = double(val);
-
-            case 'r'
-                r = double(val);
-
-            case 'coarsing'
-                coarsing = val;
-
-            case 'num_scales'
-                num_scales = double(val);
-
-            % Deprecated: keep accepting but ignore (filter removed from UI)
-            case {'filt','filt_scales','filtscales'}
-                filt_scales = logical(val);
-
-            case 'n'
-                n = double(val);
-
-            case 'vis'
-                vis = logical(val);
-
-            case {'parallel','paracomp'}
-                paraComp = logical(val);
-
-            case {'progress','trackprog'}
-                trackProg = logical(val);
-
-            case 'kernel'
-                kernel_meth = val;
-
-            case 'blocksize'
-                blocksize = double(val);
-
-            case 'filter_mode'
-                filter_mode = val;
-
-            case 'timewin'
-                TimeWin = double(val);
-
-            case 'timestep'
-                TimeStep = double(val);
-
-            otherwise
-                error('Unknown option: %s', key);
-        end
+    if ~isempty(p)
+        disp('Shutting down parallel pool (parallel computing OFF).');
+        delete(p);
     end
 end
 
-% --------
-% Defaults
-% --------
-
-% general parameters
-if isempty(chanlist)
-    disp('No channels were selected: selecting all channels (default)')
-    chanlist = {EEG.chanlocs.labels}';
-end
-
-if isempty(measure)
-    disp('No complexity measure selected: selecting RCMFE (default).')
-    measure = 'RCMFE';
-end
-
-if isempty(tau)
-    disp('No time lag selected: selecting tau = 1 (default).')
-    tau = 1;
-end
-
-if isempty(m)
-    disp('No embedding dimension selected: selecting m = 2 (default).')
-    m = 2;
-end
-
-if isempty(r)
-    disp('No similarity bound selected: selecting r = .15 (default).')
-    r = .15;
-end
-
-if isempty(vis)
-    disp('No plotting option selected: turning plotting ON (default).')
-    vis = true;
-end
-
-if isempty(trackProg)
-    disp('No progress tracking defined: setting it to ON (default).')
-    trackProg = true;
-end
-
-if isempty(paraComp)
-    disp('Computing method not selected: turning parallel computing ON (default).')
-    paraComp = true;
-    parpool
-end
-
-% multiscale parameters
-if contains(lower(measure), {'mse','mmse','mfe','rcmfe','rcmvmfe'})
-    if isempty(coarsing)
-        disp('No coarse graining method selected: selecting variance (default).')
-        coarsing = 'var';
-    end
-    if isempty(num_scales)
-        disp('Number of scale factors not selected: selecting num_scales = 30 (default).')
-        num_scales = 30;
-    end
-
-    % Filtering: UI removed, keep logic via filter_mode only
-    if isempty(filter_mode)
-        if strcmpi(lower(measure), 'mmse')
-            filter_mode = 'narrowband';
-            disp("Filtering each scale factor set to: narrowband (from Kosciessa et al. 2017)")
-        else
-            filter_mode = 'none';
-            disp("Filtering each scale factor set to: OFF")
-        end
-    else
-        disp("Filtering each scale factor mode set to: " + string(filter_mode))
-    end
-
-    if isempty(TimeWin) || isempty(TimeStep)
-        TimeWin = [];
-        TimeStep = [];
-        disp("mMSE time-resolved mode set to: OFF.")
-    else
-        disp("mMSE time-resolved mode set to: ON.")
-    end
-end
-
-% Fuzzy parameters
-if contains(lower(measure), {'fuzzen','mfe','rcmfe','rcmvmfe'})
-    if isempty(n)
-        disp('No fuzzy power selected: using n = 2 (default).')
-        n = 2;
-    end
-    if isempty(kernel_meth)
-        disp('Kernel method not selected: using exponential kernel (default).')
-        kernel_meth = 'exponential';
-    end
-    if isempty(blocksize)
-        disp('BlockSize not specified: using blocksize = 256 (default).')
-        blocksize = 256;
-    end
-end
-
-%% Compute entropy depending on choices
-
-% index with channels of interest
+% ----------------------------
+% Channel indexing
+% ----------------------------
 nChan = length(chanlist);
 if nChan > 1 && nChan < EEG.nbchan
     [~, chanIdx] = intersect({EEG.chanlocs.labels}, split(chanlist));
@@ -261,209 +159,207 @@ else
     chanIdx = 1:EEG.nbchan;
 end
 
-% extract data of interest and avoid structure broadcast overhead for
-% parfor loops
-data = EEG.data(chanIdx, :);    % EEG data (channels x samples)
-fs = EEG.srate;                 % sample rate
-nChan = size(data, 1);          % number of channels
-chanLabels = {EEG.chanlocs(chanIdx).labels}; % channel labels
-chanlocs = EEG.chanlocs(chanIdx);
+% Extract data — avoids struct broadcast overhead in parfor
+data       = EEG.data(chanIdx, :);
+fs         = EEG.srate;
+nChan      = size(data, 1);
+chanLabels = {EEG.chanlocs(chanIdx).labels};
+chanlocs   = EEG.chanlocs(chanIdx);
 
-% preallocate memory
-if contains(lower(measure), {'mse' 'mfe' 'rcmfe'})
+% Preallocate
+if contains(lower(measure), {'mse','mfe','rcmfe'})
     entropy = nan(nChan, num_scales);
 else
-    entropy = nan(nChan,1);
+    entropy = nan(nChan, 1);
 end
 scales = {};
 
-% FIXME: for multiscale measures:
-% Determine max number of scales using file length. As a rough guideline, 
-% some researchers suggest having at least 10 times as many data points as 
-% the embedding dimension m used in the entropy calculation. For instance, 
-% if you are using an embedding dimension of 2, you might want to have at 
-% least 20 data points in each coarse-grained time series. So, the maximum 
-% scale factor τ_max that you could use would be approximately N/20 when 
-% using an embedding dimension of 2.
+% ----------------------------
+% Compute
+% ----------------------------
+switch lower(measure)
 
-% COMPUTE ENTROPY/COMPLEXITY MEASURES
-switch measure
-
-    % Sample Entropy (SampEn)
-    case 'SampEn'
-        tic
+    case 'sampen'
+        % Sample Entropy — Richman & Moorman (2000)
         entropy = compute_SampEn(data, 'm', m, 'r', r, ...
-            'parallel', paraComp, 'Progress', trackProg);
-        toc
-        
-    % Fuzzy Entropy (FuzzEn)
-    case 'FuzzEn'
+            'Parallel', paraComp, 'Progress', trackProg);
+
+    case 'fuzzen'
+        % Fuzzy Entropy — Chen et al. (2009)
         entropy = compute_FuzzEn(data, 'm', m, 'tau', tau, 'n', n, 'r', r, ...
-            'Kernel', kernel_meth, 'BlockSize',blocksize, ...
+            'Kernel', kernel_meth, 'BlockSize', blocksize, ...
             'Parallel', paraComp, 'Progress', trackProg);
 
-        % % Original from Azami (2019) is actually faster
-        % entropy = nan(nChan,1);
-        % for iChan = 1:EEG.nbchan
-        %     entropy(iChan,:) = compute_FuzzEn_azami(data(iChan,:), m, kernel_meth, [r n], 0, tau); % (ts, m, mf, rn, local,tau)
-            % if trackProg
-            %    fprintf('  ch %3d/%3d: %.3f\n', iChan, EEG.nbchan, entropy(iChan,:));
-            % end
-        % end            
-
-
-    %  Multivariate Fuzzy Entropy (mvFuzzEn)
-    case 'mvFuzzEn'
-        [entropy, phi_m, phi_m1] = compute_mvFuzzEn(data, 'm', m, 'tau', tau, 'n', n, 'r', r, ...
-            'Kernel', kernel_meth, 'BlockSize',blocksize, ...
+    case 'mvfuzzen'
+        % Multivariate Fuzzy Entropy
+        [entropy, ~, ~] = compute_mvFuzzEn(data, 'm', m, 'tau', tau, 'n', n, 'r', r, ...
+            'Kernel', kernel_meth, 'BlockSize', blocksize, ...
             'Parallel', paraComp, 'Progress', trackProg);
 
-    % Extrema-Segmented Entropy (ExSEnt)    
-    case 'ExSEnt'
-        [HD, HA, HDA, info] = compute_ExSEnt(data, 'm', m, 'r', r, ...
+    case 'exsent'
+        % Extrema-Segmented Entropy
+        [HD, HA, HDA, ~] = compute_ExSEnt(data, 'm', m, 'r', r, ...
             'lambda', 0.001, 'Plot', false, ...
             'Parallel', paraComp, 'Progress', trackProg);
 
-    % Fractal Dimension (FracDim)
-    case 'FracDim'
+    case 'fracdim'
+        % Box-counting Fractal Dimension — Esteller et al. (2001)
+        [entropy, ~, ~] = compute_FracDim(data, ...
+            'RejectBursts', true, 'WinFrac', 0.02, 'ZThresh', 6, ...
+            'RobustFit', 'theilsen', 'ScaleTrimIQR', true, ...
+            'Parallel', paraComp, 'Progress', trackProg);
 
-        % Box-counting version
-        % [entropy, SD, info] = compute_FracDim(data, ...
-        %     'RejectBursts', true, 'WinFrac', 0.02, 'ZThresh', 6, ...
-        %     'RobustFit', 'theilsen', ... %  'theilsen' (default) or 'ols'
-        %     'ScaleTrimIQR', true, ...
-        %     'Parallel', paraComp, 'Progress', trackProg);
-    
-        % Higushi 
-        [entropy, SD, info] = compute_HigFracDim(data);
+    case 'higfracdim'
+        % Higuchi Fractal Dimension — Higuchi (1988)
+        [entropy, SD, info] = compute_HigFracDim(data, ...
+            'Kmax', 16, 'RobustFit', 'theilsen', 'MinScales', 4, ...
+            'Parallel', true, 'Progress', true);
 
-    case 'Aperiodic'
-        % Compute PSD first (Welch)
-        [psd, freqs] = spectopo(EEG.data, 0, EEG.srate, 'plot','off');
-        psd = 10.^(psd/10);   % spectopo returns dB → convert back to linear
+    case 'aperiodic'
+        % Aperiodic (1/f) exponent and offset — Donoghue et al. (2020)
 
-        % Compute aperiodic slope and offset
+        % Step 1: Welch PSD (linear, µV²/Hz)
+        [psd, freqs] = compute_psd(EEG.data, EEG.srate, ...
+            'freqRange', freqRange, ...
+            'winSec',    winSec,    ...
+            'overlap',   psdOverlap, ...
+            'window',    windowType, ...
+            'detrend',   true,       ...
+            'Parallel',  paraComp,   ...
+            'Progress',  trackProg);
+
+        % Step 2: Fit aperiodic model
         [exponent, offset, info] = compute_AperiodicFit(freqs, psd, ...
-            'FreqRange', [1 40], 'MaxPeaks', 6);
+            'FreqRange',       fitFreqRange,   ...
+            'AperiodicMode',   aperiodicMode,  ...
+            'MaxPeaks',        maxPeaks,       ...
+            'MinPeakHeight',   minPeakHeight,  ...
+            'PeakThreshold',   peakThreshold,  ...
+            'PeakWidthLimits', peakWidthLimits, ...
+            'Parallel',        paraComp,       ...
+            'Progress',        trackProg);
 
+        % Step 3 (optional): subtract aperiodic model from PSD
+        % Model (fixed mode): L(f) = offset - exponent * log10(f)
+        % Correction:  log10(psd_corrected) = log10(psd) - L(f)
+        if correctAperiodic
+            log_freqs = log10(freqs);
+            psd_corrected = nan(size(psd));
+            for iChan = 1:nChan
+                ap_model = offset(iChan) - exponent(iChan) .* log_freqs;
+                psd_corrected(iChan,:) = 10.^(log10(psd(iChan,:)) - ap_model);
+            end
+            disp('Aperiodic component subtracted from PSD.');
+        end
 
-    % Multiscale Entropy (MSE) 
-    case 'MSE'
-        % classic algo from Costa but optimized
+    case 'mse'
+        % Multiscale Entropy — Costa et al. (2002)
         [entropy, scales] = compute_MSE(data, 'm', m, 'tau', tau, ...
             'coarsing', coarsing, 'num_scales', num_scales, ...
             'Parallel', paraComp, 'Progress', trackProg);
 
-    % Modified Multiscale Entropy (mMSE)
-    case 'mMSE'
-        % from Kloosterman and Kosciessa, implemented in Fieldtrip) 
-        % controling for spectral leakage
-        [entropy, scales, info] = compute_mMSE(data, 'm', m, 'tau', tau, 'r', r, ...
-              'coarsing', coarsing, 'num_scales', num_scales, ...
-              'Parallel', paraComp, 'Progress', trackProg, ...
-              'filter_mode', filter_mode, 'fs', fs, ...
-              'TimeWin', TimeWin, 'TimeStep', TimeStep); % for time-resolved version
-
-    % Multiscale Fuzzy Entropy (MFE)
-    case 'MFE'
-         [entropy, scales] = compute_MFE(data, 'm', m, ...
-             'tau', tau, 'r', r, 'coarsing', coarsing, 'num_scales', num_scales, ...
-              'Parallel', paraComp, 'Progress', trackProg);
-
-    % Refined Composite Multiscale Fuzzy Entropy (RCMFE)
-    case 'RCMFE'
-            [entropy, scales] = compute_RCMFE(data, 'm', m, 'tau', tau, ...
-                'r', r, 'n', n, 'coarsing', coarsing, 'num_scales', num_scales, ...
-                'Parallel', paraComp, 'Progress', trackProg);
-
-    % Refined Composite Multivariate Multiscale Fuzzy Entropy (RCmvMFE)
-    case 'RCmvMFE'
-        % original (optimized by Cedric on Dec 17, 2025 otherwise algo
-        % takes forever or crashes)
-        % tic
-        % entropy1 = compute_RCmvMFE_ori(data, m, r, n, tau, num_scales, coarsing, ...
-        %     trackProg);
-        % toc
-
-        [entropy, scales] = compute_RCmvMFE(data,'m', m, 'tau', tau, 'r', r, ...
+    case 'mmse'
+        % Modified MSE — Kosciessa et al. (2020)
+        [entropy, scales, ~] = compute_mMSE(data, 'm', m, 'tau', tau, 'r', r, ...
             'coarsing', coarsing, 'num_scales', num_scales, ...
-             'Parallel', paraComp, 'Progress', trackProg);
+            'filter_mode', filter_mode, 'fs', fs, ...
+            'TimeWin', TimeWin, 'TimeStep', TimeStep, ...
+            'Parallel', paraComp, 'Progress', trackProg);
 
+    case 'mfe'
+        % Multiscale Fuzzy Entropy — Azami & Escudero (2016)
+        [entropy, scales] = compute_MFE(data, 'm', m, ...
+            'tau', tau, 'r', r, 'coarsing', coarsing, 'num_scales', num_scales, ...
+            'Parallel', paraComp, 'Progress', trackProg);
 
-    % % Spectral entropy (SpecEn) - Over time
-    % case 'SpecEn' 
-    %     disp('Computing spectral entropy...')
-    %     progressbar('Channels')
-    %     parfor iChan = 1:nchan
-    %         % fprintf('Channel %d \n', iChan)
-    %         [entropy(iChan,:),te] = pentropy( zscore(EEG.data(chanIdx(iChan),:)), EEG.srate);
-    % 
-    %         fprintf('   %s: %6.3f \n', EEG.chanlocs(iChan).labels, entropy(iChan,:))
-    %         progressbar(iChan/nchan)
-    %     end
+    case 'rcmfe'
+        % Refined Composite Multiscale Fuzzy Entropy — Azami & Escudero (2016)
+        [entropy, scales] = compute_RCMFE(data, 'm', m, 'tau', tau, ...
+            'r', r, 'n', n, 'coarsing', coarsing, 'num_scales', num_scales, ...
+            'Parallel', paraComp, 'Progress', trackProg);
+
+    case 'rcmvmfe'
+        % Refined Composite Multivariate Multiscale Fuzzy Entropy
+        [entropy, scales] = compute_RCmvMFE(data, 'm', m, 'tau', tau, 'r', r, ...
+            'coarsing', coarsing, 'num_scales', num_scales, ...
+            'Parallel', paraComp, 'Progress', trackProg);
 
     otherwise
-        error('Unknown entropy type. Please select one of the options (see help get_entropy).')
+        error('Unknown measure: %s. See help ascent_compute for valid options.', measure);
 end
 
-% % Get scales bounds
-% if ~isempty(scales)
-%     scale_bounds = {};
-%     for iScale = 1:length(scales)
-%         % Scale frequency bounds
-%         nf = EEG.srate / 2; % Nyquist frequency
-%         upperBound = (1/iScale).*nf + .05*((1./iScale).*nf);
-%         lowerBound = (1/(iScale+1)).*nf - .05*((1./(iScale+1)).*nf);
-%         scale_bounds{iScale} = [round(upperBound,3) round(lowerBound,3) ];
-%     end
-% end
-
-% Visualize / Plot
+% ----------------------------
+% VISUALIZATIONS | PLOTS
+% ----------------------------
 if vis
-    if nChan>1
-        if strcmpi(measure, 'ExSEnt')
-            ascent_plot(HD, chanlocs, 'SampEn of durations', scales);
-            ascent_plot(HA, chanlocs, 'SampEn of amplitudes', scales);
-            ascent_plot(HDA, chanlocs, 'Joint SampEn of durations & amplitudes', scales);
-        else
-            % % Standard plot
-            ascent_plot(entropy, chanlocs, measure, scales);
-
-            % Time-resolved plot
-            if strcmpi(measure, 'mMSE') && ~isempty(TimeStep)
-                ascent_plot(info.mse_time, EEG.chanlocs, 'Time-resolved mMSE', scales, info.time_sec);
-            end
+    if nChan > 1
+        switch lower(measure)
+            case 'exsent'
+                ascent_plot(HD,  chanlocs, 'SampEn of durations',                    []);
+                ascent_plot(HA,  chanlocs, 'SampEn of amplitudes',                   []);
+                ascent_plot(HDA, chanlocs, 'Joint SampEn of durations & amplitudes', []);
+            case 'aperiodic'
+                if correctAperiodic
+                    ascent_plot(exponent, chanlocs, 'Aperiodic', [], offset, freqs, psd, psd_corrected);
+                else
+                    ascent_plot(exponent, chanlocs, 'Aperiodic', [], offset, freqs, psd);
+                end
+            otherwise
+                ascent_plot(entropy, chanlocs, measure, scales);
+                if strcmpi(measure, 'mmse') && ~isempty(TimeStep)
+                    ascent_plot(info.mse_time, chanlocs, 'Time-resolved mMSE', scales, info.time_sec);
+                end
         end
     else
-        disp("Sorry, you need more than 1 EEG channel for visualization.")
+        disp('Visualization requires more than 1 channel.');
     end
 end
 
-% outputs to export in EEG structure
-if strcmpi(measure, 'ExSEnt')
-    EEG.ascent.(measure).data.HD = HD;
-    EEG.ascent.(measure).data.HA = HA;
-    EEG.ascent.(measure).data.HDA = HDA;
-else
-    EEG.ascent.(measure).data = entropy;
+% ----------------------------
+% Store outputs in EEG structure
+% ----------------------------
+switch lower(measure)
+    case 'exsent'
+        EEG.ascent.(measure).data.HD  = HD;
+        EEG.ascent.(measure).data.HA  = HA;
+        EEG.ascent.(measure).data.HDA = HDA;
+    case 'aperiodic'
+        EEG.ascent.(measure).data.exponent = exponent;
+        EEG.ascent.(measure).data.offset   = offset;
+        EEG.ascent.(measure).data.psd      = psd;
+        EEG.ascent.(measure).data.freqs    = freqs;
+        EEG.ascent.(measure).params.freqRange       = freqRange;
+        EEG.ascent.(measure).params.winSec          = winSec;
+        EEG.ascent.(measure).params.overlap         = psdOverlap;
+        EEG.ascent.(measure).params.window          = windowType;
+        EEG.ascent.(measure).params.aperiodicMode   = aperiodicMode;
+        EEG.ascent.(measure).params.fitFreqRange    = fitFreqRange;
+        EEG.ascent.(measure).params.maxPeaks        = maxPeaks;
+        EEG.ascent.(measure).params.minPeakHeight   = minPeakHeight;
+        EEG.ascent.(measure).params.peakThreshold   = peakThreshold;
+        EEG.ascent.(measure).params.peakWidthLimits = peakWidthLimits;
+        if correctAperiodic
+            EEG.ascent.(measure).data.psd_corrected = psd_corrected;
+        end
+    otherwise
+        EEG.ascent.(measure).data = entropy;
 end
-EEG.ascent.(measure).electrode_labels = chanLabels;
+EEG.ascent.(measure).electrode_labels    = chanLabels;
 EEG.ascent.(measure).electrode_locations = chanlocs;
-if contains(lower(measure), {'mse' 'mfe' 'rcmfe'})
+if contains(lower(measure), {'mse','mfe','rcmfe'})
     EEG.ascent.(measure).scales = scales;
 end
+if exist('info','var')
+    EEG.ascent.(measure).info = info; % additional outputs from some algos 
+end
 
-% ADD PARAMETERS USED IN STRUCTURE OUTPUT 
+% ----------------------------
+% Command history
+% ----------------------------
+com = sprintf("EEG = ascent_compute(EEG, 'measure', '%s', 'chanlist', '%s', " + ...
+              "'tau', %d, 'm', %d, 'vis', %d);", ...
+              measure, strjoin(chanlist, ','), tau, m, vis);
 
-
-% Command history (TO FIX)
-chanLabels = strjoin(chanlist);
-chanLabels = insertBefore(chanLabels," ", "'");
-chanLabels = insertAfter(chanLabels," ", "'");
-com = sprintf('EEG = ascent_compute(''%s'', {''%s''}, %d, %d, %s, %d, %d, %s, %d);', ...
-    measure,chanLabels,tau,m,coarsing,num_scales,filt_scales,'[]',vis);
-
-fprintf('Time to compute: %.2f minutes. \n', toc(tstart)/60)
-disp('Done computing with Ascent! Outputs can be found in the EEG.ascent structure.')
-
-
+disp('Done!');
+fprintf('Time to compute: %.2f minutes.\n', toc(tstart)/60);
+disp('All outputs are stored in EEG.ascent.');
