@@ -1,0 +1,14 @@
+%% Save High-res GUI figures for tutorial
+
+cd 'C:\Users\ccann\Documents\MATLAB\Ascent\figures_new'
+
+saveas(gcf, 'fig_rcmfe_median.fig');
+
+% Figures
+print(gcf, 'fig_rcmfe_median.png', '-dpng', '-r300');
+
+
+
+% GUI figures
+exportapp(gcf,'fig_rcmfe_median.png')
+

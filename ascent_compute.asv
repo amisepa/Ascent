@@ -70,12 +70,25 @@ blocksize   = [];
 TimeWin     = [];
 TimeStep    = [];
 
+% aperiodic params
+correctAperiodic  = [];
+aperiodicMode     = [];
+maxPeaks          = [];
+minPeakHeight     = [];
+peakThreshold     = [];
+peakWidthLimits   = [];
+
 % -----------------------------
 % Get parameters: GUI if none, else name–value pairs
 % -----------------------------
 if nargin == 1 || (nargin == 2 && isempty(varargin{1}))
 
     [measure, chanlist, tau, m, coarsing, num_scales, ~, n, vis, paraComp, trackProg] = ascent_compute_gui(EEG);
+
+    if isempty(measure)
+        disp("User abort.")
+        return
+    end
 
     % Debug once (remove after you confirm)
     disp(['GUI paraComp = ' num2str(paraComp) ', trackProg = ' num2str(trackProg)])
@@ -150,6 +163,23 @@ else
             case 'timestep'
                 TimeStep = double(val);
 
+            case 'correctaperiodic'
+                correctAperiodic = logical(val);
+
+            case 'aperiodicmode'
+                aperiodicMode = val;             % 'fixed' or 'knee'
+
+            case 'maxpeaks'
+                maxPeaks = double(val);
+
+            case 'minpeakheight'
+                minPeakHeight = double(val);
+
+            case 'peakthreshold'
+                peakThreshold = double(val);
+
+            case 'peakwidthlimits'
+                peakWidthLimits = double(val);   % [min max] Hz
             otherwise
                 error('Unknown option: %s', key);
         end
@@ -199,7 +229,6 @@ end
 if isempty(paraComp)
     disp('Computing method not selected: turning parallel computing ON (default).')
     paraComp = true;
-    parpool
 end
 
 % multiscale parameters
@@ -251,6 +280,51 @@ if contains(lower(measure), {'fuzzen','mfe','rcmfe','rcmvmfe'})
     end
 end
 
+% Aperiodic parameters
+if contains(lower(measure), {'aperiodic'})
+    if isempty(correctAperiodic)
+        disp('Aperiodic correction not set: OFF (default).')
+        correctAperiodic = true;
+    end
+    if isempty(aperiodicMode)
+        disp('Aperiodic mode not set: using ''fixed'' (default).')
+        aperiodicMode = 'fixed';
+    end
+    if isempty(maxPeaks)
+        disp('MaxPeaks not set: using 6 (default).')
+        maxPeaks = 6;
+    end
+    if isempty(minPeakHeight)
+        disp('MinPeakHeight not set: using 0.05 (default).')
+        minPeakHeight = 0.05;
+    end
+    if isempty(peakThreshold)
+        disp('PeakThreshold not set: using 2.0 (default).')
+        peakThreshold = 2.0;
+    end
+    if isempty(peakWidthLimits)
+        disp('PeakWidthLimits not set: using [0.5 12] Hz (default).')
+        peakWidthLimits = [0.5 12];
+    end
+end
+
+% Launch parpool
+p = gcp;
+if paraComp
+    if isempty(p)
+        disp("Parpool not yet opened. Launching it...")
+        parpool
+    end
+else
+    % shut down existing parpool    
+    if ~isempty(p)
+        disp("Parpool already opened. Shutting it down.")
+        delete(gcp('nocreate'))
+    end
+end
+
+
+
 %% Compute entropy depending on choices
 
 % index with channels of interest
@@ -287,17 +361,17 @@ scales = {};
 % using an embedding dimension of 2.
 
 % COMPUTE ENTROPY/COMPLEXITY MEASURES
-switch measure
+switch lower(measure)
 
     % Sample Entropy (SampEn)
-    case 'SampEn'
+    case 'sampen'
         tic
         entropy = compute_SampEn(data, 'm', m, 'r', r, ...
             'parallel', paraComp, 'Progress', trackProg);
         toc
         
     % Fuzzy Entropy (FuzzEn)
-    case 'FuzzEn'
+    case 'fuzzen'
         entropy = compute_FuzzEn(data, 'm', m, 'tau', tau, 'n', n, 'r', r, ...
             'Kernel', kernel_meth, 'BlockSize',blocksize, ...
             'Parallel', paraComp, 'Progress', trackProg);
@@ -313,46 +387,71 @@ switch measure
 
 
     %  Multivariate Fuzzy Entropy (mvFuzzEn)
-    case 'mvFuzzEn'
+    case 'mvfuzzen'
         [entropy, phi_m, phi_m1] = compute_mvFuzzEn(data, 'm', m, 'tau', tau, 'n', n, 'r', r, ...
             'Kernel', kernel_meth, 'BlockSize',blocksize, ...
             'Parallel', paraComp, 'Progress', trackProg);
 
     % Extrema-Segmented Entropy (ExSEnt)    
-    case 'ExSEnt'
+    case 'exsent'
         [HD, HA, HDA, info] = compute_ExSEnt(data, 'm', m, 'r', r, ...
-            'lambda', 0.001, 'Plot', false, ...
+            'lambda', 0.001, 'Plot', true, ...
             'Parallel', paraComp, 'Progress', trackProg);
 
-    % Fractal Dimension (FracDim)
-    case 'FracDim'
+    % Box-counting Fractal Dimension (FracDim) - Legacy
+    case 'fracdim'
 
-        % Box-counting version
-        % [entropy, SD, info] = compute_FracDim(data, ...
-        %     'RejectBursts', true, 'WinFrac', 0.02, 'ZThresh', 6, ...
-        %     'RobustFit', 'theilsen', ... %  'theilsen' (default) or 'ols'
-        %     'ScaleTrimIQR', true, ...
-        %     'Parallel', paraComp, 'Progress', trackProg);
-    
+        [entropy, SD, info] = compute_FracDim(data, ...
+            'RejectBursts', true, 'WinFrac', 0.02, 'ZThresh', 6, ...
+            'RobustFit', 'theilsen', ... %  'theilsen' (default) or 'ols'
+            'ScaleTrimIQR', true, ...
+            'Parallel', paraComp, 'Progress', trackProg);
+
+     % Higushi Fractal Dimension (FracDim)
+    case 'higfracdim'
+   
         % Higushi 
         [entropy, SD, info] = compute_HigFracDim(data);
 
-    case 'Aperiodic'
-        % Compute PSD first (Welch)
-[psd, freqs] = spectopo(EEG.data, 0, EEG.srate, 'plot','off');
-psd_lin = 10.^(psd/10);   % spectopo returns dB → convert to linear
+    % Aperiodic (1/f) exponent (slope) and offset
+    case 'aperiodic'
+        % Compute Welch linear PSD
+        [psd, freqs] = compute_psd(EEG.data, EEG.srate, ...
+            'freqRange', [1 40], 'winSec', 2, 'overlap', 0.5, ...
+            'window', 'hann', 'detrend', true, ...
+            'Progress', trackProg, 'Parallel', paraComp);
 
-[exponent, offset, info] = compute_AperiodicFit(freqs, psd_lin, ...
-    'FreqRange', [1 40], 'MaxPeaks', 6);
+        % Aperiodic exponent and offset
+        [exponent, offset, info] = compute_AperiodicFit(freqs, psd, ...
+            'FreqRange',      [1 40],          ...
+            'AperiodicMode',  aperiodicMode,   ...
+            'MaxPeaks',       maxPeaks,        ...
+            'MinPeakHeight',  minPeakHeight,   ...
+            'PeakThreshold',  peakThreshold,   ...
+            'PeakWidthLimits', peakWidthLimits, ...
+            'Parallel', paraComp, 'Progress', trackProg);
+        
+        if correctAperiodic
+            log_freqs = log10(freqs);
+            psd_corrected = nan(size(psd));
+            for iChan = 1:size(psd, 1)
+                aperiodic_model      = offset(iChan) - exponent(iChan) .* log_freqs;
+                psd_corrected(iChan,:) = 10.^(log10(psd(iChan,:)) - aperiodic_model);
+            end
+            disp('Aperiodic component subtracted from PSD (periodic-only spectrum stored).')
+        end
 
-    % Classic Multiscale Entropy (MSE) from Costa but enhanced
-    case 'MSE'
+    % Multiscale Entropy (MSE) 
+    case 'mse'
+        % classic algo from Costa but optimized
         [entropy, scales] = compute_MSE(data, 'm', m, 'tau', tau, ...
             'coarsing', coarsing, 'num_scales', num_scales, ...
             'Parallel', paraComp, 'Progress', trackProg);
 
-    % Modified Multiscale Entropy (mMSE; from Kloosterman and Kosciessa, implemented in Fieldtrip)
-    case 'mMSE'
+    % Modified Multiscale Entropy (mMSE)
+    case 'mmse'
+        % from Kloosterman and Kosciessa, implemented in Fieldtrip) 
+        % controling for spectral leakage
         [entropy, scales, info] = compute_mMSE(data, 'm', m, 'tau', tau, 'r', r, ...
               'coarsing', coarsing, 'num_scales', num_scales, ...
               'Parallel', paraComp, 'Progress', trackProg, ...
@@ -360,19 +459,19 @@ psd_lin = 10.^(psd/10);   % spectopo returns dB → convert to linear
               'TimeWin', TimeWin, 'TimeStep', TimeStep); % for time-resolved version
 
     % Multiscale Fuzzy Entropy (MFE)
-    case 'MFE'
+    case 'mfe'
          [entropy, scales] = compute_MFE(data, 'm', m, ...
              'tau', tau, 'r', r, 'coarsing', coarsing, 'num_scales', num_scales, ...
               'Parallel', paraComp, 'Progress', trackProg);
 
     % Refined Composite Multiscale Fuzzy Entropy (RCMFE)
-    case 'RCMFE'
+    case 'rcmfe'
             [entropy, scales] = compute_RCMFE(data, 'm', m, 'tau', tau, ...
                 'r', r, 'n', n, 'coarsing', coarsing, 'num_scales', num_scales, ...
                 'Parallel', paraComp, 'Progress', trackProg);
 
     % Refined Composite Multivariate Multiscale Fuzzy Entropy (RCmvMFE)
-    case 'RCmvMFE'
+    case 'rcmvmfe'
         % original (optimized by Cedric on Dec 17, 2025 otherwise algo
         % takes forever or crashes)
         % tic
@@ -386,7 +485,7 @@ psd_lin = 10.^(psd/10);   % spectopo returns dB → convert to linear
 
 
     % % Spectral entropy (SpecEn) - Over time
-    % case 'SpecEn' 
+    % case 'sepcen' 
     %     disp('Computing spectral entropy...')
     %     progressbar('Channels')
     %     parfor iChan = 1:nchan
@@ -420,8 +519,15 @@ if vis
             ascent_plot(HD, chanlocs, 'SampEn of durations', scales);
             ascent_plot(HA, chanlocs, 'SampEn of amplitudes', scales);
             ascent_plot(HDA, chanlocs, 'Joint SampEn of durations & amplitudes', scales);
+        elseif strcmpi(measure, 'aperiodic')
+            if ~correctAperiodic
+                ascent_plot(exponent, chanlocs, 'Aperiodic', [], offset, freqs, psd);
+            else
+                ascent_plot(exponent, chanlocs, 'Aperiodic', [], offset, freqs, psd, psd_corrected);
+            end
+
         else
-            % % Standard plot
+            % Standard plot
             ascent_plot(entropy, chanlocs, measure, scales);
 
             % Time-resolved plot
@@ -439,6 +545,14 @@ if strcmpi(measure, 'ExSEnt')
     EEG.ascent.(measure).data.HD = HD;
     EEG.ascent.(measure).data.HA = HA;
     EEG.ascent.(measure).data.HDA = HDA;
+elseif strcmpi(measure, 'aperiodic')
+    EEG.ascent.(measure).data.exponent = exponent;
+    EEG.ascent.(measure).data.offset = offset;
+    EEG.ascent.(measure).data.psd = psd;
+    EEG.ascent.(measure).data.freqs = freqs;
+    if correctAperiodic
+        EEG.ascent.(measure).data.psd_corrected = psd_corrected;
+    end
 else
     EEG.ascent.(measure).data = entropy;
 end

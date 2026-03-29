@@ -1,0 +1,2 @@
+Cluster,Start,End,Peak,Tvalue_full,Tvalue,ES_full,ES,ES_metric,df_used,Channel,Polarity,NumElectrodes
+1,1,50,40,-25.301444456705,-25.301,-3.92308041015009,-3.923,g,39,FPz,Negative,64

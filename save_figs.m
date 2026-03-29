@@ -1,8 +1,16 @@
 %% Save High-res GUI figures for tutorial
 
-cd 'C:\Users\ccann\Documents\MATLAB\Ascent\figures'
+cd 'C:\Users\ccann\Documents\MATLAB\Ascent\figures_new'
 
-% saveas(gcf, 'fig1.fig');
-% print(gcf, 'fig1.png', '-dpng', '-r300');
+%% Normal figures
 
-exportapp(f,'fig1.png')
+saveas(gcf, 'fig_rcmfe_mean.fig');
+print(gcf, 'fig_rcmfe_mean.png', '-dpng', '-r300');
+
+
+
+%% GUI figures (for Matlab 2025 or later)
+
+saveas(gcf, 'fig1c.fig');
+exportapp(gcf,'fig1c.png')
+
