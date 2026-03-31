@@ -199,7 +199,7 @@ for iChan = 1:EEG.nbchan
     % for tau = 1:num_scales
         % out1(iChan,tau) = compute_mse_costa(zscore(data(iChan,:)), m, r, tau, coarsing);
     % end
-    [out1(iChan,:), CI] = compute_MSE_ori(data(iChan,:), Mobj, ...
+    [out1(iChan,:), CI] = compute_MSE_ori(EEG.data(iChan,:), Mobj, ...
         'Scales',  num_scales, 'Methodx', 'coarse', ...
         'RadNew',  1, ...       % rescale r by std at each scale
         'Plotx',   false);
@@ -208,14 +208,16 @@ for iChan = 1:EEG.nbchan
 end
 disp('')
 toc
+ascent_plot(out1, EEG.chanlocs, 'mse', 1:num_scales);
 
 
 % Ascent
 tic
-[out2, scales] = compute_MSE(data, 'm', m, 'tau', tau, ...
+[out2, scales] = compute_MSE(EEG.data, 'm', m, 'tau', tau, ...
     'coarsing', coarsing, 'num_scales', num_scales, ...
     'Parallel', paraComp, 'Progress', trackProg);
 toc
+ascent_plot(out2, EEG.chanlocs, 'mse', 1:num_scales);
 
 out1(:,1) = [];
 out2(:,1) = [];

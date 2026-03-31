@@ -86,25 +86,25 @@ function [mse, scales, info] = compute_mMSE(data, varargin)
 % USAGE EXAMPLES
 % --------------
 % 1) Costa-like MSE (statistical path), mean coarse-grain
-%    [mse, scales, info] = compute_mse(X, 'Fs', 256, 'm', 2, 'tau', 1, ...
+%    [mse, scales, info] = compute_mMSE(X, 'Fs', 256, 'm', 2, 'tau', 1, ...
 %        'r', 0.15, 'num_scales', 30, 'coarsing', 'mean', ...
 %        'filter_mode','none', 'Parallel', true, 'Progress', true);
 %
 % 2) Volatility-MSE (std), statistical path
-%    [mse, scales] = compute_mse(X, 'Fs', 512, 'coarsing','std', ...
+%    [mse, scales] = compute_mMSE(X, 'Fs', 512, 'coarsing','std', ...
 %        'num_scales', 25, 'filter_mode','none');
 %
 % 3) Narrowband filtskip (Kosciessa-style), FIR when feasible
-%    [mse, scales] = compute_mse(X, 'Fs', 500, 'filter_mode','narrowband', ...
+%    [mse, scales] = compute_mMSE(X, 'Fs', 500, 'filter_mode','narrowband', ...
 %        'NBWiden', 0.05, 'FilterDesign','fir', 'num_scales', 20, 'coarsing','mean');
 %
 % 4) Time-resolved narrowband MSE, 2-s windows every 0.5-s
-%    [mse, scales, info] = compute_mse(X, 'Fs', 256, 'filter_mode','narrowband', ...
+%    [mse, scales, info] = compute_mMSE(X, 'Fs', 256, 'filter_mode','narrowband', ...
 %        'TimeWin', 2.0, 'TimeStep', 0.5, 'num_scales', 15);
 %    % → info.mse_time: [nChan×nScales×nTime], info.time_sec: centers (s)
 %
 % 5) EEGLAB struct input with auto Fs
-%    [mse, scales] = compute_mse(EEG, 'num_scales', 20, 'filter_mode','none');
+%    [mse, scales] = compute_mMSE(EEG, 'num_scales', 20, 'filter_mode','none');
 %
 %
 % Notes

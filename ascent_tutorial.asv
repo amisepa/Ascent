@@ -151,13 +151,14 @@ EEG = ascent_compute(EEG, 'measure', 'RCmvMFE', 'chanlist', 'Fz FCz FPz Cz Pz Iz
 %% Multiscale entropy on indepent components (ICs) instead of 
 % scalp channel signals. note: ICA was precomputed on the sample dataset.
 
-if isempty(EE)
+if isempty(EEG.icaact)
     EEG.icaact = EEG.icaweights * EEG.icasphere * EEG.data; % sometimes not saved on disk to save space
 end
 
-[entropy, scales] = compute_MSE(EEG.icaact, 'coarsing', 'variance', 'num_scales', 10);
+% [entropy, scales] = compute_MSE(EEG.icaact, 'coarsing', 'variance', 'num_scales', 10);
+[entropy, scales] = compute_RCMFE(EEG.icaact, 'coarsing', 'variance', 'num_scales', 50);
 
-ascent_plot(entropy, EEG.chanlocs, 'MSE', scales, ...
+ascent_plot(entropy, EEG.chanlocs, 'RCMFE', scales, ...
     'ICA', true, 'icawinv', EEG.icawinv);
 
 %% Aperiodic parametrization on indepent components (ICs) instead of 
