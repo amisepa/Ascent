@@ -135,6 +135,7 @@ EEG = ascent_compute(EEG, 'measure', 'RCMFE', ...
 % PCA components, ROIs, or very short segments, otherwise, extremely long to
 % compute. 
 
+% EEG = ascent_compute(EEG, 'measure', 'mvFuzzEn'); 
 EEG = ascent_compute(EEG, 'measure', 'mvFuzzEn', 'chanlist', 'Fz Cz Pz Iz Oz'); 
 
 %% Refined Composite Multivariate Generalized Multiscale Fuzzy Entropy (RCmvMFE)
@@ -155,8 +156,8 @@ if isempty(EEG.icaact)
     EEG.icaact = EEG.icaweights * EEG.icasphere * EEG.data; % sometimes not saved on disk to save space
 end
 
-% [entropy, scales] = compute_MSE(EEG.icaact, 'coarsing', 'variance', 'num_scales', 10);
-[entropy, scales] = compute_RCMFE(EEG.icaact, 'coarsing', 'variance', 'num_scales', 50);
+% [entropy, scales] = compute_MSE(EEG.icaact, 'coarsing', 'mean', 'num_scales', 10);
+[entropy, scales] = compute_RCMFE(EEG.icaact, 'coarsing', 'mean', 'num_scales', 50);
 
 ascent_plot(entropy, EEG.chanlocs, 'RCMFE', scales, ...
     'ICA', true, 'icawinv', EEG.icawinv);

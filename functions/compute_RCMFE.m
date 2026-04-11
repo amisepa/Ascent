@@ -157,11 +157,11 @@ function v = cmfe_one_channel(sig, m, r, n_exp, tau, coarseType, S, minBinsHard)
 % Composite MFE using ONLY compute_FuzzEn — mean across offsets at each scale.
 v = nan(1, S);
 
-for s = 2:S
-    % if s == 1
-    %     v(1) = fuzz_one(sig, m, r, n_exp, tau);   % original series
-    %     continue
-    % end
+for s = 1:S
+    if s == 1
+        v(1) = fuzz_one(sig, m, r, n_exp, tau);   % original series
+        continue
+    end
 
     L = floor(numel(sig)/s)*s;
     nBins = L / s;

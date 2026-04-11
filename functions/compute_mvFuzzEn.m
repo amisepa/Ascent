@@ -101,31 +101,35 @@ end
 
 % ---------------- phi_m (dimension m) ----------------
 A = embed_mv(data_z, M, tau, N);
-phi_m = fuzzy_mean_similarity_block(A, r, n_exp, kernelType, blk);
+A = A - mean(A, 2);  % mean substraction as in original
+phi_m = fuzzy_mean_similarity_block(A, r, n_exp, kernelType, blk, showProg);
 
-% ---------------- phi_m1 (dimension m+1, averaged across nvar subspaces) ----------------
-Mmat = repmat(M(:).', nvar, 1) + eye(nvar);  % each row increments one channel's embedding by 1
-
+% ---------------- phi_m1 (per-subspace average, not pooled) ----------------
+Mmat = repmat(M(:).', nvar, 1) + eye(nvar);
+phi_m1_vec = nan(nvar, 1);
 if doPar
     Bcells = cell(nvar,1);
     parfor h = 1:nvar
-        Bcells{h} = embed_mv(data_z, Mmat(h,:), tau, N);
+        Btmp = embed_mv(data_z, Mmat(h,:), tau, N);
+        Bcells{h} = Btmp - mean(Btmp, 2);
     end
-    B = vertcat(Bcells{:});
+    for h = 1:nvar
+        phi_m1_vec(h) = fuzzy_mean_similarity_block(Bcells{h}, r, n_exp, kernelType, blk, false);
+        if showProg
+            fprintf('  subspace %3d/%3d: phi_m1=%.6f\n', h, nvar, phi_m1_vec(h));
+        end
+    end
 else
-    B = zeros(nvar*N, sum(M)+1);
-    row0 = 0;
     for h = 1:nvar
         Bh = embed_mv(data_z, Mmat(h,:), tau, N);
-        B((row0+1):(row0+N), :) = Bh;
-        row0 = row0 + N;
-        if showProg && (h==1 || h==nvar || mod(h, max(1,floor(nvar/10)))==0)
-            fprintf('  building m+1 embeddings: %d/%d\n', h, nvar);
+        Bh = Bh - mean(Bh, 2);
+        phi_m1_vec(h) = fuzzy_mean_similarity_block(Bh, r, n_exp, kernelType, blk, false);
+        if showProg
+            fprintf('  subspace %3d/%3d: phi_m1=%.6f\n', h, nvar, phi_m1_vec(h));
         end
     end
 end
-
-phi_m1 = fuzzy_mean_similarity_block(B, r, n_exp, kernelType, blk);
+phi_m1 = mean(phi_m1_vec(isfinite(phi_m1_vec)));
 
 % ---------------- mvFuzzEn ----------------
 if phi_m > 0 && phi_m1 > 0 && isfinite(phi_m) && isfinite(phi_m1)
@@ -169,10 +173,11 @@ for ch = 1:nvar
 end
 end
 
-function mu_mean = fuzzy_mean_similarity_block(X, r, n, kernelType, blk)
+function mu_mean = fuzzy_mean_similarity_block(X, r, n, kernelType, blk, verbose)
 % Mean fuzzy similarity over unique pairs under Chebyshev (max) distance.
 nVec = size(X,1);
 if nVec < 2, mu_mean = NaN; return; end
+if nargin < 6, verbose = false; end
 
 sum_mu = 0;
 num_p  = 0;
@@ -181,8 +186,8 @@ nDim   = size(X,2);
 t0 = tic;
 lastPrint = 0;
 for i1 = 1:blk:nVec
-    if toc(t0) - lastPrint > 5
-        fprintf('    pairs progress: block start %d/%d (%.1f%%)\n', i1, nVec, 100*i1/nVec);
+    if verbose && toc(t0) - lastPrint > 5
+        fprintf('    pairs progress: %.1f%%\n', 100*i1/nVec);
         lastPrint = toc(t0);
     end
     
