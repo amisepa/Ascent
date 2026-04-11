@@ -487,7 +487,7 @@ elseif ~multiscale && multiChan
     set(findall(hFig3,'type','axes'),'FontSize',10,'FontWeight','bold');
 
 elseif multiscale && ~multiChan
-    %% --- Single channel/IC curve ---
+    % Single channel/IC curve 
     hFig4 = figure('Color','w','InvertHardCopy','off');
     try icadefs; set(hFig4,'color',BACKCOLOR); catch; end
     ax_s = axes(hFig4);
@@ -496,6 +496,46 @@ elseif multiscale && ~multiChan
     title(ax_s, entropyType,'Interpreter','none');
     axis(ax_s,'tight');
     set(findall(hFig4,'type','axes'),'FontSize',10,'FontWeight','bold');
+
+    elseif ~multiscale && ~multiChan
+    % Scalar (e.g. mvFuzzEn)
+    hFig5 = figure('Color','w','InvertHardCopy','off', ...
+                   'Name', entropyType, ...
+                   'Toolbar','none','Menu','none','NumberTitle','Off', ...
+                   'Position',[200 200 400 300]);
+    try icadefs; set(hFig5,'color',BACKCOLOR); catch; end
+
+    val = entropyData(isfinite(entropyData));
+    ax_sc = axes(hFig5);
+
+    if isempty(val)
+        axis(ax_sc,'off');
+        text(0.5, 0.5, sprintf('%s = NaN', entropyType), ...
+            'Parent', ax_sc, ...
+            'HorizontalAlignment','center', ...
+            'VerticalAlignment','middle', ...
+            'FontSize', 14, 'FontWeight','bold', ...
+            'Interpreter','none');
+    else
+        bar(ax_sc, 1, val, 0.4, ...
+            'FaceColor',[0.18 0.45 0.87], 'EdgeColor','none');
+        set(ax_sc, 'XTick', 1, 'XTickLabel', {entropyType}, ...
+            'TickDir','out', 'TickLabelInterpreter','none');
+        ylabel(ax_sc, 'Entropy');
+        title(ax_sc, sprintf('%s = %.4f', entropyType, val), ...
+            'Interpreter','none', 'FontSize', 13, 'FontWeight','bold');
+        ylim(ax_sc, [min(0, val*1.2), max(0, val*1.2)]);
+        box(ax_sc, 'on');
+        % Note negative values are valid for mvFuzzEn
+        if val < 0
+            text(1, val*0.5, 'negative entropy is valid', ...
+                'Parent', ax_sc, ...
+                'HorizontalAlignment','center', ...
+                'FontSize', 9, 'Color',[0.5 0.5 0.5], ...
+                'Interpreter','none');
+        end
+    end
+    set(findall(hFig5,'type','axes'),'FontSize',10,'FontWeight','bold');
 
 else
     error('ascent_plot: data format not recognized.')

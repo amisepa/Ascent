@@ -190,17 +190,29 @@ switch lower(measure)
             'Kernel', kernel_meth, 'BlockSize', blocksize, ...
             'Parallel', paraComp, 'Progress', trackProg);
 
-    case 'mvfuzzen'
-        % Multivariate Fuzzy Entropy
-        [entropy, ~, ~] = compute_mvFuzzEn(data, 'm', m, 'tau', tau, 'n', n, 'r', r, ...
-            'Kernel', kernel_meth, 'BlockSize', blocksize, ...
-            'Parallel', paraComp, 'Progress', trackProg);
-
     case 'exsent'
         % Extrema-Segmented Entropy
         [HD, HA, HDA, ~] = compute_ExSEnt(data, 'm', m, 'r', r, ...
             'lambda', 0.001, 'Plot', false, ...
             'Parallel', paraComp, 'Progress', trackProg);
+
+    case 'mvfuzzen'
+        % Multivariate Fuzzy Entropy
+        % tic
+        [entropy, ~, ~] = compute_mvFuzzEn(data, 'm', m, 'tau', tau, 'n', n, 'r', r, ...
+            'Kernel', kernel_meth, 'BlockSize', blocksize, ...
+            'Parallel', paraComp, 'Progress', trackProg);
+        % toc
+
+        % % Azami original algo
+        % tic
+        % [MFuzz, B0, Bt, B1] = MvFuzzEn_ori(data.', ...
+        %     'm',   repmat(m,   size(data,1), 1), ...  % vector of length n_channels
+        %     'tau', repmat(tau, size(data,1), 1), ...  % vector of length n_channels
+        %     'r',   [r, n], ...                         % [r, exponent] as two-element vector
+        %     'Fx',  'default', ...                      % equivalent to your exponential kernel
+        %     'Norm', false);                            % you're already z-scoring beforehand
+        % toc
 
     case 'fracdim'
         % Box-counting Fractal Dimension — Esteller et al. (2001)

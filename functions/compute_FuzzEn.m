@@ -12,7 +12,7 @@ function FuzzEn = compute_FuzzEn(data, varargin)
 %   'tau'       : time lag (default = 1)
 %   'r'         : similarity bound (default = .15)
 %   'Kernel'    : 'exponential' [default] | 'gaussian'
-%   'BlockSize' : pair-block size to bound memory (default = 256; >=128)
+%   'BlockSize' : pair-block size to bound memory (default = 512)
 %   'Parallel'  : logical true/false to enable parfor over channels (default = false)
 %   'Progress'  : logical true/false to show progress (default = false)
 %
@@ -45,7 +45,7 @@ p.addParameter('n', 2,               @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('tau', 1,             @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('r', .15,             @(x) isnumeric(x) && x > 0 && x < 1);
 p.addParameter('Kernel','exponential',@(s) any(strcmpi(s,{'exponential','gaussian'})));
-p.addParameter('BlockSize', 256,    @(x) isnumeric(x) && isscalar(x) && x >= 128 && x <= 2048);
+p.addParameter('BlockSize', 512,    @(x) isnumeric(x) && isscalar(x) && x >= 128 && x <= 2048);
 p.addParameter('Parallel', true,    @(x) islogical(x) && isscalar(x));
 p.addParameter('Progress', true,    @(x) islogical(x) && isscalar(x));
 p.parse(data, varargin{:});
@@ -96,7 +96,8 @@ end
 FuzzEn = nan(nchan, 1);
 if parallelMode && ~isempty(ver('parallel'))
     parfor iChan = 1:nchan
-        FuzzEn(iChan) = fuzz_blockwise(data_z(iChan,:), m, r, n_exp, tau, kernelType, blk);
+        % FuzzEn(iChan) = fuzz_blockwise(data_z(iChan,:), m, r, n_exp, tau, kernelType, blk);
+        FuzzEn(iChan) = fuzz_engine(data_z(iChan,:), m, r, n_exp, tau, kernelType);
         % FuzzEn(iChan) = fuzz(data_z(iChan,:), m, r, n_exp, tau, kernelType);
         % if showProgress && (mod(iChan, max(1, floor(nchan/20)))==0 || iChan==nchan)
         if showProgress
@@ -110,7 +111,7 @@ else
         try hWB = waitbar(0,'Computing Fuzzy Entropy...','Name','compute_FuzzEn'); catch, hWB = []; end
     end
     for iChan = 1:nchan
-        FuzzEn(iChan) = fuzz_blockwise(data_z(iChan,:), m, r, n_exp, tau, kernelType, blk);
+        FuzzEn(iChan) = fuzz_engine(data_z(iChan,:), m, r, n_exp, tau, kernelType);
         % FuzzEn(iChan) = fuzz(data_z(iChan,:), m, r, n_exp, tau, kernelType);
         if showProgress
             fprintf('  ch %3d/%3d: %.6f\n', iChan, nchan, FuzzEn(iChan));
@@ -124,25 +125,28 @@ end
 end
 
 % =========================================================================
-function fe = fuzz_blockwise(signal, m, r, n, tau, kernelType, blk)
-% function fe = fuzz(signal, m, r, n, tau, kernelType)
-% Bounded-memory FuzzyEn with Chebyshev metric.
+function fe = fuzz_engine(signal, m, r, n, tau, kernelType)
 
 x = signal(isfinite(signal));
 if tau > 1, x = x(1:tau:end); end
 N = numel(x);
 if N <= m + 1, fe = NaN; return; end
 
-% Embeddings for k=m and k=m+1
 [Xm,  Lm]  = embed_tau(x, m,   tau);
 [Xm1, Lm1] = embed_tau(x, m+1, tau);
 if Lm < 2 || Lm1 < 2, fe = NaN; return; end
 
-% Mean fuzzy similarity over UNIQUE pairs
-pm  = fuzzy_mean_similarity_block(Xm,  r, n, kernelType, blk);
-pm1 = fuzzy_mean_similarity_block(Xm1, r, n, kernelType, blk);
-% pm  = fuzzy_mean_similarity_fast(Xm,  r, n, kernelType);
-% pm1 = fuzzy_mean_similarity_fast(Xm1, r, n, kernelType);
+% Auto-select mode based on estimated memory cost
+useBlock = should_use_blockwise(max(Lm, Lm1));
+
+if useBlock
+    blk = auto_blocksize();
+    pm  = fuzzy_mean_similarity_block(Xm,  r, n, kernelType, blk);
+    pm1 = fuzzy_mean_similarity_block(Xm1, r, n, kernelType, blk);
+else
+    pm  = fuzzy_mean_similarity_fast(Xm,  r, n, kernelType);
+    pm1 = fuzzy_mean_similarity_fast(Xm1, r, n, kernelType);
+end
 
 if pm>0 && pm1>0 && isfinite(pm) && isfinite(pm1)
     fe = log(pm / pm1);
@@ -150,6 +154,47 @@ else
     fe = NaN;
 end
 end
+
+
+function tf = should_use_blockwise(L)
+bytes_needed = L^2 * 8;  % float64 pairwise matrix
+mem_thresh   = 0.75 * available_ram_bytes();
+tf = bytes_needed > mem_thresh;
+end
+
+
+function blk = auto_blocksize()
+% Target ~256 MB per block
+ram   = available_ram_bytes();
+blk   = floor(sqrt(ram * 0.25 / 8));  % vectors fitting in 25% RAM
+blk   = max(128, min(blk, 4096));
+end
+
+
+function ram = available_ram_bytes()
+try
+    % Windows only
+    m   = memory;
+    ram = m.MemAvailableAllArrays;
+catch
+    ram = 4 * 1024^3;  % conservative 4 GB fallback for Mac/Linux
+end
+end
+
+
+function mu_mean = fuzzy_mean_similarity_fast(X, r, n, kernelType)
+nVec = size(X, 1);
+if nVec < 2, mu_mean = NaN; return; end
+
+Dmax = zeros(nVec, nVec);
+for dim = 1:size(X, 2)
+    Dmax = max(Dmax, abs(X(:,dim) - X(:,dim).'));
+end
+ut     = triu(true(nVec), 1);
+mu_mean = mean(fuzzy_kernel(Dmax(ut), r, n, kernelType));
+end
+
+
 
 function mu_mean = fuzzy_mean_similarity_block(X, r, n, kernelType, blk)
 % Mean fuzzy similarity over unique pairs; diagonal uses upper triangle only.

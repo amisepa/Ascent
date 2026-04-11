@@ -158,12 +158,12 @@ function v = mse_one_channel(sig, m, r, tau, coarseType, S, minBinsAll, minBinsS
 % Compute MSE across scales (no filtering); drop scales with too-few coarse bins
 v = nan(1, S);
 
-for s = 2:S
-    % if s == 1
-        % % Scale 1 = SampEn of original (z-scored) signal
-        % v(1) = compute_SampEn(sig, 'm', m, 'r', r, 'tau', tau, 'Parallel', false, 'Progress', false);
-        % continue
-    % end
+for s = 1:S
+    if s == 1
+        % Scale 1 = SampEn of original (z-scored) signal
+        v(1) = compute_SampEn(sig, 'm', m, 'r', r, 'tau', tau, 'Parallel', false, 'Progress', false);
+        continue
+    end
 
     L = floor(numel(sig)/s)*s;          % samples used for coarse-graining
     nBins = L / s;                      % coarse bins at this scale
