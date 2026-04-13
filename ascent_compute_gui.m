@@ -87,7 +87,7 @@ parallelComp  = logical(param{5});
 % ---------------------------
 % GUI #2b — multiscale / fuzzy measures (includes tau and m)
 % ---------------------------
-isMS = contains(lower(measType), {'mse','mmse','mfe','rcmfe','rcmvmfe'});
+isMS = contains(lower(measType), {'mse','mmse','mfe','cmfe','rcmfe','rcmvmfe'});
 isFZ = contains(lower(measType), {'fuzzen','mfe','rcmfe','rcmvmfe'});
 
 if isMS || isFZ
@@ -95,7 +95,7 @@ if isMS || isFZ
     if isMS, enMS = 'on'; else, enMS = 'off'; end
     if isFZ, enFZ = 'on'; else, enFZ = 'off'; end
 
-    cTypes = {'Mean' 'Median' 'Std' 'Variance (default)'};
+    cTypes = {'Mean' 'Median' 'Std' 'Variance'};
 
     uigeom2 = { [0.5 0.5] [1] [0.5 0.5] [1] [0.5 0.5] [1] [0.5 0.5] [1] [0.5 0.5] };
 
@@ -107,7 +107,7 @@ if isMS || isFZ
         {'style' 'edit' 'string' '2'}                                              % 5
         {}                                                                         % 6
         {'style' 'text'      'string' 'Coarse graining method:' 'fontweight' 'bold' 'enable' enMS}   % 7
-        {'style' 'popupmenu' 'string' cTypes 'value' 4                             'enable' enMS}    % 8
+        {'style' 'popupmenu' 'string' cTypes 'value' 1                             'enable' enMS}    % 8
         {}                                                                         % 9
         {'style' 'text'      'string' 'Number of scale factors:' 'fontweight' 'bold' 'enable' enMS}  % 10
         {'style' 'edit'      'string' '30'                                         'enable' enMS}    % 11

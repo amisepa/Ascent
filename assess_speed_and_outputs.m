@@ -115,6 +115,15 @@ trackProg   = true; % track progress
 %     'Parallel', paraComp, 'Progress', trackProg);
 
 
+Mobj.Func = @MvFuzzEn; 
+Mobj.m    = m;
+Mobj.r    = r;
+Mobj.n    = n;
+Mobj.tau  = tau;
+[entropy, CI] = MvFuzzEn(data.', Mobj, 'Methodx', 'coarse');
+
+
+
 %% Extrema-Segmented Entropy (ExSEnt)
 
 clear % clear every time to avoid potential memory bias

@@ -2,142 +2,143 @@ function [mvFuzzEn, phi_m, phi_m1] = compute_mvFuzzEn(data, varargin)
 % compute_mvFuzzEn  Computes uniscale Multivariate Fuzzy Entropy (mvFuzzEn).
 %
 %   [mvFuzzEn, phi_m, phi_m1] = compute_mvFuzzEn(data, ...
-%       'M', 2, 'tau', 1, 'r', .15, 'n', 2, ...
-%       'Kernel','exponential', 'BlockSize', 256, ...
-%       'Parallel', false, 'Progress', false)
+%       'm', 2, 'tau', 1, 'r', .15, 'n', 2, ...
+%       'Kernel', 'exponential', 'BlockSize', 2000, 'pdistMaxGB', 2.0, ...
+%       'Parallel', true, 'Progress', true)
 %
 % Inputs:
-%   data        : multichannel data [n_channels x n_samples] (numeric)
-%   'm'         : embedding vector per channel OR scalar (default = 2)
-%   'tau'       : time lag vector per channel OR scalar (default = 1)
-%   'r'         : similarity bound (default = .15)
-%   'n'         : fuzziness exponent for exponential kernel (default = 2)
-%   'Kernel'    : 'exponential' [default] | 'gaussian' (note: Azami-style uses exponential)
-%   'BlockSize' : pair-block size to bound memory (default = 256; >=128)
-%   'Parallel'  : logical true/false to enable parfor for building m+1 embeddings (default = false)
-%   'Progress'  : logical true/false to show text progress (default = false)
+%   data        : multichannel data [n_channels x n_samples]
+%   'm'         : embedding dimension per channel, or scalar (default = 2)
+%   'tau'       : time lag per channel, or scalar (default = 1)
+%   'r'         : similarity bound (default = 0.15)
+%   'n'         : fuzzy exponent (default = 2)
+%   'Kernel'    : 'exponential' [default] | 'gaussian'
+%   'BlockSize' : block size for bounded-memory pairwise accumulation (default = 2000)
+%   'pdistMaxGB': max GB allowed for pdist temporary vector (default = 2.0)
+%   'Parallel'  : use parallel computation for m+1 subspaces when available (default = true)
+%   'Progress'  : display progress (default = true)
 %
 % Outputs:
-%   mvFuzzEn    : scalar mvFuzzEn of the multivariate signal
-%   phi_m       : mean fuzzy similarity in dimension m
-%   phi_m1      : mean fuzzy similarity in dimension m+1 (averaged across nvar subspaces)
+%   mvFuzzEn    : scalar multivariate fuzzy entropy
+%   phi_m       : mean fuzzy similarity in embedding dimension m
+%   phi_m1      : mean fuzzy similarity in embedding dimension m+1
 %
 % Notes:
-%   • Data is z-score normalized per channel so std = 1 (stable r across recordings).
-%   • Implements the uniscale mvFE structure from Azami & Escudero (Physica A, 2016),
-%     but computed with bounded-memory blockwise pair accumulation (no pdist).
-%   • The entropy estimate is mvFuzzEn = log(phi_m / phi_m1).
-%
-% References:
-%   Azami, H. & Escudero, J. (2016). Refined Composite Multivariate Generalized
-%       Multiscale Fuzzy Entropy. Physica A.
-%
-% -------------------------------------------------------------------------
-% Copyright (C) 2025
-% EEGLAB Ascent plugin — Author: Cedric Cannard
-% License: GNU GPL v2 or later
-% -------------------------------------------------------------------------
+%   • Data are z-score normalized per channel prior to embedding.
+%   • Pairwise similarities are computed exactly using pdist when memory allows,
+%     otherwise an exact blocked fallback is used.
+%   • This implementation follows the multivariate fuzzy entropy formulation
+%     used in the RCmvMFE reference, where phi_m1 is averaged across the K
+%     augmented (m+1) subspaces.
+%   • Entropy values are not constrained to be positive; negative values are valid.
 
-% ---------------- Parse inputs ----------------
+% ---------- Parse inputs ----------
 p = inputParser;
 p.addRequired('data', @(x) isnumeric(x) && ndims(x) == 2);
 p.addParameter('m', 2,                  @(x) isnumeric(x) && all(x(:) > 0));
 p.addParameter('tau', 1,                @(x) isnumeric(x) && all(x(:) > 0));
-p.addParameter('r', .15,                @(x) isnumeric(x) && isscalar(x) && x > 0);
+p.addParameter('r', 0.15,               @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('n', 2,                  @(x) isnumeric(x) && isscalar(x) && x > 0);
-p.addParameter('Kernel','exponential',  @(s) any(strcmpi(s,{'exponential','gaussian'})));
-p.addParameter('BlockSize', 256,        @(x) isnumeric(x) && isscalar(x) && x >= 128 && x <= 4096);
+p.addParameter('Kernel', 'exponential', @(s) any(strcmpi(s, {'exponential','gaussian'})));
+p.addParameter('BlockSize', 2000,       @(x) isnumeric(x) && isscalar(x) && x >= 100);
+p.addParameter('pdistMaxGB', 2.0,       @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('Parallel', true,        @(x) islogical(x) && isscalar(x));
 p.addParameter('Progress', true,        @(x) islogical(x) && isscalar(x));
 p.parse(data, varargin{:});
 
-m_in         = p.Results.m;
-tau_in       = p.Results.tau;
-r            = p.Results.r;
-n_exp        = p.Results.n;
-kernelType   = lower(p.Results.Kernel);
-blk          = p.Results.BlockSize;
-doPar        = p.Results.Parallel && ~isempty(ver('parallel'));
-showProg     = p.Results.Progress;
+m_in       = p.Results.m;
+tau_in     = p.Results.tau;
+r          = p.Results.r;
+n_exp      = p.Results.n;
+kernelType = lower(p.Results.Kernel);
+blockSize  = p.Results.BlockSize;
+pdistMaxGB = p.Results.pdistMaxGB;
+doPar      = p.Results.Parallel && ~isempty(ver('parallel'));
+showProg   = p.Results.Progress;
 
-% Enforce [n_channels x n_samples]
+% ---------- Enforce [n_channels x n_samples] ----------
 if size(data,1) > size(data,2)
-    data = data.';  % [n_channels x n_samples]
+    data = data.';
 end
 [nvar, nsamp] = size(data);
 
-% Expand M and tau to per-channel vectors
-M   = expand_param_vec(m_in,   nvar, 'M');
+% ---------- Expand m and tau ----------
+M   = expand_param_vec(m_in,   nvar, 'm');
 tau = expand_param_vec(tau_in, nvar, 'tau');
 
-% Z-score normalization per channel
-data_z = data;
-for c = 1:nvar
-    x  = data(c,:);
-    sd = std(x,0,'omitnan');
+% ---------- Z-score per channel ----------
+X = data;
+for ch = 1:nvar
+    x  = X(ch,:);
+    mu = mean(x, 'omitnan');
+    sd = std(x, 0, 'omitnan');
     if ~isfinite(sd) || sd == 0
-        data_z(c,:) = 0;
+        X(ch,:) = 0;
     else
-        mu = mean(x,'omitnan');
-        data_z(c,:) = (x - mu)./sd;
+        X(ch,:) = (x - mu) ./ sd;
     end
 end
 
-% Azami-style effective embedding horizon
-max_M   = max(M);
-max_tau = max(tau);
-nn      = max_M * max_tau;
-N       = nsamp - nn;
-
+% ---------- Embedding horizon ----------
+N = nsamp - max(M) * max(tau);
 if N < 3
-    mvFuzzEn = NaN; phi_m = NaN; phi_m1 = NaN;
-    return;
+    mvFuzzEn = NaN;
+    phi_m    = NaN;
+    phi_m1   = NaN;
+    return
 end
 
 if showProg
-    fprintf('mvFuzzEn: %d ch | N=%d | sum(M)=%d | r=%g | n=%g | kernel=%s\n', ...
+    fprintf('mvFuzzEn: %d ch | N=%d | sum(m)=%d | r=%g | n=%g | kernel=%s\n', ...
         nvar, N, sum(M), r, n_exp, kernelType);
 end
 
-% ---------------- phi_m (dimension m) ----------------
-A = embed_mv(data_z, M, tau, N);
-A = A - mean(A, 2);  % mean substraction as in original
-phi_m = fuzzy_mean_similarity_block(A, r, n_exp, kernelType, blk, showProg);
+if ~strcmp(kernelType, 'exponential')
+    error('compute_mvFuzzEn:KernelNotSupported', ...
+        'Shared exact helper currently supports only the exponential kernel.');
+end
 
-% ---------------- phi_m1 (per-subspace average, not pooled) ----------------
-Mmat = repmat(M(:).', nvar, 1) + eye(nvar);
+% ---------- phi_m ----------
+A = embed_mv(X, M, tau, N);
+A = A - mean(A, 2);
+phi_m = fuzzy_pairmean_cheby_exact(A, r, n_exp, blockSize, pdistMaxGB);
+
+% ---------- phi_m1 ----------
+Mplus = repmat(M, nvar, 1) + eye(nvar);
 phi_m1_vec = nan(nvar, 1);
+
 if doPar
-    Bcells = cell(nvar,1);
+    Bcells = cell(nvar, 1);
     parfor h = 1:nvar
-        Btmp = embed_mv(data_z, Mmat(h,:), tau, N);
-        Bcells{h} = Btmp - mean(Btmp, 2);
+        Bh = embed_mv(X, Mplus(h,:), tau, N);
+        Bcells{h} = Bh - mean(Bh, 2);
     end
+
     for h = 1:nvar
-        phi_m1_vec(h) = fuzzy_mean_similarity_block(Bcells{h}, r, n_exp, kernelType, blk, false);
+        phi_m1_vec(h) = fuzzy_pairmean_cheby_exact(Bcells{h}, r, n_exp, blockSize, pdistMaxGB);
         if showProg
             fprintf('  subspace %3d/%3d: phi_m1=%.6f\n', h, nvar, phi_m1_vec(h));
         end
     end
 else
     for h = 1:nvar
-        Bh = embed_mv(data_z, Mmat(h,:), tau, N);
+        Bh = embed_mv(X, Mplus(h,:), tau, N);
         Bh = Bh - mean(Bh, 2);
-        phi_m1_vec(h) = fuzzy_mean_similarity_block(Bh, r, n_exp, kernelType, blk, false);
+        phi_m1_vec(h) = fuzzy_pairmean_cheby_exact(Bh, r, n_exp, blockSize, pdistMaxGB);
         if showProg
             fprintf('  subspace %3d/%3d: phi_m1=%.6f\n', h, nvar, phi_m1_vec(h));
         end
     end
 end
+
 phi_m1 = mean(phi_m1_vec(isfinite(phi_m1_vec)));
 
-% ---------------- mvFuzzEn ----------------
+% ---------- Entropy ----------
 if phi_m > 0 && phi_m1 > 0 && isfinite(phi_m) && isfinite(phi_m1)
     mvFuzzEn = log(phi_m / phi_m1);
 else
     mvFuzzEn = NaN;
 end
-
 end
 
 % =========================================================================
@@ -145,112 +146,24 @@ function v = expand_param_vec(x, n, name)
 x = x(:).';
 if isscalar(x)
     v = repmat(x, 1, n);
-else
-    if numel(x) ~= n
-        error('compute_mvFuzzEn:Bad%s', name, ...
-            '%s must be scalar or have length n_channels.', name);
-    end
+elseif numel(x) == n
     v = x;
+else
+    error('compute_mvFuzzEn:Bad%s', name, ...
+        '%s must be scalar or have length n_channels.', name);
 end
 end
 
+% =========================================================================
 function A = embed_mv(X, M, tau, N)
-% Create multivariate delay-embedding matrix A of size [N x sum(M)].
-% X: [nvar x nsamp], M: [1 x nvar], tau: [1 x nvar], N: #rows
-[nvar, ~] = size(X);
-D = sum(M);
-A = zeros(N, D);
+A = zeros(N, sum(M));
 
 col = 0;
-for ch = 1:nvar
-    m  = M(ch);
-    t  = tau(ch);
-    for k = 0:(m-1)
+for ch = 1:numel(M)
+    for k = 0:(M(ch)-1)
         col = col + 1;
-        idx = (1:N) + k*t;
+        idx = (1:N) + k * tau(ch);
         A(:, col) = X(ch, idx).';
     end
-end
-end
-
-function mu_mean = fuzzy_mean_similarity_block(X, r, n, kernelType, blk, verbose)
-% Mean fuzzy similarity over unique pairs under Chebyshev (max) distance.
-nVec = size(X,1);
-if nVec < 2, mu_mean = NaN; return; end
-if nargin < 6, verbose = false; end
-
-sum_mu = 0;
-num_p  = 0;
-nDim   = size(X,2);
-
-t0 = tic;
-lastPrint = 0;
-for i1 = 1:blk:nVec
-    if verbose && toc(t0) - lastPrint > 5
-        fprintf('    pairs progress: %.1f%%\n', 100*i1/nVec);
-        lastPrint = toc(t0);
-    end
-    
-    i2 = min(i1+blk-1, nVec);
-    Xi = X(i1:i2,:);  bi = size(Xi,1);
-
-    % (A) Within-block: upper triangle only
-    if bi > 1
-        for d1 = 1:blk:bi
-            d2 = min(d1+blk-1, bi);
-            Xd = Xi(d1:d2,:); bd = size(Xd,1);
-            if bd > 1
-                Dmax = zeros(bd, bd);
-                for dim = 1:nDim
-                    Dij = abs(Xd(:,dim) - Xd(:,dim).');
-                    if dim == 1
-                        Dmax = Dij;
-                    else
-                        Dmax = max(Dmax, Dij);
-                    end
-                end
-                ut = triu(true(bd,bd), 1);
-                dvec = Dmax(ut);
-                sum_mu = sum_mu + sum(fuzzy_kernel(dvec, r, n, kernelType));
-                num_p  = num_p  + nnz(ut);
-            end
-        end
-    end
-
-    % (B) Across-blocks: full rectangle
-    for j1 = (i2+1):blk:nVec
-        j2 = min(j1+blk-1, nVec);
-        Xj = X(j1:j2,:);  bj = size(Xj,1);
-
-        Dmax = zeros(bi, bj);
-        for dim = 1:nDim
-            Dij = abs(Xi(:,dim) - Xj(:,dim).');
-            if dim == 1
-                Dmax = Dij;
-            else
-                Dmax = max(Dmax, Dij);
-            end
-        end
-        sum_mu = sum_mu + sum(fuzzy_kernel(Dmax(:), r, n, kernelType));
-        num_p  = num_p  + bi * bj;
-    end
-end
-
-if num_p == 0
-    mu_mean = NaN;
-else
-    mu_mean = sum_mu / num_p;
-end
-end
-
-function y = fuzzy_kernel(d, r, n, kernelType)
-switch kernelType
-    case 'exponential'
-        % Azami-style kernel
-        y = exp(-(d.^n) / r);
-    case 'gaussian'
-        y = exp(-(d.^2) / (2*r^2));
-    otherwise
-        y = exp(-(d.^n) / r);
 end
 end
