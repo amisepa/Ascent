@@ -64,9 +64,8 @@ EEG = ascent_compute(EEG, 'measure', 'FuzzEn');
 
 % Fine-tuning parameters (for demonstration only)
 EEG = ascent_compute(EEG, 'measure', 'FuzzEn', ...
-    'n', 2, ...
-    'kernel','gaussian', ...    % default: exponential
-    'blocksize', 512);          % default: 256
+    'n', 2, ...             % fuzy power (default = 2)
+    'kernel','gaussian');    % default: 'exponential'
 
 
 %% Extrema-Segmented Entropy (ExSEnt)
@@ -85,17 +84,17 @@ EEG = ascent_compute(EEG, 'measure', 'Aperiodic');
 %% Multiscale entropy (MSE)
 
 EEG = ascent_compute(EEG, 'measure', 'MSE', ...
-    'coarsing', 'median', ...     % 'median' (default) 'mean' 'trimmed mean' 'std' 'var'
-    'num_scales', 50, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
+    'coarsing', 'mean', ...     % 'median' 'mean' 'trimmed mean' 'std' 'var'
+    'num_scales', 30, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
     'parallel', true, 'progress', true);
 
 
 %% Modified MSE (mMSE)
 
 EEG = ascent_compute(EEG, 'measure', 'mMSE', ...
-    'coarsing', 'mean', ... % 'mean' (default) 'std' 'variance'
-    'num_scales', 50, ...
-    'filter_mode', 'lowpass', ...  %  'lowpass' (default), 'none'
+    'coarsing', 'mean', ... % 'median' 'mean' 'trimmed mean' 'std' 'var'
+    'num_scales', 30, ...
+    'filter_mode', 'narrowband', ...  %  'narrowband' (default), 'none' (normal MSE)
     'parallel', true, 'progress', true);
 
 % ascent_plot(EEG.ascent.mMSE.data, EEG.chanlocs,'mMSE',EEG.ascent.mMSE.scales)
@@ -116,16 +115,25 @@ EEG = ascent_compute(EEG, 'measure', 'mMSE', ...
 %% Multiscale Fuzzy Entropy (MFE)
 
 EEG = ascent_compute(EEG, 'measure', 'MFE', ...
-    'coarsing', 'mean', ...     % 'mean' (default), 'median', 'trimmed mean', 'std', 'var'
-    'num_scales', 30, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
+    'coarsing', 'var', ...     % 'mean' (default), 'median', 'trimmed mean', 'std', 'var'
+    'num_scales', 50, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
     'n', 2, ...                 % fuzzy power (default = 2)
     'parallel', true, 'progress', true);
+
+%% Composite Multiscale Fuzzy Entropy (CMFE)
+
+EEG = ascent_compute(EEG, 'measure', 'CMFE', ...
+    'coarsing', 'var', ...     %  'mean' (default) 'median'  'trimmed mean' 'std' 'var'
+    'num_scales', 50, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
+    'n', 2, ...                 % fuzzy power (default = 2)
+    'parallel', true, 'progress', true);
+
 
 %% Refined Composite Multiscale Fuzzy Entropy (RCMFE)
 
 EEG = ascent_compute(EEG, 'measure', 'RCMFE', ...
-    'coarsing', 'mean', ...     % 'median' (default) 'mean' 'trimmed mean' 'std' 'var'
-    'num_scales', 20, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
+    'coarsing', 'mean', ...     % 'median' 'mean' 'trimmed mean' 'std' 'var'
+    'num_scales', 50, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
     'n', 2, ...                 % fuzzy power (default = 2)
     'parallel', true, 'progress', true);
 
@@ -135,17 +143,16 @@ EEG = ascent_compute(EEG, 'measure', 'RCMFE', ...
 % PCA components, ROIs, or very short segments, otherwise, extremely long to
 % compute. 
 
-% EEG = ascent_compute(EEG, 'measure', 'mvFuzzEn'); 
-EEG = ascent_compute(EEG, 'measure', 'mvFuzzEn', 'chanlist', 'Fz Cz Pz Iz Oz'); 
+% EEG = ascent_compute(EEG, 'measure', 'mvFuzzEn');  % all channels
+
+EEG = ascent_compute(EEG, 'measure', 'mvFuzzEn', 'chanlist', 'Fpz Fz Cz Pz Iz Oz POz'); 
 
 %% Refined Composite Multivariate Generalized Multiscale Fuzzy Entropy (RCmvMFE)
-% WARNING: use only for low-channel count (e.g. <10 EEG channels) or on few
-% PCA components, or very short segments, otherwise, extremely long to
-% compute. 
+% WARNING: scale 1 is much longer than the rest of the scales.
 
-EEG = ascent_compute(EEG, 'measure', 'RCmvMFE', 'chanlist', 'Fz FCz FPz Cz Pz Iz Oz', ...
-    'coarsing', 'var', ...     % 'median' (default) 'mean' 'trimmed mean' 'std' 'var'
-    'num_scales', 50, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
+EEG = ascent_compute(EEG, 'measure', 'RCmvMFE', 'chanlist', 'Fpz Fz Cz Pz Iz Oz POz', ...
+    'coarsing', 'mean', ...     % 'median' (default) 'mean' 'trimmed mean' 'std' 'var'
+    'num_scales', 10, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
     'n', 2, ...                % fuzzy power (default = 2)
     'parallel', true, 'progress', true);
 
@@ -156,7 +163,7 @@ if isempty(EEG.icaact)
     EEG.icaact = EEG.icaweights * EEG.icasphere * EEG.data; % sometimes not saved on disk to save space
 end
 
-% [entropy, scales] = compute_MSE(EEG.icaact, 'coarsing', 'mean', 'num_scales', 10);
+% [entropy, scales] = compute_MSE(EEG.icaact, 'coarsing', 'mean', 'num_scales', 50);
 [entropy, scales] = compute_RCMFE(EEG.icaact, 'coarsing', 'std', 'num_scales', 50);
 
 ascent_plot(entropy, EEG.chanlocs, 'RCMFE', scales, ...

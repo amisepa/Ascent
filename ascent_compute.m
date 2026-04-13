@@ -13,9 +13,9 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %
 %   General:
 %     'measure'          - Complexity measure to compute. One of:
-%                          'SampEn', 'FuzzEn', 'ExSEnt', 'FracDim',
+%                          'SampEn', 'FuzzEn' (default), 'ExSEnt', 'FracDim',
 %                          'HigFracDim', 'Aperiodic', 'MSE', 'mMSE',
-%                          'MFE', 'RCMFE' (default), 'RCmvMFE'
+%                          'MFE', 'CMFE', 'RCMFE', 'RCmvMFE'
 %     'chanlist'         - Channel labels, e.g. {'Fz','Cz'} or 'all' (default: all)
 %     'tau'              - Time lag for embedding (default: 1)
 %     'm'                - Embedding dimension (default: 2)
@@ -25,12 +25,14 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %     'progress'         - Track progress in console, logical (default: true)
 %
 %   Multiscale measures (MSE, mMSE, MFE, RCMFE, RCmvMFE):
-%     'coarsing'         - Coarse-graining method: 'mean', 'std', 'var', 'median'
+%     'coarsing'         - Coarse-graining method: 'mean', 'median', 'std', 'var' (default: 'mean')
 %     'num_scales'       - Number of scale factors (default: 30)
 %     'filter_mode'      - Scale filtering: 'none' or 'narrowband' (mMSE only)
+%     'TimeOnly'         - compute time-resolved mMSE only
 %     'TimeWin'          - Window length for time-resolved mMSE (default: [])
-%     'TimeStep'         - Step between time windows (default: [])
-%     'TimeOnly'         - Skip whole-epoch mMSE, compute time course only
+%     'TimeStep'         - Step between time windows for time-resolved mMSE
+%                           (default: []). Setting this value to TimeWin/2
+%                           gives 50% overlap (default). 
 %
 %   Fuzzy measures (FuzzEn, MFE, RCMFE, RCmvMFE):
 %     'n'                - Fuzzy power (default: 2)
@@ -169,7 +171,7 @@ chanLabels = {EEG.chanlocs(chanIdx).labels};
 chanlocs   = EEG.chanlocs(chanIdx);
 
 % Preallocate
-if contains(lower(measure), {'mse','mmse','mfe','rcmfe','rcmvmfe'})
+if contains(lower(measure), {'mse','mmse','mfe','cmfe','rcmfe','rcmvmfe'})
     entropy = nan(nChan, num_scales);
 else
     entropy = nan(nChan, 1);
@@ -189,7 +191,7 @@ switch lower(measure)
     case 'fuzzen'
         % Fuzzy Entropy — Chen et al. (2009)
         entropy = compute_FuzzEn(data, 'm', m, 'tau', tau, 'n', n, 'r', r, ...
-            'Kernel', kernel_meth, 'BlockSize', blocksize, ...
+            'Kernel', kernel_meth, ... 'exponential' (default) or 'gaussian'
             'Parallel', parallel, 'Progress', progress);
 
     case 'exsent'
@@ -274,19 +276,11 @@ switch lower(measure)
 
     case 'mmse'
         % Modified MSE — Kosciessa et al. (2020)
-        [entropy, scales, info] = compute_mMSE(data, ...
-            'Fs', fs, ...
-            'm', m, ...
-            'tau', tau, ...
-            'r', r, ...
-            'num_scales', num_scales, ...
-            'coarsing', coarsing, ...
+        [entropy, scales, info] = compute_mMSE(data, 'Fs', fs, ...
+            'm', m, 'tau', tau, 'r', r, 'num_scales', num_scales, 'coarsing', coarsing, ...
             'filter_mode', filter_mode, ...
-            'TimeWin', TimeWin, ...
-            'TimeStep', TimeStep, ...
-            'TimeOnly', TimeOnly, ...
-            'Parallel', parallel, ...
-            'Progress', progress);
+            'TimeWin', TimeWin,  'TimeStep', TimeStep, 'TimeOnly', TimeOnly, ... % for time-resolved mode
+            'Parallel', parallel, 'Progress', progress);
 
     case 'mfe'
         % Multiscale Fuzzy Entropy — Azami & Escudero (2016)
@@ -294,8 +288,14 @@ switch lower(measure)
             'tau', tau, 'r', r, 'coarsing', coarsing, 'num_scales', num_scales, ...
             'Parallel', parallel, 'Progress', progress);
 
+    case 'cmfe'
+        % Composite Multiscale Fuzzy Entropy (CMFE) — Azami & Escudero (2016)
+        [entropy, scales] = compute_CMFE(data, 'm', m, 'tau', tau, ...
+            'r', r, 'n', n, 'coarsing', coarsing, 'num_scales', num_scales, ...
+            'Parallel', parallel, 'Progress', progress);
+
     case 'rcmfe'
-        % Refined Composite Multiscale Fuzzy Entropy — Azami & Escudero (2016)
+        % Refined Composite Multiscale Fuzzy Entropy (RCMFE) — Azami & Escudero (2016)
         [entropy, scales] = compute_RCMFE(data, 'm', m, 'tau', tau, ...
             'r', r, 'n', n, 'coarsing', coarsing, 'num_scales', num_scales, ...
             'Parallel', parallel, 'Progress', progress);
@@ -305,6 +305,25 @@ switch lower(measure)
         [entropy, scales] = compute_RCmvMFE(data, 'm', m, 'tau', tau, 'r', r, ...
             'coarsing', coarsing, 'num_scales', num_scales, ...
             'Parallel', parallel, 'Progress', progress);
+        
+        % % original version fro comparison
+        % tic
+        % Xcmp = zscore(data, 0, 2);      % data is channels x samples
+        % Xcmp = Xcmp.';                  % EntropyHub wants samples x channels
+        % nChan = size(data,1);
+        % Mobj = struct();
+        % Mobj.Func = @MvFuzzEn;
+        % Mobj.m    = m   * ones(nChan,1);
+        % Mobj.tau  = tau * ones(nChan,1);
+        % Mobj.r    = [r, n];
+        % Mobj.Fx   = 'default';
+        % Mobj.Norm = logical(false);
+        % [entropy, ~] = MvMSEn(Xcmp, Mobj, ...
+        %     'Scales', num_scales, ...
+        %     'Methodx', 'coarse');
+        % 
+        % scales = 1:num_scales;
+        % toc
 
     otherwise
         error('Unknown measure: %s. See help ascent_compute for valid options.', measure);

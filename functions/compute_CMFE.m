@@ -1,5 +1,5 @@
-function [RCMFE, scales] = compute_RCMFE(data, varargin)
-% compute_RCMFE  True Refined Composite Multiscale Fuzzy Entropy (RCMFE)
+function [CMFE, scales] = compute_CMFE(data, varargin)
+% compute_CMFE  Composite Multiscale Fuzzy Entropy (CMFE).
 
 p = inputParser;
 p.addRequired('data', @(x) (isstruct(x) && isfield(x,'data')) || (isnumeric(x) && ndims(x)==2));
@@ -37,7 +37,7 @@ end
 S    = max(1, floor(nScales_req));
 maxS = floor(nSamp / max(1, minBinsHard));
 if S > maxS
-    warning('compute_RCMFE:ReducingScales', ...
+    warning('compute_CMFE:ReducingScales', ...
         'Reducing num_scales from %d to %d to keep >=%d coarse bins at every scale.', ...
         S, maxS, minBinsHard);
     S = maxS;
@@ -74,13 +74,13 @@ else
     coarseLabel = upper(coarseType);
 end
 
-RCMFE = nan(nch, S);
+CMFE = nan(nch, S);
 if showProg
     if parallelMode && ~isempty(ver('parallel'))
-        fprintf('RCMFE: %d ch | m=%g, tau=%g, r=%g, n=%g | coarse=%s | S=%d | parallel=on\n', ...
+        fprintf('CMFE: %d ch | m=%g, tau=%g, r=%g, n=%g | coarse=%s | S=%d | parallel=on\n', ...
             nch, m, tau, r, n_exp, coarseLabel, S);
     else
-        fprintf('RCMFE: %d ch | m=%g, tau=%g, r=%g, n=%g | coarse=%s | S=%d | parallel=off\n', ...
+        fprintf('CMFE: %d ch | m=%g, tau=%g, r=%g, n=%g | coarse=%s | S=%d | parallel=off\n', ...
             nch, m, tau, r, n_exp, coarseLabel, S);
     end
 end
@@ -89,7 +89,7 @@ useWB = ~parallelMode && usejava('desktop') && showProg;
 hWB = [];
 if useWB
     try
-        hWB = waitbar(0, 'Computing RCMFE...', 'Name', 'compute_RCMFE');
+        hWB = waitbar(0, 'Computing CMFE...', 'Name', 'compute_CMFE');
     catch
         hWB = [];
     end
@@ -108,9 +108,18 @@ if parallelMode && ~isempty(ver('parallel'))
         v = nan(1, S);
 
         for s = 1:S
-            phi_m_all  = nan(1, s);
-            phi_m1_all = nan(1, s);
+            if s == 1
+                [fe, ~, ~] = fuzz_engine_raw(sig, m, r, n_exp, tau, 'exponential', false);
+                v(1) = double(fe);
+                continue
+            end
 
+            nBins = floor(numel(sig) / s);
+            if nBins < max(minBinsHard, m+1)
+                continue
+            end
+
+            fe_vals = nan(1, s);
             for off = 1:s
                 xoff = sig(off:end);
                 Loff = floor(numel(xoff) / s) * s;
@@ -123,20 +132,17 @@ if parallelMode && ~isempty(ver('parallel'))
                 Y  = reshape(xoff(1:Loff), s, []);
                 cg = coarsegrain(Y, coarseType);
 
-                [~, pm, pm1] = fuzz_engine_raw(cg, m, r, n_exp, tau, 'exponential', false);
-                phi_m_all(off)  = double(pm);
-                phi_m1_all(off) = double(pm1);
+                [fe, ~, ~] = fuzz_engine_raw(cg, m, r, n_exp, tau, 'exponential', false);
+                fe_vals(off) = double(fe);
             end
 
-            good = isfinite(phi_m_all) & isfinite(phi_m1_all) & phi_m_all > 0 & phi_m1_all > 0;
-            if any(good)
-                phi_m_bar  = mean(phi_m_all(good));
-                phi_m1_bar = mean(phi_m1_all(good));
-                v(s) = log(phi_m_bar / phi_m1_bar);
+            valid = isfinite(fe_vals);
+            if any(valid)
+                v(s) = mean(fe_vals(valid));
             end
         end
 
-        RCMFE(ch,:) = v;
+        CMFE(ch,:) = v;
         if useDQ
             send(dq, 1);
         end
@@ -147,9 +153,18 @@ else
         v = nan(1, S);
 
         for s = 1:S
-            phi_m_all  = nan(1, s);
-            phi_m1_all = nan(1, s);
+            if s == 1
+                [fe, ~, ~] = fuzz_engine_raw(sig, m, r, n_exp, tau, 'exponential', false);
+                v(1) = double(fe);
+                continue
+            end
 
+            nBins = floor(numel(sig) / s);
+            if nBins < max(minBinsHard, m+1)
+                continue
+            end
+
+            fe_vals = nan(1, s);
             for off = 1:s
                 xoff = sig(off:end);
                 Loff = floor(numel(xoff) / s) * s;
@@ -162,24 +177,21 @@ else
                 Y  = reshape(xoff(1:Loff), s, []);
                 cg = coarsegrain(Y, coarseType);
 
-                [~, pm, pm1] = fuzz_engine_raw(cg, m, r, n_exp, tau, 'exponential', false);
-                phi_m_all(off)  = double(pm);
-                phi_m1_all(off) = double(pm1);
+                [fe, ~, ~] = fuzz_engine_raw(cg, m, r, n_exp, tau, 'exponential', false);
+                fe_vals(off) = double(fe);
             end
 
-            good = isfinite(phi_m_all) & isfinite(phi_m1_all) & phi_m_all > 0 & phi_m1_all > 0;
-            if any(good)
-                phi_m_bar  = mean(phi_m_all(good));
-                phi_m1_bar = mean(phi_m1_all(good));
-                v(s) = log(phi_m_bar / phi_m1_bar);
+            valid = isfinite(fe_vals);
+            if any(valid)
+                v(s) = mean(fe_vals(valid));
             end
         end
 
-        RCMFE(ch,:) = v;
+        CMFE(ch,:) = v;
 
         if ~isempty(hWB) && isvalid(hWB)
             try
-                waitbar(ch/nch, hWB, sprintf('Computing RCMFE... (%d/%d)', ch, nch));
+                waitbar(ch/nch, hWB, sprintf('Computing CMFE... (%d/%d)', ch, nch));
             catch
             end
         end
