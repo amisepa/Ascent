@@ -24,19 +24,20 @@ function p = ascent_get_params(EEG, varargin)
 %     p.m              embedding dimension                    (default: 2)
 %     p.r              similarity bound (fraction of SD)      (default: 0.15)
 %     p.vis            plot outputs                           (default: true)
-%     p.paraComp       use parallel computing                 (default: true)
-%     p.trackProg      print progress to console              (default: true)
+%     p.parallel       use parallel computing                 (default: true)
+%     p.progress      print progress to console              (default: true)
 %
 %   Multiscale (MSE, mMSE, MFE, RCMFE, RCmvMFE):
-%     p.coarsing       coarse-graining: 'mean'|'std'|'var'   (default: 'var')
-%     p.num_scales     number of scale factors                (default: 30)
-%     p.filter_mode    'none' | 'narrowband' (mMSE only)     (default: 'none')
-%     p.TimeWin        window length for time-resolved mMSE   (default: [])
-%     p.TimeStep       step size for time-resolved mMSE       (default: [])
+%     p.coarsing         coarse-graining: 'mean'|'median'|'std'|'var'   (default: 'mean')
+%     p.num_scales       number of scale factors                        (default: 30)
+%     p.filter_mode      'none' | 'narrowband' (mMSE only)             (default: 'narrowband' if mMSE)
+%     p.TimeWin          window length for time-resolved mMSE          (default: [])
+%     p.TimeStep         step size for time-resolved mMSE              (default: [])
+%     p.TimeOnly         compute only time-resolved mMSE               (default: false)
 %
 %   Fuzzy (FuzzEn, MFE, RCMFE, RCmvMFE):
 %     p.n              fuzzy power                            (default: 2)
-%     p.kernel_meth    kernel type: 'exponential'|...        (default: 'exponential')
+%     p.kernel_meth    kernel type: 'exponential'|...         (default: 'exponential')
 %     p.blocksize      block size for fuzzy computation       (default: 256)
 %
 %   Aperiodic:
@@ -50,7 +51,7 @@ function p = ascent_get_params(EEG, varargin)
 %     p.minPeakHeight  min peak height above aperiodic (log)  (default: 0.05)
 %     p.peakThreshold  peak detection threshold (SDs)         (default: 2.0)
 %     p.peakWidthLimits [min max] peak width in Hz            (default: [0.5 12])
-%     p.correctAperiodic subtract aperiodic model from PSD   (default: true)
+%     p.correctAperiodic subtract aperiodic model from PSD    (default: true)
 % ----------------------------
 % Initialize all fields to []
 % ----------------------------
@@ -60,8 +61,8 @@ p.tau              = [];
 p.m                = [];
 p.r                = [];
 p.vis              = [];
-p.paraComp         = [];
-p.trackProg        = [];
+p.parallel         = [];
+p.progress        = [];
 
 % Multiscale
 p.coarsing         = [];
@@ -69,6 +70,7 @@ p.num_scales       = [];
 p.filter_mode      = [];
 p.TimeWin          = [];
 p.TimeStep         = [];
+p.TimeOnly         = [];
 
 % Fuzzy
 p.n                = [];
@@ -95,7 +97,7 @@ if isempty(varargin) || (numel(varargin) == 1 && isempty(varargin{1}))
 
     % --- GUI mode ---
     [p.measure, p.chanlist, p.tau, p.m, p.coarsing, p.num_scales, extraParams, ...
-     p.n, p.vis, p.paraComp, p.trackProg] = ascent_compute_gui(EEG);
+     p.n, p.vis, p.parallel, p.progress] = ascent_compute_gui(EEG);
 
     if isempty(p.measure)
         p = [];     % signal abort to caller
@@ -138,33 +140,32 @@ else
                 elseif iscell(val),  p.chanlist       = val(:);
                 else, error('chanlist must be ''all'', a string, or a cellstr.');
                 end
-            case 'tau',              p.tau            = double(val);
-            case 'm',                p.m              = double(val);
-            case 'r',                p.r              = double(val);
-            case 'vis',              p.vis            = logical(val);
-            case {'parallel','paracomp'},  p.paraComp  = logical(val);
-            case {'progress','trackprog'}, p.trackProg = logical(val);
-            case 'coarsing',         p.coarsing       = val;
-            case 'num_scales',       p.num_scales     = double(val);
-            case 'filter_mode',      p.filter_mode    = val;
-            case 'timewin',          p.TimeWin        = double(val);
-            case 'timestep',         p.TimeStep       = double(val);
-            case 'n',                p.n              = double(val);
-            case 'kernel',           p.kernel_meth    = val;
-            case 'blocksize',        p.blocksize      = double(val);
-            case 'freqrange',        p.freqRange      = double(val);
-            case 'winsec',           p.winSec         = double(val);
-            case 'overlap',          p.psdOverlap     = double(val);
-            case 'window',           p.windowType     = val;
-            case 'aperiodicmode',    p.aperiodicMode   = val;
-            case 'fitfreqrange',     p.fitFreqRange    = double(val);
-            case 'maxpeaks',         p.maxPeaks        = double(val);
-            case 'minpeakheight',    p.minPeakHeight   = double(val);
-            case 'peakthreshold',    p.peakThreshold   = double(val);
-            case 'peakwidthlimits',  p.peakWidthLimits = double(val);
+            case 'tau',              p.tau              = double(val);
+            case 'm',                p.m                = double(val);
+            case 'r',                p.r                = double(val);
+            case 'vis',              p.vis              = logical(val);
+            case 'parallel',         p.parallel         = logical(val);
+            case 'progress',         p.progress        = logical(val);
+            case 'coarsing',         p.coarsing         = val;
+            case 'num_scales',       p.num_scales       = double(val);
+            case 'filter_mode',      p.filter_mode      = val;
+            case 'timewin',          p.TimeWin          = double(val);
+            case 'timestep',         p.TimeStep         = double(val);
+            case 'timeonly',         p.TimeOnly         = logical(val);
+            case 'n',                p.n                = double(val);
+            case 'kernel',           p.kernel_meth      = val;
+            case 'blocksize',        p.blocksize        = double(val);
+            case 'freqrange',        p.freqRange        = double(val);
+            case 'winsec',           p.winSec           = double(val);
+            case 'overlap',          p.psdOverlap       = double(val);
+            case 'window',           p.windowType       = val;
+            case 'aperiodicmode',    p.aperiodicMode    = val;
+            case 'fitfreqrange',     p.fitFreqRange     = double(val);
+            case 'maxpeaks',         p.maxPeaks         = double(val);
+            case 'minpeakheight',    p.minPeakHeight    = double(val);
+            case 'peakthreshold',    p.peakThreshold    = double(val);
+            case 'peakwidthlimits',  p.peakWidthLimits  = double(val);
             case 'correctaperiodic', p.correctAperiodic = logical(val);
-            % Deprecated — silently ignored
-            case {'filt','filt_scales','filtscales','filtdata'}
             otherwise
                 error('Unknown option: %s', key);
         end
@@ -196,25 +197,26 @@ if isempty(p.r)
     p.r = 0.15;
 end
 if isempty(p.vis),       p.vis       = true;  end
-if isempty(p.trackProg)
+if isempty(p.progress)
     disp('Progress tracking not set: ON (default).');
-    p.trackProg = true;
+    p.progress = true;
 end
-if isempty(p.paraComp)
+if isempty(p.parallel)
     disp('Parallel computing not set: ON (default).');
-    p.paraComp = true;
+    p.parallel = true;
 end
 
 % Multiscale defaults
 if contains(lower(p.measure), {'mse','mmse','mfe','rcmfe','rcmvmfe'})
     if isempty(p.coarsing)
-        disp('No coarse-graining method selected: using variance (default).');
-        p.coarsing = 'var';
+        disp('No coarse-graining method selected: using mean (default).');
+        p.coarsing = 'mean';
     end
     if isempty(p.num_scales)
         disp('Number of scales not set: using 30 (default).');
         p.num_scales = 30;
     end
+
     if isempty(p.filter_mode)
         if strcmpi(p.measure, 'mmse')
             p.filter_mode = 'narrowband';
@@ -223,9 +225,14 @@ if contains(lower(p.measure), {'mse','mmse','mfe','rcmfe','rcmvmfe'})
             p.filter_mode = 'none';
         end
     end
-    if isempty(p.TimeWin) || isempty(p.TimeStep)
-        p.TimeWin  = [];
+    if isempty(p.TimeWin)
+        p.TimeWin = [];
+    end
+    if isempty(p.TimeStep)
         p.TimeStep = [];
+    end
+    if isempty(p.TimeOnly)
+        p.TimeOnly = false;
     end
 end
 

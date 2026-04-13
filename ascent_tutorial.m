@@ -34,7 +34,7 @@ EEG = pop_loadset('filename','ascent_sample_data.set','filepath',fullfile(plugin
 disp("Are you ready for your 1st ascent?!")
 disp("Run each cell below one by one by clicking in the cell and then pressing CTRL + ENTER")
 
-%% Sample Entropy (SampEn) via GUI
+%% Launch main GUI
 
 EEG = ascent_compute(EEG);  % or Tools > Compute entropy
 
@@ -66,7 +66,7 @@ EEG = ascent_compute(EEG, 'measure', 'FuzzEn');
 EEG = ascent_compute(EEG, 'measure', 'FuzzEn', ...
     'n', 2, ...
     'kernel','gaussian', ...    % default: exponential
-    'blocksize', 128);          % default: 256
+    'blocksize', 512);          % default: 256
 
 
 %% Extrema-Segmented Entropy (ExSEnt)
@@ -93,29 +93,30 @@ EEG = ascent_compute(EEG, 'measure', 'MSE', ...
 %% Modified MSE (mMSE)
 
 EEG = ascent_compute(EEG, 'measure', 'mMSE', ...
-    'coarsing', 'median', ... % 'median' (default) 'mean' 'std' 'variance'
+    'coarsing', 'mean', ... % 'mean' (default) 'std' 'variance'
     'num_scales', 50, ...
-    'filter_mode', 'narrowband', ...  %  'narrowband' (default, annuli), 'none'
+    'filter_mode', 'lowpass', ...  %  'lowpass' (default), 'none'
     'parallel', true, 'progress', true);
 
 % ascent_plot(EEG.ascent.mMSE.data, EEG.chanlocs,'mMSE',EEG.ascent.mMSE.scales)
 
 
-%% Modified MSE (mMSE) - Time-resolved version
+%% Modified MSE (mMSE) - Time-course mode 
 
+% on contninuous resting-state data
 EEG = ascent_compute(EEG, 'measure', 'mMSE', ...
-    'coarsing', 'median', ...  % 'median' (default) 'mean' 'std' 'variance'
-    'num_scales', 15, ...
-    'filter_mode', 'narrowband', ...  %  'narrowband' (default, annuli), 'none'
-    'TimeWin', 4, ...       %  window length (in s; default = 2 for continuous data)
-    'TimeStep', 2, ...    % step between centers (s); default = TimeWin/2
-    'parallel', true, 'progress', true);
+    'num_scales', 10, ...
+    'TimeWin',    8, ...   % 10 s: stable through scale ~25 at 256 Hz
+    'TimeStep',   4, ...   % 50% overlap
+    'TimeOnly',  true, ...
+    'Parallel',  true, ...
+    'Progress',  true);
 
 
 %% Multiscale Fuzzy Entropy (MFE)
 
 EEG = ascent_compute(EEG, 'measure', 'MFE', ...
-    'coarsing', 'median', ...     % 'median' (default) 'mean' 'trimmed mean' 'std' 'var'
+    'coarsing', 'mean', ...     % 'mean' (default), 'median', 'trimmed mean', 'std', 'var'
     'num_scales', 30, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
     'n', 2, ...                 % fuzzy power (default = 2)
     'parallel', true, 'progress', true);
@@ -124,10 +125,9 @@ EEG = ascent_compute(EEG, 'measure', 'MFE', ...
 
 EEG = ascent_compute(EEG, 'measure', 'RCMFE', ...
     'coarsing', 'mean', ...     % 'median' (default) 'mean' 'trimmed mean' 'std' 'var'
-    'num_scales', 50, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
+    'num_scales', 20, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
     'n', 2, ...                 % fuzzy power (default = 2)
     'parallel', true, 'progress', true);
-
 
 
 %% Multivariate Fuzzy entropy (mvFuzzEn)
@@ -157,10 +157,11 @@ if isempty(EEG.icaact)
 end
 
 % [entropy, scales] = compute_MSE(EEG.icaact, 'coarsing', 'mean', 'num_scales', 10);
-[entropy, scales] = compute_RCMFE(EEG.icaact, 'coarsing', 'mean', 'num_scales', 50);
+[entropy, scales] = compute_RCMFE(EEG.icaact, 'coarsing', 'std', 'num_scales', 50);
 
 ascent_plot(entropy, EEG.chanlocs, 'RCMFE', scales, ...
     'ICA', true, 'icawinv', EEG.icawinv);
+% xlim([2:size(entropy,2)])
 
 %% Aperiodic parametrization on indepent components (ICs) instead of 
 % scalp channel signals. note: ICA was precomputed on the sample dataset.
