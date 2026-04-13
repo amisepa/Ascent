@@ -25,11 +25,12 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %     'progress'         - Track progress in console, logical (default: true)
 %
 %   Multiscale measures (MSE, mMSE, MFE, RCMFE, RCmvMFE):
-%     'coarsing'         - Coarse-graining method: 'mean', 'std', 'var' (default)
+%     'coarsing'         - Coarse-graining method: 'mean', 'std', 'var', 'median'
 %     'num_scales'       - Number of scale factors (default: 30)
-%     'filter_mode'      - Scale filtering: 'none' (default) or 'narrowband' (mMSE)
-%     'TimeWin'          - Time window for time-resolved mMSE (default: [])
-%     'TimeStep'         - Time step for time-resolved mMSE (default: [])
+%     'filter_mode'      - Scale filtering: 'none' or 'narrowband' (mMSE only)
+%     'TimeWin'          - Window length for time-resolved mMSE (default: [])
+%     'TimeStep'         - Step between time windows (default: [])
+%     'TimeOnly'         - Skip whole-epoch mMSE, compute time course only
 %
 %   Fuzzy measures (FuzzEn, MFE, RCMFE, RCmvMFE):
 %     'n'                - Fuzzy power (default: 2)
@@ -111,13 +112,14 @@ tau              = p.tau;
 m                = p.m;
 r                = p.r;
 vis              = p.vis;
-paraComp         = p.paraComp;
-trackProg        = p.trackProg;
+parallel         = p.parallel;
+progress         = p.progress;
 coarsing         = p.coarsing;
 num_scales       = p.num_scales;
 filter_mode      = p.filter_mode;
 TimeWin          = p.TimeWin;
 TimeStep         = p.TimeStep;
+TimeOnly         = p.TimeOnly;
 n                = p.n;
 kernel_meth      = p.kernel_meth;
 blocksize        = p.blocksize;
@@ -137,7 +139,7 @@ correctAperiodic = p.correctAperiodic;
 % Parpool management
 % ----------------------------
 p = gcp('nocreate');
-if paraComp
+if parallel
     if isempty(p)
         disp('Launching parallel pool...');
         parpool;
@@ -167,7 +169,7 @@ chanLabels = {EEG.chanlocs(chanIdx).labels};
 chanlocs   = EEG.chanlocs(chanIdx);
 
 % Preallocate
-if contains(lower(measure), {'mse','mfe','rcmfe'})
+if contains(lower(measure), {'mse','mmse','mfe','rcmfe','rcmvmfe'})
     entropy = nan(nChan, num_scales);
 else
     entropy = nan(nChan, 1);
@@ -182,26 +184,26 @@ switch lower(measure)
     case 'sampen'
         % Sample Entropy — Richman & Moorman (2000)
         entropy = compute_SampEn(data, 'm', m, 'r', r, ...
-            'Parallel', paraComp, 'Progress', trackProg);
+            'Parallel', parallel, 'Progress', progress);
 
     case 'fuzzen'
         % Fuzzy Entropy — Chen et al. (2009)
         entropy = compute_FuzzEn(data, 'm', m, 'tau', tau, 'n', n, 'r', r, ...
             'Kernel', kernel_meth, 'BlockSize', blocksize, ...
-            'Parallel', paraComp, 'Progress', trackProg);
+            'Parallel', parallel, 'Progress', progress);
 
     case 'exsent'
         % Extrema-Segmented Entropy
         [HD, HA, HDA, ~] = compute_ExSEnt(data, 'm', m, 'r', r, ...
             'lambda', 0.001, 'Plot', false, ...
-            'Parallel', paraComp, 'Progress', trackProg);
+            'Parallel', parallel, 'Progress', progress);
 
     case 'mvfuzzen'
         % Multivariate Fuzzy Entropy
         % tic
         [entropy, ~, ~] = compute_mvFuzzEn(data, 'm', m, 'tau', tau, 'n', n, 'r', r, ...
             'Kernel', kernel_meth, 'BlockSize', blocksize, ...
-            'Parallel', paraComp, 'Progress', trackProg);
+            'Parallel', parallel, 'Progress', progress);
         % toc
 
         % % Azami original algo
@@ -219,7 +221,7 @@ switch lower(measure)
         [entropy, ~, ~] = compute_FracDim(data, ...
             'RejectBursts', true, 'WinFrac', 0.02, 'ZThresh', 6, ...
             'RobustFit', 'theilsen', 'ScaleTrimIQR', true, ...
-            'Parallel', paraComp, 'Progress', trackProg);
+            'Parallel', parallel, 'Progress', progress);
 
     case 'higfracdim'
         % Higuchi Fractal Dimension — Higuchi (1988)
@@ -237,8 +239,8 @@ switch lower(measure)
             'overlap',   psdOverlap, ...
             'window',    windowType, ...
             'detrend',   true,       ...
-            'Parallel',  paraComp,   ...
-            'Progress',  trackProg);
+            'Parallel',  parallel,   ...
+            'Progress',  progress);
 
         % Step 2: Fit aperiodic model
         [exponent, offset, info] = compute_AperiodicFit(freqs, psd, ...
@@ -248,8 +250,8 @@ switch lower(measure)
             'MinPeakHeight',   minPeakHeight,  ...
             'PeakThreshold',   peakThreshold,  ...
             'PeakWidthLimits', peakWidthLimits, ...
-            'Parallel',        paraComp,       ...
-            'Progress',        trackProg);
+            'Parallel',        parallel,       ...
+            'Progress',        progress);
 
         % Step 3 (optional): subtract aperiodic model from PSD
         % Model (fixed mode): L(f) = offset - exponent * log10(f)
@@ -268,33 +270,41 @@ switch lower(measure)
         % Multiscale Entropy — Costa et al. (2002)
         [entropy, scales] = compute_MSE(data, 'm', m, 'tau', tau, ...
             'coarsing', coarsing, 'num_scales', num_scales, ...
-            'Parallel', paraComp, 'Progress', trackProg);
+            'Parallel', parallel, 'Progress', progress);
 
     case 'mmse'
         % Modified MSE — Kosciessa et al. (2020)
-        [entropy, scales, ~] = compute_mMSE(data, 'm', m, 'tau', tau, 'r', r, ...
-            'coarsing', coarsing, 'num_scales', num_scales, ...
-            'filter_mode', filter_mode, 'fs', fs, ...
-            'TimeWin', TimeWin, 'TimeStep', TimeStep, ...
-            'Parallel', paraComp, 'Progress', trackProg);
+        [entropy, scales, info] = compute_mMSE(data, ...
+            'Fs', fs, ...
+            'm', m, ...
+            'tau', tau, ...
+            'r', r, ...
+            'num_scales', num_scales, ...
+            'coarsing', coarsing, ...
+            'filter_mode', filter_mode, ...
+            'TimeWin', TimeWin, ...
+            'TimeStep', TimeStep, ...
+            'TimeOnly', TimeOnly, ...
+            'Parallel', parallel, ...
+            'Progress', progress);
 
     case 'mfe'
         % Multiscale Fuzzy Entropy — Azami & Escudero (2016)
         [entropy, scales] = compute_MFE(data, 'm', m, ...
             'tau', tau, 'r', r, 'coarsing', coarsing, 'num_scales', num_scales, ...
-            'Parallel', paraComp, 'Progress', trackProg);
+            'Parallel', parallel, 'Progress', progress);
 
     case 'rcmfe'
         % Refined Composite Multiscale Fuzzy Entropy — Azami & Escudero (2016)
         [entropy, scales] = compute_RCMFE(data, 'm', m, 'tau', tau, ...
             'r', r, 'n', n, 'coarsing', coarsing, 'num_scales', num_scales, ...
-            'Parallel', paraComp, 'Progress', trackProg);
+            'Parallel', parallel, 'Progress', progress);
 
     case 'rcmvmfe'
         % Refined Composite Multivariate Multiscale Fuzzy Entropy
         [entropy, scales] = compute_RCmvMFE(data, 'm', m, 'tau', tau, 'r', r, ...
             'coarsing', coarsing, 'num_scales', num_scales, ...
-            'Parallel', paraComp, 'Progress', trackProg);
+            'Parallel', parallel, 'Progress', progress);
 
     otherwise
         error('Unknown measure: %s. See help ascent_compute for valid options.', measure);
@@ -316,11 +326,17 @@ if vis
                 else
                     ascent_plot(exponent, chanlocs, 'Aperiodic', [], offset, freqs, psd);
                 end
+            case 'mmse'
+                hasTime = exist('info','var') && isstruct(info) && isfield(info,'mse_time') ...
+                          && ~isempty(info.mse_time);
+                if hasTime
+                    plot_mMSE_timecourse(info.mse_time, info.time_sec, scales);
+                end
+                if ~TimeOnly && ~all(isnan(entropy(:)))
+                    ascent_plot(entropy, chanlocs, measure, scales);
+                end    
             otherwise
                 ascent_plot(entropy, chanlocs, measure, scales);
-                if strcmpi(measure, 'mmse') && ~isempty(TimeStep)
-                    ascent_plot(info.mse_time, chanlocs, 'Time-resolved mMSE', scales, info.time_sec);
-                end
         end
     else
         disp('Visualization requires more than 1 channel.');
@@ -358,7 +374,7 @@ switch lower(measure)
 end
 EEG.ascent.(measure).electrode_labels    = chanLabels;
 EEG.ascent.(measure).electrode_locations = chanlocs;
-if contains(lower(measure), {'mse','mfe','rcmfe'})
+if contains(lower(measure), {'mse','mmse','mfe','rcmfe','rcmvmfe'})
     EEG.ascent.(measure).scales = scales;
 end
 if exist('info','var')
