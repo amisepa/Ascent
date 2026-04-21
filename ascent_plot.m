@@ -324,7 +324,8 @@ if multiscale && multiChan
     if iscell(scales)
         Xticks = scales; nX = numel(scales);
     else
-        Xticks = arrayfun(@(x){num2str(x)},1:nScales); nX = nScales;
+        % Xticks = arrayfun(@(x){num2str(x)},1:nScales); nX = nScales;
+        Xticks = arrayfun(@(x){num2str(x)}, scales); nX = numel(scales); % Use actual scale values, not 1:nScales
     end
     newX = 1:nX;
     if nX > 30, newX = round(linspace(1,nX,20)); end
@@ -371,8 +372,13 @@ if multiscale && multiChan
     ax6 = subplot(3,3,6); hold(ax6,'on'); box(ax6,'on');
     row = entropyData(peak_channel,:);
     if all(~isfinite(row)), row = nan(1,nScales); end
-    plot(ax6, 1:nScales, row, 'LineWidth',2);
-    xlim(ax6,[1 nScales]);
+    if isnumeric(scales)
+        xvals6 = scales;
+    else
+        xvals6 = 1:nScales;
+    end
+    plot(ax6, xvals6, row, 'LineWidth',2);
+    xlim(ax6,[xvals6(1) xvals6(end)]);   
     xlabel(ax6,'Scale'); ylabel(ax6,'Entropy');
     title(ax6, ifelse(isICA, sprintf('IC%d',peak_channel), ...
           sprintf('Channel %s',chanlocs(peak_channel).labels)), 'Interpreter','none');
@@ -490,9 +496,14 @@ elseif multiscale && ~multiChan
     % Single channel/IC curve 
     hFig4 = figure('Color','w','InvertHardCopy','off');
     try icadefs; set(hFig4,'color',BACKCOLOR); catch; end
-    ax_s = axes(hFig4);
-    plot(ax_s, scales, entropyData, 'LineWidth',2);
-    ylabel(ax_s,'Entropy'); xlabel(ax_s,'Scales');
+    if isnumeric(scales)
+        xvals = scales;
+    else
+        xvals = 1:numel(scales);  % cell array fallback
+    end
+    plot(ax_s, xvals, entropyData, 'LineWidth', 2);
+    xlabel(ax_s, 'Scale');
+    ylabel(ax_s,'Entropy'); 
     title(ax_s, entropyType,'Interpreter','none');
     axis(ax_s,'tight');
     set(findall(hFig4,'type','axes'),'FontSize',10,'FontWeight','bold');
