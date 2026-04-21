@@ -53,7 +53,7 @@ end
 if S < 1
     S = 1;
 end
-scales = 1:S;
+scales = 2:S;  % skip scale 1 (sampEn) that is not very comparable to the rest
 
 % ---------------- Fill missing & z-score per channel ---------------------
 for ch = 1:nch
@@ -91,7 +91,9 @@ for c = 1:nch
 end
 
 % ---------------- Outputs & progress header ------------------------------
-MSE = nan(nch, S);
+% MSE = nan(nch, S);
+MSE = nan(nch, S-1);
+
 
 cl = lower(strtrim(coarseType));
 if any(strcmp(cl, {'sd','std','standard deviation'}))
@@ -179,15 +181,16 @@ end
 function v = mse_one_channel(sig, m, r, tau, coarseType, S, ...
     minBinsAll, minBinsStable, showProgress, ch, nch)
 
-v = nan(1, S);
+% v = nan(1, S);
+v = nan(1, S-1);   % scales 2:S => S-1 values
 
-for s = 1:S
-    if s == 1
-        v(1) = compute_SampEn(sig, ...
-            'm', m, 'r', r, 'tau', tau, ...
-            'Parallel', false, 'Progress', false);
-        continue
-    end
+for s = 2:S
+    % if s == 1
+    %     v(1) = compute_SampEn(sig, ...
+    %         'm', m, 'r', r, 'tau', tau, ...
+    %         'Parallel', false, 'Progress', false);
+    %     continue
+    % end
 
     L = floor(numel(sig)/s) * s;
     nBins = L / s;
@@ -203,9 +206,10 @@ for s = 1:S
     Y  = reshape(sig(1:L), s, []);
     cg = coarsegrain(Y, coarseType);
 
-    v(s) = compute_SampEn(cg, ...
-        'm', m, 'r', r, 'tau', tau, ...
-        'Parallel', false, 'Progress', false);
+    % v(s) = compute_SampEn(cg, 'm', m, 'r', r, 'tau', tau, ...
+    %     'Parallel', false, 'Progress', false);
+    v(s-1) = compute_SampEn(cg, 'm', m, 'r', r, 'tau', tau, ...
+        'Parallel', false, 'Progress', false); % when ignoring scale 1
 end
 
 if showProgress

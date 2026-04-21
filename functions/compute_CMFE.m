@@ -45,7 +45,7 @@ end
 if S < 1
     S = 1;
 end
-scales = 1:S;
+scales = 2:S;
 
 Xz = X;
 for c = 1:nch
@@ -74,14 +74,15 @@ else
     coarseLabel = upper(coarseType);
 end
 
-CMFE = nan(nch, S);
+% CMFE = nan(nch, S);
+CMFE = nan(nch, S-1);
 if showProg
     if parallelMode && ~isempty(ver('parallel'))
-        fprintf('CMFE: %d ch | m=%g, tau=%g, r=%g, n=%g | coarse=%s | S=%d | parallel=on\n', ...
-            nch, m, tau, r, n_exp, coarseLabel, S);
+        fprintf('CMFE: %d ch | m=%g, tau=%g, r=%g, n=%g | coarse=%s | S=%d (scales 2:%d) | parallel=on\n', ...
+            nch, m, tau, r, n_exp, coarseLabel, S-1, S);
     else
-        fprintf('CMFE: %d ch | m=%g, tau=%g, r=%g, n=%g | coarse=%s | S=%d | parallel=off\n', ...
-            nch, m, tau, r, n_exp, coarseLabel, S);
+        fprintf('CMFE: %d ch | m=%g, tau=%g, r=%g, n=%g | coarse=%s | S=%d (scales 2:%d) | parallel=off\n', ...
+            nch, m, tau, r, n_exp, coarseLabel, S-1, S);    
     end
 end
 
@@ -105,14 +106,15 @@ end
 if parallelMode && ~isempty(ver('parallel'))
     parfor ch = 1:nch
         sig = Xz(ch,:);
-        v = nan(1, S);
+        % v = nan(1, S);
+        v = nan(1, S-1);
 
-        for s = 1:S
-            if s == 1
-                [fe, ~, ~] = fuzz_engine_raw(sig, m, r, n_exp, tau, 'exponential', false);
-                v(1) = double(fe);
-                continue
-            end
+        for s = 2:S
+            % if s == 1
+            %     [fe, ~, ~] = fuzz_engine_raw(sig, m, r, n_exp, tau, 'exponential', false);
+            %     v(1) = double(fe);
+            %     continue
+            % end
 
             nBins = floor(numel(sig) / s);
             if nBins < max(minBinsHard, m+1)
@@ -138,7 +140,8 @@ if parallelMode && ~isempty(ver('parallel'))
 
             valid = isfinite(fe_vals);
             if any(valid)
-                v(s) = mean(fe_vals(valid));
+                % v(s) = mean(fe_vals(valid));
+                v(s-1) = mean(fe_vals(valid)); % excluding scale 1
             end
         end
 
@@ -150,14 +153,15 @@ if parallelMode && ~isempty(ver('parallel'))
 else
     for ch = 1:nch
         sig = Xz(ch,:);
-        v = nan(1, S);
+        % v = nan(1, S);
+        v = nan(1, S-1);
 
-        for s = 1:S
-            if s == 1
-                [fe, ~, ~] = fuzz_engine_raw(sig, m, r, n_exp, tau, 'exponential', false);
-                v(1) = double(fe);
-                continue
-            end
+        for s = 2:S
+            % if s == 1
+            %     [fe, ~, ~] = fuzz_engine_raw(sig, m, r, n_exp, tau, 'exponential', false);
+            %     v(1) = double(fe);
+            %     continue
+            % end
 
             nBins = floor(numel(sig) / s);
             if nBins < max(minBinsHard, m+1)
@@ -183,7 +187,8 @@ else
 
             valid = isfinite(fe_vals);
             if any(valid)
-                v(s) = mean(fe_vals(valid));
+                % v(s) = mean(fe_vals(valid));
+                v(s-1) = mean(fe_vals(valid)); % excluding scale 1
             end
         end
 

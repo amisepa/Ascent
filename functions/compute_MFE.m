@@ -60,7 +60,7 @@ end
 if S < 1
     S = 1;
 end
-scales = 1:S;
+scales = 2:S;
 
 % ---------------- Fill missing & z-score per channel ---------------------
 for ch = 1:nch
@@ -98,7 +98,9 @@ for c = 1:nch
 end
 
 % ---------------- Outputs & progress header ------------------------------
-MFE = nan(nch, S);
+% MFE = nan(nch, S);
+MFE = nan(nch, S-1);  % excludign scale 1
+
 
 cl = lower(strtrim(coarseType));
 if any(strcmp(cl, {'sd','std','standard deviation'}))
@@ -185,21 +187,21 @@ end
 function v = mfe_one_channel(sig, m, r, n_exp, tau, coarseType, S, ...
     minBinsAll, minBinsStable, blockSize, pdistMaxGB, showProgress, ch, nch)
 
-v = nan(1, S);
+% v = nan(1, S);
+v = nan(1, S-1); % excluding scale 1
 
-for s = 1:S
-    if s == 1
-        v(1) = compute_FuzzEn(sig, ...
-            'm', m, 'n', n_exp, 'tau', tau, 'r', r, ...
-            'BlockSize', blockSize, 'pdistMaxGB', pdistMaxGB, ...
-            'Parallel', false, 'Progress', false);
-        continue
-    end
+for s = 2:S
+    % if s == 1
+    %     v(1) = compute_FuzzEn(sig, ...
+    %         'm', m, 'n', n_exp, 'tau', tau, 'r', r, ...
+    %         'BlockSize', blockSize, 'pdistMaxGB', pdistMaxGB, ...
+    %         'Parallel', false, 'Progress', false);
+    %     continue
+    % end
 
     L = floor(numel(sig)/s) * s;
     nBins = L / s;
     minNeeded = max([minBinsAll, m+1, minBinsStable]);
-
     if nBins < minNeeded
         if showProgress
             fprintf('  [drop] ch %d: scale %d nBins=%d (<%d)\n', ch, s, nBins, minNeeded);
@@ -210,10 +212,12 @@ for s = 1:S
     Y  = reshape(sig(1:L), s, []);
     cg = coarsegrain(Y, coarseType);
 
-    v(s) = compute_FuzzEn(cg, ...
-        'm', m, 'n', n_exp, 'tau', tau, 'r', r, ...
+    % v(s) = compute_FuzzEn(cg, 'm', m, 'n', n_exp, 'tau', tau, 'r', r, ...
+    %     'BlockSize', blockSize, 'pdistMaxGB', pdistMaxGB, ...
+    %     'Parallel', false, 'Progress', false);
+    v(s-1) = compute_FuzzEn(cg, 'm', m, 'n', n_exp, 'tau', tau, 'r', r, ...
         'BlockSize', blockSize, 'pdistMaxGB', pdistMaxGB, ...
-        'Parallel', false, 'Progress', false);
+        'Parallel', false, 'Progress', false);  % excluding scale 1
 end
 
 if showProgress
