@@ -1,5 +1,41 @@
 function [RCMFE, scales] = compute_RCMFE(data, varargin)
-% compute_RCMFE  True Refined Composite Multiscale Fuzzy Entropy (RCMFE)
+% compute_RCMFE  Refined Composite Multiscale Fuzzy Entropy (RCMFE).
+%
+%   [RCMFE, scales] = compute_RCMFE(data, 'm', 2, 'r', 0.15, 'tau', 1, ...
+%                                   'n', 2, 'coarsing', 'median', ...
+%                                   'num_scales', 15)
+%
+% Inputs
+%   data : EEGLAB EEG struct with .data OR numeric [n_ch x n_samp]
+%
+% Name-value parameters
+%   'm'               : embedding dimension (default = 2)
+%   'r'               : similarity bound (default = 0.15)
+%   'tau'             : embedding delay for FuzEn (default = 1)
+%   'n'               : fuzzy exponent (default = 2)
+%   'coarsing'        : 'mean' | 'median' | 'trimmed mean' | 'std' | 'var'
+%                       (default = 'median')
+%   'num_scales'      : requested number of scales (default = 15)
+%   'MinSamplesPerBin': minimum number of coarse-grained bins required for a valid FE estimate (default = 4)
+%   'Parallel'        : true/false (default = true)
+%   'Progress'        : true/false (default = true)
+%
+% Outputs
+%   RCMFE  : [n_channels x num_scales] refined composite multiscale fuzzy entropy
+%   scales : 1:num_scales (all scales are retained)
+%
+% Notes
+%   • RCMFE pools phi_m and phi_m+1 across all offset-shifted coarse-grained
+%     series first, then computes the log-ratio: log(mean(phi_m) / mean(phi_m+1)).
+%   • This differs from CMFE, which computes FuzzyEntropy independently for
+%     each offset and then averages those values.
+%   • Pooling phi values before the log-ratio reduces variance at coarser
+%     scales where fewer offset samples are available.
+%   • Unlike CMFE, RCMFE does not expose a 'Mode' parameter and always uses
+%     the default 'local' detrending of embedded vectors (classical FuzEn style).
+%   • All scales are retained regardless of coarsing type; scale 1 is
+%     meaningful because phi is estimated from the raw z-scored signal.
+
 
 p = inputParser;
 p.addRequired('data', @(x) (isstruct(x) && isfield(x,'data')) || (isnumeric(x) && ndims(x)==2));
@@ -7,7 +43,7 @@ p.addParameter('m', 2,                 @(x) isnumeric(x) && isscalar(x) && x>0);
 p.addParameter('r', 0.15,              @(x) isnumeric(x) && isscalar(x) && x>0 && x<2);
 p.addParameter('tau', 1,               @(x) isnumeric(x) && isscalar(x) && x>=1);
 p.addParameter('n', 2,                 @(x) isnumeric(x) && isscalar(x) && x>0);
-p.addParameter('coarsing','std',       @(s) any(strcmpi(s,{'median','mean','trimmed mean','trimmed','tmean','trim20','std','sd','standard deviation','var','variance'})));
+p.addParameter('coarsing','median',       @(s) any(strcmpi(s,{'median','mean','trimmed mean','trimmed','tmean','trim20','std','sd','standard deviation','var','variance'})));
 p.addParameter('num_scales', 15,       @(x) isnumeric(x) && isscalar(x) && x>=1);
 p.addParameter('MinSamplesPerBin', 4,  @(x) isnumeric(x) && isscalar(x) && x>=1);
 p.addParameter('Parallel', true,       @(x) islogical(x) && isscalar(x));

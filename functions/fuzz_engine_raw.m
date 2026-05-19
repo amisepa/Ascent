@@ -1,24 +1,32 @@
-function [fe, pm, pm1] = fuzz_engine_raw(signal, m, r, n_exp, tau, kernelType, doNormalize, blockSize, pdistMaxGB)
+function [fe, pm, pm1] = fuzz_engine_raw(signal, m, r, n_exp, tau, kernelType, doNormalize, blockSize, pdistMaxGB, modeType)
 % fuzz_engine_raw  Low-level Fuzzy Entropy backend for a single series.
 %
-%   [fe, pm, pm1] = fuzz_engine_raw(signal, m, r, n_exp, tau, kernelType, doNormalize)
-%   [fe, pm, pm1] = fuzz_engine_raw(signal, m, r, n_exp, tau, kernelType, doNormalize, blockSize, pdistMaxGB)
+%   [fe, pm, pm1] = fuzz_engine_raw(signal, m, r, n_exp, tau, kernelType, ...
+%                                   doNormalize, blockSize, pdistMaxGB, modeType)
 %
-% Inputs:
+% Inputs
 %   signal      : numeric vector
 %   m           : embedding dimension
 %   r           : similarity bound
 %   n_exp       : fuzzy exponent
-%   tau         : time lag
+%   tau         : embedding delay
 %   kernelType  : 'exponential' or 'gaussian'
-%   doNormalize : true/false, z-score this signal before computing FuzzEn
-%   blockSize   : block size for exact blocked fallback (default = 2000)
-%   pdistMaxGB  : max GB allowed for pdist temporary vector (default = 2.0)
+%   doNormalize : true/false, z-score signal before embedding
+%   blockSize   : block size for exact blocked fallback
+%   pdistMaxGB  : max temporary memory for pdist path
+%   modeType    : 'local' | 'global'
+%                 - local  : subtract row mean from each embedded vector
+%                 - global : keep embedded vectors unchanged
 %
-% Outputs:
+% Outputs
 %   fe   : Fuzzy Entropy = log(pm / pm1)
 %   pm   : mean fuzzy similarity for embedding dimension m
 %   pm1  : mean fuzzy similarity for embedding dimension m+1
+%
+% Notes
+%   • 'local' corresponds to the classical FuzEn-style local detrending of
+%     each embedded vector before distance calculation.
+%   • 'global' compares raw embedded vectors directly.
 
 if nargin < 8 || isempty(blockSize)
     blockSize = 2000;
@@ -26,6 +34,10 @@ end
 if nargin < 9 || isempty(pdistMaxGB)
     pdistMaxGB = 2.0;
 end
+if nargin < 10 || isempty(modeType)
+    modeType = 'local';
+end
+modeType = lower(modeType);
 
 if ~isrow(signal)
     signal = signal(:).';
@@ -48,14 +60,24 @@ nVec_m  = N - (m   - 1) * tau;
 nVec_m1 = N - (m+1 - 1) * tau;
 
 if nVec_m < 2 || nVec_m1 < 2
-    fe = NaN;
-    pm = NaN;
+    fe  = NaN;
+    pm  = NaN;
     pm1 = NaN;
     return
 end
 
 Xm  = embed_uni_local(x, m,   tau, nVec_m);
 Xm1 = embed_uni_local(x, m+1, tau, nVec_m1);
+
+switch modeType
+    case 'local'
+        Xm  = Xm  - mean(Xm,  2);
+        Xm1 = Xm1 - mean(Xm1, 2);
+    case 'global'
+        % leave as-is
+    otherwise
+        error('fuzz_engine_raw:BadMode', 'Unknown modeType "%s".', modeType);
+end
 
 pm  = fuzzy_pairmean_cheby_exact(Xm,  r, n_exp, blockSize, pdistMaxGB, kernelType);
 pm1 = fuzzy_pairmean_cheby_exact(Xm1, r, n_exp, blockSize, pdistMaxGB, kernelType);

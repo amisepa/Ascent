@@ -12,7 +12,7 @@ function [RCmvMFE, scales] = compute_RCmvMFE(data, varargin)
 %   'r'         : scalar threshold scaling factor sr (default = 0.15)
 %   'tau'       : scalar time lag (default = 1)
 %   'n'         : fuzzy exponent (default = 2)
-%   'coarsing'  : 'mean' or 'var' (default = 'mean')
+%   'coarsing'  : 'mean' 'median' 'trimmed mean' 'std' or 'var' (default = 'std')
 %   'num_scales': number of scales (default = 15)
 %   'Parallel'  : parallelize offsets within a scale when useful (default = false)
 %   'Progress'  : show progress (default = true)
@@ -40,7 +40,7 @@ p.addParameter('m', 2, @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('r', 0.15, @(x) isnumeric(x) && isscalar(x) && x > 0 && x < 2);
 p.addParameter('tau', 1, @(x) isnumeric(x) && isscalar(x) && x >= 1);
 p.addParameter('n', 2, @(x) isnumeric(x) && isscalar(x) && x > 0);
-p.addParameter('coarsing', 'mean', @(s) any(strcmpi(s, {'mean','var'})));
+p.addParameter('coarsing', 'mean', @(s) any(strcmpi(s, {'mean','median','trimmed mean','trimmed','trimmean','std','sd','standard deviation','var','variance'})));
 p.addParameter('num_scales', 15, @(x) isnumeric(x) && isscalar(x) && x >= 1);
 p.addParameter('Parallel', false, @(x) islogical(x) && isscalar(x));
 p.addParameter('Progress', true, @(x) islogical(x) && isscalar(x));
@@ -86,8 +86,17 @@ M   = sm   * ones(1, nChan);
 Tau = stau * ones(1, nChan);
 
 % ---------- Outputs ----------
-scales = 1:num_scales;
-RCmvMFE = nan(1, num_scales);
+% Exclude scale 1 for std/var operators (std of single-sample bin = 0)
+ct = lower(strtrim(coarseType));
+stdvarOp = any(strcmp(ct, {'std','sd','standard deviation','var','variance'}));
+if stdvarOp
+    scales   = 2:num_scales;
+    scaleVec = 2:num_scales;
+else
+    scales   = 1:num_scales;
+    scaleVec = 1:num_scales;
+end
+RCmvMFE = nan(1, numel(scales));
 
 % ---------- Header ----------
 doPar = parallelMode && ~isempty(ver('parallel'));
@@ -96,8 +105,8 @@ if showProg
     if doPar
         parStr = 'on';
     end
-    fprintf('RCmvMFE: channels=%d | m=%g, tau=%g, r=%g, n=%g | coarse=%s | scales=%d | parallel=%s\n', ...
-        nChan, sm, stau, r, n_exp, coarseType, num_scales, parStr);
+    fprintf('RCmvMFE: channels=%d | m=%g, tau=%g, r=%g, n=%g | coarse=%s | scales=%s | parallel=%s\n', ...
+        nChan, sm, stau, r, n_exp, coarseType, mat2str(scales), parStr);
 end
 
 parMinOffsets = 6;
@@ -108,7 +117,8 @@ if showProg
 end
 
 % ---------- Main loop ----------
-for iScale = 1:num_scales
+for si = 1:numel(scaleVec)
+    iScale = scaleVec(si);
     if showProg
         fprintf('  computing scale %d/%d...\n', iScale, num_scales);
         tScale = tic;
@@ -162,14 +172,14 @@ for iScale = 1:num_scales
     BB = sum(fi_m2_vec);
 
     if BB > 0 && isfinite(AA) && isfinite(BB)
-        RCmvMFE(iScale) = log(AA / BB);
+        RCmvMFE(si) = log(AA / BB);
     else
-        RCmvMFE(iScale) = NaN;
+        RCmvMFE(si) = NaN;
     end
 
     if showProg
         fprintf('     --> finished scale %d/%d (%.1fs)\n', iScale, num_scales, toc(tScale));
-        progressbar(iScale / num_scales)
+        progressbar(si / numel(scaleVec))
     end
 end
 end

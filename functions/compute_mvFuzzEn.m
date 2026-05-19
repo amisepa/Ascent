@@ -31,6 +31,20 @@ function [mvFuzzEn, phi_m, phi_m1] = compute_mvFuzzEn(data, varargin)
 %     used in the RCmvMFE reference, where phi_m1 is averaged across the K
 %     augmented (m+1) subspaces.
 %   • Entropy values are not constrained to be positive; negative values are valid.
+%
+% References: 
+%	 Fuzzy entropy formulation, kernel, and phi_m+1 averaging:
+%	Azami, H & Escudero, J 2017, 'Refined Composite Multivariate Generalized 
+% Multiscale Fuzzy Entropy: A Tool for Complexity Analysis of Multichannel Signals',
+% Physica a-Statistical mechanics and its applications, vol. 465, pp. 261-276
+%
+%   Multivariate embedding structure:
+%	Ahmed, M. U., & Mandic, D. P. (2011). Multivariate multiscale entropy: 
+%A tool for complexity analysis of multichannel data. Physical Review 
+%E—Statistical, Nonlinear, and Soft Matter Physics, 84(6), 061918.
+%
+% Adapted and improved for the ASCENT EEGLAB plugin by Cedric Cannard, 2025.
+
 
 % ---------- Parse inputs ----------
 p = inputParser;
