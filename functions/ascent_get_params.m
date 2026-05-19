@@ -76,6 +76,7 @@ p.TimeOnly         = [];
 p.n                = [];
 p.kernel_meth      = [];
 p.blocksize        = [];
+p.fuzzy_mode        = [];
 
 % Aperiodic
 p.freqRange        = [];
@@ -154,6 +155,7 @@ else
             case 'timeonly',         p.TimeOnly         = logical(val);
             case 'n',                p.n                = double(val);
             case 'kernel',           p.kernel_meth      = val;
+            case 'fuzzy_mode',       p.fuzzy_mode       = val;
             case 'blocksize',        p.blocksize        = double(val);
             case 'freqrange',        p.freqRange        = double(val);
             case 'winsec',           p.winSec           = double(val);
@@ -207,7 +209,7 @@ if isempty(p.parallel)
 end
 
 % Multiscale defaults
-if contains(lower(p.measure), {'mse','mmse','mfe','rcmfe','rcmvmfe'})
+if contains(lower(p.measure), {'mse','mmse','mfe','cmfe','rcmfe','rcmvmfe'})
     if isempty(p.coarsing)
         disp('No coarse-graining method selected: using mean (default).');
         p.coarsing = 'mean';
@@ -237,7 +239,7 @@ if contains(lower(p.measure), {'mse','mmse','mfe','rcmfe','rcmvmfe'})
 end
 
 % Fuzzy defaults
-if contains(lower(p.measure), {'fuzzen','mfe','rcmfe','rcmvmfe'})
+if contains(lower(p.measure), {'fuzzen','mfe','cmfe','rcmfe','rcmvmfe'})
     if isempty(p.n)
         disp('No fuzzy power selected: using n = 2 (default).');
         p.n = 2;
@@ -249,6 +251,10 @@ if contains(lower(p.measure), {'fuzzen','mfe','rcmfe','rcmvmfe'})
     if isempty(p.blocksize)
         disp('BlockSize not set: using 256 (default).');
         p.blocksize = 256;
+    end
+    if isempty(p.fuzzy_mode)
+        disp('Fuzzy mode not set: using local (default).');
+        p.fuzzy_mode = 'local';
     end
 end
 

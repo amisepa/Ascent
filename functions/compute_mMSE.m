@@ -6,6 +6,20 @@ function [mse, scales, info] = compute_mMSE(data, varargin)
 %
 % Scale 1 is excluded: it is equivalent to uniscale SampEn and can be
 % computed directly via compute_SampEn. Scales run from 2 to num_scales.
+%
+% Scale-wise r (Kosciessa et al. 2020, Modification 2): data are
+% z-normalized once at the start, then each scale's signal (filtered or
+% coarse-grained) is further normalized to unit variance before SampEn,
+% so r is always relative to the scale-specific SD rather than the
+% original broadband variance.
+%
+% Note that the different coarse-graining methods only apply to filter_mode = 'none'.
+% the filt-skip method filters to isolate the frequency band and then decimates 
+% by selecting every s-th sample, so applying mean/std/variance operators to 
+% bins would change the measure's meaning and defeat the purpose of the spectral isolation.
+%
+% Author: Cedric Cannard, 2025
+% EEGLAB ASCENT PLUGIN
 
 % -------- Parse inputs
 p = inputParser;
@@ -14,7 +28,7 @@ p.addParameter('m',                2,  @(x) isnumeric(x) && isscalar(x) && x>=1)
 p.addParameter('tau',              1,  @(x) isnumeric(x) && isscalar(x) && x>=1);
 p.addParameter('r',               .15, @(x) isnumeric(x) && isscalar(x) && x>0 && x<1);
 p.addParameter('num_scales',      20,  @(x) isnumeric(x) && isscalar(x) && x>=1);
-p.addParameter('coarsing',       'std');
+p.addParameter('coarsing',       'std', @(s) any(strcmpi(s,{'median','mean','trimmed mean','trimmed','trimmean','std','sd','standard deviation','var','variance'})));
 p.addParameter('filter_mode', 'narrowband', @(s) any(strcmpi(s,{'none','narrowband'})));
 p.addParameter('BlockSize',     2000, @(x) isnumeric(x) && isscalar(x) && x>=100);
 p.addParameter('pdistMaxGB',     2.0, @(x) isnumeric(x) && isscalar(x) && x>0);
@@ -165,6 +179,16 @@ for ch = 1:nChan
     end
 end
 
+% -------- Z-normalize each channel (Kosciessa modification 2 requires this
+%          as baseline so that r is interpretable as a fraction of SD)
+for ch = 1:nChan
+    mu = mean(dat(ch,:), 'omitnan');
+    sg = std(dat(ch,:), 0, 2, 'omitnan');
+    if sg > 0
+        dat(ch,:) = (dat(ch,:) - mu) / sg;
+    end
+end
+
 % =========================================================================
 %  SCALE LOOP — PARALLEL
 %  Loop variable s is the array index (1:S-1).
@@ -186,6 +210,10 @@ if useParScales
             [CG, nBins] = coarsegrain_stat(Y, actualScale, ct);
             cg_len_s    = nBins;
             if nBins >= max(o.MinSamplesPerBin, o.m+1)
+                % Scale-wise r: normalize CG to unit variance per channel
+                CG_std = std(CG, 0, 2);
+                CG_std(CG_std < 1e-10) = 1;
+                CG = CG ./ CG_std;
                 if ~o.TimeOnly
                     for ch = 1:nChan
                         mse_s(ch) = compute_SampEn(CG(ch,:), 'm', o.m, 'tau', o.tau, ...
@@ -201,6 +229,11 @@ if useParScales
         else
             isHPonly = isinf(band(2));
             Y = fir_zero_phase(Y, band, o.Fs, o.PadLen);
+            % Scale-wise r: normalize filtered signal to unit variance per
+            % channel so r is relative to scale-specific SD (Kosciessa 2020)
+            Y_std = std(Y, 0, 2);
+            Y_std(Y_std < 1e-10) = 1;
+            Y = Y ./ Y_std;
 
             if isHPonly
                 nStarts   = 1;
@@ -278,6 +311,10 @@ else
             [CG, nBins] = coarsegrain_stat(Y, actualScale, ct);
             cg_len(s)   = nBins;
             if nBins >= max([o.MinSamplesPerBin, o.m+1, o.MinWinSamples])
+                % Scale-wise r: normalize CG to unit variance per channel
+                CG_std = std(CG, 0, 2);
+                CG_std(CG_std < 1e-10) = 1;
+                CG = CG ./ CG_std;
                 if ~o.TimeOnly
                     for ch = 1:nChan
                         mse(ch,s) = compute_SampEn(CG(ch,:), 'm', o.m, 'tau', o.tau, ...
@@ -294,6 +331,11 @@ else
 
         isHPonly = isinf(band(2));
         Y = fir_zero_phase(Y, band, o.Fs, o.PadLen);
+        % Scale-wise r: normalize filtered signal to unit variance per
+        % channel so r is relative to scale-specific SD (Kosciessa 2020)
+        Y_std = std(Y, 0, 2);
+        Y_std(Y_std < 1e-10) = 1;
+        Y = Y ./ Y_std;
 
         if isHPonly
             nStarts   = 1;
@@ -406,10 +448,10 @@ if isnumeric(token)
     end
 else
     t = lower(regexprep(strtrim(char(token)),'[^a-z]',''));
-    if     any(strcmp(t,{'std','sigma','standarddeviation'})), ct = 'std';
-    elseif any(strcmp(t,{'variance','var','sigma2'})),         ct = 'variance';
-    elseif any(strcmp(t,{'mean','avg','average','mu'})),       ct = 'mean';
-    elseif any(strcmp(t,{'median','med'})),                    ct = 'median';
+    if     any(strcmp(t,{'std','sd','standard deviation'})), 	ct = 'std';
+    elseif any(strcmp(t,{'variance','var'})),         			ct = 'variance';
+    elseif any(strcmp(t,{'mean','average'})),       			ct = 'mean';
+    elseif any(strcmp(t,{'median','med'})),                    	ct = 'median';
     end
 end
 end

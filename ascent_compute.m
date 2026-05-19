@@ -268,6 +268,13 @@ switch lower(measure)
             disp('Aperiodic component subtracted from PSD.');
         end
 
+		% Time-resolved version
+		[exp_t, off_t, times, freqs, psd_t, psd_corr_t] = compute_AperiodicFit_sliding(EEG.data, EEG.srate, ...
+			'slidWinSec',      4,   ...   % 4 s window
+			'slidStepSec',     1,   ...   % 1 s step
+			'freqRange',       [1 40], ...
+			'correctAperiodic', true);
+	
     case 'mse'
         % Multiscale Entropy — Costa et al. (2002)
         [entropy, scales] = compute_MSE(data, 'm', m, 'tau', tau, ...
@@ -329,38 +336,6 @@ switch lower(measure)
         error('Unknown measure: %s. See help ascent_compute for valid options.', measure);
 end
 
-% ----------------------------
-% VISUALIZATIONS | PLOTS
-% ----------------------------
-if vis
-    if nChan > 1
-        switch lower(measure)
-            case 'exsent'
-                ascent_plot(HD,  chanlocs, 'SampEn of durations',                    []);
-                ascent_plot(HA,  chanlocs, 'SampEn of amplitudes',                   []);
-                ascent_plot(HDA, chanlocs, 'Joint SampEn of durations & amplitudes', []);
-            case 'aperiodic'
-                if correctAperiodic
-                    ascent_plot(exponent, chanlocs, 'Aperiodic', [], offset, freqs, psd, psd_corrected);
-                else
-                    ascent_plot(exponent, chanlocs, 'Aperiodic', [], offset, freqs, psd);
-                end
-            case 'mmse'
-                hasTime = exist('info','var') && isstruct(info) && isfield(info,'mse_time') ...
-                          && ~isempty(info.mse_time);
-                if hasTime
-                    plot_mMSE_timecourse(info.mse_time, info.time_sec, scales);
-                end
-                if ~TimeOnly && ~all(isnan(entropy(:)))
-                    ascent_plot(entropy, chanlocs, measure, scales);
-                end    
-            otherwise
-                ascent_plot(entropy, chanlocs, measure, scales);
-        end
-    else
-        disp('Visualization requires more than 1 channel.');
-    end
-end
 
 % ----------------------------
 % Store outputs in EEG structure
@@ -399,6 +374,41 @@ end
 if exist('info','var')
     EEG.ascent.(measure).info = info; % additional outputs from some algos 
 end
+
+
+% ----------------------------
+% VISUALIZATIONS | PLOTS
+% ----------------------------
+if vis
+    if nChan > 1
+        switch lower(measure)
+            case 'exsent'
+                ascent_plot(HD,  chanlocs, 'SampEn of durations',                    []);
+                ascent_plot(HA,  chanlocs, 'SampEn of amplitudes',                   []);
+                ascent_plot(HDA, chanlocs, 'Joint SampEn of durations & amplitudes', []);
+            case 'aperiodic'
+                if correctAperiodic
+                    ascent_plot(exponent, chanlocs, 'Aperiodic', [], offset, freqs, psd, psd_corrected);
+                else
+                    ascent_plot(exponent, chanlocs, 'Aperiodic', [], offset, freqs, psd);
+                end
+            case 'mmse'
+                hasTime = exist('info','var') && isstruct(info) && isfield(info,'mse_time') ...
+                          && ~isempty(info.mse_time);
+                if hasTime
+                    plot_mMSE_timecourse(info.mse_time, info.time_sec, scales);
+                end
+                if ~TimeOnly && ~all(isnan(entropy(:)))
+                    ascent_plot(entropy, chanlocs, measure, scales);
+                end    
+            otherwise
+                ascent_plot(entropy, chanlocs, measure, scales);
+        end
+    else
+        disp('Visualization requires more than 1 channel.');
+    end
+end
+
 
 % ----------------------------
 % Command history

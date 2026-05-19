@@ -14,7 +14,7 @@ p.addParameter('m', 2,                 @(x) isnumeric(x) && isscalar(x) && x>0);
 p.addParameter('r', 0.15,              @(x) isnumeric(x) && isscalar(x) && x>0 && x<2);
 p.addParameter('tau', 1,               @(x) isnumeric(x) && isscalar(x) && x>=1);
 p.addParameter('n', 2,                 @(x) isnumeric(x) && isscalar(x) && x>0);
-p.addParameter('coarsing','std',       @(s) any(strcmpi(s,{'median','mean','trimmed mean','trimmed','tmean','trim20','std','sd','standard deviation','var','variance'})));
+p.addParameter('coarsing','std',       @(s) any(strcmpi(s,{'median','mean','trimmed mean','trimmed','trimmean','std','sd','standard deviation','var','variance'})));
 p.addParameter('num_scales', 15,       @(x) isnumeric(x) && isscalar(x) && x>=1);
 p.addParameter('MinSamplesPerBin', 4,  @(x) isnumeric(x) && isscalar(x) && x>=1);
 p.addParameter('StableMinBins', 100,   @(x) isnumeric(x) && isscalar(x) && x>=1);
@@ -111,7 +111,7 @@ elseif strcmp(cl, 'mean')
     coarseLabel = 'MEAN';
 elseif strcmp(cl, 'median')
     coarseLabel = 'MEDIAN';
-elseif any(strcmp(cl, {'trimmed mean','trimmed','tmean','trim20'}))
+elseif any(strcmp(cl, {'trimmed mean','trimmed','trimmean'}))
     coarseLabel = 'TRIM20';
 else
     coarseLabel = upper(coarseType);

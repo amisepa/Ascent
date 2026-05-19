@@ -8,9 +8,9 @@ cd(pluginPath)
 eeglab; close
 
 %%%%%%%%%%%%%%%%%%%%%%%%%% parameters %%%%%%%%%%%%%%%%%%%%%%%%%%
-num_scales = 50;
+num_scales = 30;
 num_chan = 64;
-coarsing = 'mean';
+coarsing = 'sd';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -30,9 +30,9 @@ Exponent = nan(num_chan, num_files);
 Offset = nan(num_chan, num_files);
 PSD = nan(num_chan, 79, num_files);
 PSD_corr = nan(num_chan, 79, num_files);
-MSE = nan(num_chan, num_scales, num_files);
-mMSE = nan(num_chan, num_scales, num_files);
-MFE = nan(num_chan, num_scales, num_files);
+MSE = nan(num_chan, num_scales-1, num_files);
+mMSE = nan(num_chan, num_scales-1, num_files);
+MFE = nan(num_chan, num_scales-1, num_files);
 RCMFE = nan(num_chan, num_scales, num_files);
 % RCmvMFE = nan(num_chan, num_scales, num_files);
 progressbar('Prosessing and computing measures for eyes-closed condition')
@@ -74,21 +74,24 @@ for iFile = 1:num_files
     % Load if already preprocessed
     EEG = pop_loadset('filepath', fullfile(data_path, 'eyes_closed'), 'filename', sprintf('%s.set', filenames{iFile}(1:end-4)));
 
-    % % Compute complexity measures
-    % EEG = ascent_compute(EEG, 'measure', 'SampEn', 'vis', false);
-    % EEG = ascent_compute(EEG, 'measure', 'FuzzEn', 'vis', false);
-    % EEG = ascent_compute(EEG, 'measure', 'HigFracDim', 'vis', false);
-    % EEG = ascent_compute(EEG, 'measure', 'Aperiodic', 'vis', false);
-    % EEG = ascent_compute(EEG, 'measure', 'MSE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
-    % EEG = ascent_compute(EEG, 'measure', 'mMSE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
-    % EEG = ascent_compute(EEG, 'measure', 'ExSEnt', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
-    % EEG = ascent_compute(EEG, 'measure', 'MFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
-    % EEG = ascent_compute(EEG, 'measure', 'RCMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
-    % % EEG = ascent_compute(EEG, 'measure', 'RCmvMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    % Compute complexity measures
+    EEG = ascent_compute(EEG, 'measure', 'SampEn', 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'ExSEnt', 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'FuzzEn', 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'HigFracDim', 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'Aperiodic', 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'MSE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'mMSE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'MFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    % EEG = ascent_compute(EEG, 'measure', 'CMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'RCMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    % EEG = ascent_compute(EEG, 'measure', 'RCmvMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
 
     % ascent_plot(EEG.ascent.MSE.data, EEG.chanlocs, 'mse', EEG.ascent.MSE.scales);
+    % ascent_plot(EEG.ascent.MFE.data, EEG.chanlocs, 'RCMFE', EEG.ascent.MFE.scales);
+    % ascent_plot(EEG.ascent.RCMFE.data, EEG.chanlocs, 'RCMFE', EEG.ascent.RCMFE.scales);
     % ascent_plot(EEG.ascent.ExSEnt.data, EEG.chanlocs, 'exsent', []);
-
+    
     % Save for running entropy on ICA time series later
     % EEG = pop_saveset(EEG, 'filepath', fullfile(data_path, 'eyes_closed'), 'filename', sprintf('%s.set', filenames{iFile}(1:end-4)));
 
@@ -106,6 +109,7 @@ for iFile = 1:num_files
     MSE(:,:,iFile) = EEG.ascent.MSE.data;
     mMSE(:,:,iFile) = EEG.ascent.mMSE.data;
     MFE(:,:,iFile) = EEG.ascent.MFE.data;
+    % CMFE(:,:,iFile) = EEG.ascent.CMFE.data;
     RCMFE(:,:,iFile) = EEG.ascent.RCMFE.data;
     % RCmvMFE(:,:,iFile) = EEG.ascent.RCmvMFE.data;
 
@@ -145,9 +149,10 @@ Exponent = nan(num_chan, num_files);
 Offset = nan(num_chan, num_files);
 PSD = nan(num_chan, 79, num_files);
 PSD_corr = nan(num_chan, 79, num_files);
-MSE = nan(num_chan, num_scales, num_files);
-mMSE = nan(num_chan, num_scales, num_files);
-MFE = nan(num_chan, num_scales, num_files);
+MSE = nan(num_chan, num_scales-1, num_files);
+mMSE = nan(num_chan, num_scales-1, num_files);
+MFE = nan(num_chan, num_scales-1, num_files);
+% CMFE = nan(num_chan, num_scales, num_files);
 RCMFE = nan(num_chan, num_scales, num_files);
 % RCmvMFE = nan(num_chan, num_scales, num_files);
 progressbar('Prosessing and computing measures for eyes-open condition')
@@ -187,17 +192,18 @@ for iFile = 1:num_files
     % % Load if already processed
     EEG = pop_loadset('filepath', fullfile(data_path, 'eyes_open'), 'filename', sprintf('%s.set', filenames{iFile}(1:end-4)));
 
-    % % Compute complexity measures
-    % EEG = ascent_compute(EEG, 'measure', 'SampEn', 'vis', false);
-    % EEG = ascent_compute(EEG, 'measure', 'FuzzEn', 'vis', false);
-    % EEG = ascent_compute(EEG, 'measure', 'HigFracDim', 'vis', false);
-    % EEG = ascent_compute(EEG, 'measure', 'Aperiodic', 'vis', false);
-    % EEG = ascent_compute(EEG, 'measure', 'MSE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
-    % EEG = ascent_compute(EEG, 'measure', 'mMSE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
-    % EEG = ascent_compute(EEG, 'measure', 'ExSEnt', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
-    % EEG = ascent_compute(EEG, 'measure', 'MFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
-    % EEG = ascent_compute(EEG, 'measure', 'RCMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
-    % % EEG = ascent_compute(EEG, 'measure', 'RCmvMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    % Compute complexity measures
+    EEG = ascent_compute(EEG, 'measure', 'SampEn', 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'ExSEnt', 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'FuzzEn', 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'HigFracDim', 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'Aperiodic', 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'MSE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'mMSE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'MFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    % EEG = ascent_compute(EEG, 'measure', 'CMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'RCMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    % EEG = ascent_compute(EEG, 'measure', 'RCmvMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
     % 
     % % Save for running entropy on ICA time series later
     % EEG = pop_saveset(EEG, 'filepath', fullfile(data_path, 'eyes_open'), 'filename', sprintf('%s.set', filenames{iFile}(1:end-4)));
@@ -216,6 +222,7 @@ for iFile = 1:num_files
     MSE(:,:,iFile) = EEG.ascent.MSE.data;
     mMSE(:,:,iFile) = EEG.ascent.mMSE.data;
     MFE(:,:,iFile) = EEG.ascent.MFE.data;
+    % CMFE(:,:,iFile) = EEG.ascent.CMFE.data;
     RCMFE(:,:,iFile) = EEG.ascent.RCMFE.data;
     % RCmvMFE(:,:,iFile) = EEG.ascent.RCmvMFE.data;
 
@@ -243,7 +250,7 @@ gong
 
 %% Load, separate the data by condition, & reorganize electrodes
 
-coarsing = 'mean';
+% coarsing = 'sd';
 
 % Load chanlocs only
 load(fullfile(data_path, sprintf('ascent_outputs_EC_%s_new.mat', coarsing)), 'chanlocs')
@@ -294,11 +301,11 @@ Exponent1 = Exponent(order_idx,:);
 Offset1 = Offset(order_idx,:);
 PSD1  = PSD(order_idx, :, :);
 PSD_corr1 = PSD_corr(order_idx, :, :);
-MSE1     = MSE(order_idx, 3:end, :);
-MFE1     = MFE(order_idx, 3:end, :);
-mMSE1    = mMSE(order_idx, 3:end, :);
-RCMFE1   = RCMFE(order_idx, 3:end, :);
-% RCmvMFE1   = RCmvMFE(order_idx, 2:end, :);
+MSE1     = MSE(order_idx, :, :);
+MFE1     = MFE(order_idx, :, :);
+mMSE1    = mMSE(order_idx, :, :);
+RCMFE1   = RCMFE(order_idx, :, :);
+% RCmvMFE1   = RCmvMFE(order_idx, :, :);
 
 % Load EO metrics and reorder
 load(fullfile(data_path, sprintf('ascent_outputs_EO_%s_new.mat', coarsing)), ...
@@ -314,35 +321,36 @@ FracDim2 = FracDim(order_idx, :);
 Exponent2 = Exponent(order_idx,:);
 Offset2 = Offset(order_idx,:);
 PSD2 = PSD(order_idx, :, :);
-PSD_corr2 = PSD_corr(order_idx, :, :);MSE2     = MSE(order_idx, 3:end, :);
-MFE2     = MFE(order_idx, 3:end, :);
-mMSE2    = mMSE(order_idx, 3:end, :);
-RCMFE2   = RCMFE(order_idx, 3:end, :);
-% RCmvMFE2   = RCmvMFE(order_idx, 2:end, :);
+PSD_corr2 = PSD_corr(order_idx, :, :);
+MSE2     = MSE(order_idx, :, :);
+MFE2     = MFE(order_idx, :, :);
+mMSE2    = mMSE(order_idx, :, :);
+RCMFE2   = RCMFE(order_idx, :, :);
+% RCmvMFE2   = RCmvMFE(order_idx, :, :);
 
-scales = scales(3:end);  % avoid frequencies filtered out by lowpass filter
-scales_bounds = scales_bounds(3:end);  % avoid frequencies filtered out by lowpass filter
-num_scales = numel(scales);  % update
+% scales = scales(1:end);  % avoid frequencies filtered out by lowpass filter
+% scales_bounds = scales_bounds(3:end);  % avoid frequencies filtered out by lowpass filter
+% num_scales = numel(scales);  % update
 
 %% Stats
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-nPerm = 5000;          % number of permutations for H0
+nPerm = 1000;          % number of permutations for H0
 alpha = 0.05;           % NaN to show maps of p-values
 ct = 'mean';            % central tendency method ('mean' for normal t-test, 'trimmed mean' for Yuen t-test)
 grp_type = 'dpt';       % groupe is dependent ('dpt') or independent ('idpt')
 mcc_type = 2;   % 0 = uncorrected; 1 = t-max; 2 = cluster; 3 = TFCE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
 % load(fullfile(data_path,'chanlocs_reorganized.mat'), 'chanlocs')
 outputs_path = fullfile(pluginPath, 'figures_new', 'group_results'); mkdir(outputs_path)
-load colormap_bwr.mat; dmap(1,:) = [0.9 0.9 0.9]; % set NaNs to grey
-
+% load colormap_bwr.mat; dmap(1,:) = [0.9 0.9 0.9]; % set NaNs to grey
+rdbu_cmap    = interp1([1;128;256],[0.698 0.094 0.168;1 1 1;0.129 0.400 0.675],(1:256)','linear');
+dmap    = flipud(max(0,min(1,rdbu_cmap)));
 
 %%%%%%%%%%%%%%%%%%%%% UNISCALES %%%%%%%%%%%%%%%%%%%%%
 
-figure('Color','w');
+figure('Color','w','ToolBar','none','MenuBar','none');
 
 % SampEn
 % nexttile
@@ -361,6 +369,7 @@ subplot(2,4,1)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
+    % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
@@ -378,6 +387,7 @@ subplot(2,4,2)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
+    % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
@@ -395,6 +405,7 @@ subplot(2,4,3)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
+    % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
@@ -412,6 +423,7 @@ subplot(2,4,4)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
+    % tvals(~mask) = NaN;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
@@ -428,22 +440,23 @@ subplot(2,4,5)
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(ExSEnt1_3, ExSEnt2_3, nPerm, ct, grp_type);
 % mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
-% if any(mask)
-%     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
-%         'verbose','off','whitebk','on');
-%     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
-%     % title(sprintf("ExSEnt (coarse: %s)", coarsing));
-%     title("ExSEnt (amp + dur)")
-% else
-%     close(gcf)
-mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, 0, 0.05, chanlocs);
-% [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
-topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
-    'verbose','off','whitebk','on');
-c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
-% title(sprintf("ExSEnt (coarse: %s)", coarsing));
-title("ExSEnt (amp + dur; uncorrected)")
-% end
+if any(mask)
+    % tvals(~mask) = NaN;
+    topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
+        'verbose','off','whitebk','on');
+    c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
+    % title(sprintf("ExSEnt (coarse: %s)", coarsing));
+    title("ExSEnt (amp + dur)")
+else
+    close(gcf)
+% mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, 0, 0.05, chanlocs);
+% % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
+% topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
+%     'verbose','off','whitebk','on');
+% c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
+% % title(sprintf("ExSEnt (coarse: %s)", coarsing));
+% title("ExSEnt (amp + dur; uncorrected)")
+end
 
 % FracDim
 % nexttile
@@ -453,11 +466,12 @@ subplot(2,4,6)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
+    tvals(mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
     % title(sprintf("FracDim (coarse: %s)", coarsing));
-    title("FracDim")
+    title("HigFracDim")
 else
     close(gcf)
 end
@@ -470,6 +484,7 @@ subplot(2,4,7)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
+    % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
@@ -487,6 +502,7 @@ subplot(2,4,8)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
+    % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
@@ -506,15 +522,16 @@ print(gcf, fullfile(outputs_path, 'fig_uniscales.png'), '-dpng', '-r300');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 coarsing = 'mean';
-nPerm = 5000;          % number of permutations for H0
+nPerm = 1000;          % number of permutations for H0
 alpha = 0.05;           % NaN to show maps of p-values
 ct = 'mean';            % central tendency method ('mean' for normal t-test, 'trimmed mean' for Yuen t-test)
 grp_type = 'dpt';       % groupe is dependent ('dpt') or independent ('idpt')
-mcc_type = 2;   % 0 = uncorrected; 1 = t-max; 2 = cluster; 3 = TFCE
+mcc_type = 3;         % 0 = uncorrected; 1 = t-max; 2 = cluster; 3 = TFCE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 %% MSE
+
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(MSE1, MSE2, nPerm, ct, grp_type);
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(MSE1, MSE2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
@@ -532,7 +549,7 @@ if ~isempty(mask_clusters)
     for i = 1:numel(hs.curve)
         saveas(hs.topo{i}, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_cluster-%g_topo.fig', coarsing, i)));
         print(hs.topo{i}, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
-        xlim(findobj(hs.curve{i}, 'Type', 'axes'), [2 num_scales]);
+        xlim(findobj(hs.curve{i}, 'Type', 'axes'), [1 num_scales]);
         saveas(hs.curve{i}, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_cluster-%g_curve.fig', coarsing, i)));
         print(hs.curve{i}, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_cluster-%g_curve.png', coarsing, i)),'-dpng','-r300');
     end
@@ -589,21 +606,22 @@ end
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(mMSE1, mMSE2, nPerm, ct, grp_type);
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(mMSE1, mMSE2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
-[mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
-    'nonlinear', grp_type, {size(mMSE1,3) size(mMSE2,3)}, [], [], [], 'g');
-plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-title("mMSE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold');
-ax = findobj(hs.curve{i}, 'Type', 'axes');
-xlim([1 num_scales]);
-tick_idx = 1:2:num_scales;
-xticks(tick_idx);
-fmt_labels = cellfun(@(s) format_scale_label(s), scales_bounds(tick_idx), 'UniformOutput', false);
-xticklabels(fmt_labels);
-xtickangle(45);
-set(gca, 'FontSize', 14, 'LineWidth', 1.2);
-saveas(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_main.fig', coarsing)));
-print(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
-if ~isempty(mask_clusters)
+if any(mask, 'all')
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
+        'nonlinear', grp_type, {size(mMSE1,3) size(mMSE2,3)}, [], [], [], 'g');
+    plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
+    title("mMSE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold');
+    ax = findobj(hs.curve{i}, 'Type', 'axes');
+    xlim([1 num_scales]);
+    tick_idx = 1:2:num_scales;
+    xticks(tick_idx);
+    fmt_labels = cellfun(@(s) format_scale_label(s), scales_bounds(tick_idx), 'UniformOutput', false);
+    xticklabels(fmt_labels);
+    xtickangle(45);
+    set(gca, 'FontSize', 14, 'LineWidth', 1.2);
+    saveas(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_main.fig', coarsing)));
+    print(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
+
     writetable(summary_tbl, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_summary.csv', coarsing)));
     hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, scales, chanlocs, 'mMSE', ...
         'DataType', 'scalp', 'Domain', 'nonlinear');
@@ -629,13 +647,14 @@ end
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(MFE1, MFE2, nPerm, ct, grp_type);
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(MFE1, MFE2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
-[mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
-    'nonlinear', grp_type, {size(MFE1,3) size(MFE2,3)}, [], [], [], 'g');
-plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-title("MFE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold');
-saveas(gcf, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_main.fig', coarsing)));
-print(gcf, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
-if ~isempty(mask_clusters)
+if any(mask, 'all')
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
+        'nonlinear', grp_type, {size(MFE1,3) size(MFE2,3)}, [], [], [], 'g');
+    plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
+    title("MFE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold');
+    saveas(gcf, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_main.fig', coarsing)));
+    print(gcf, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
+
     writetable(summary_tbl, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_summary.csv', coarsing)));
     hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, scales, chanlocs, 'MFE', ...
         'DataType', 'scalp', 'Domain', 'nonlinear');
@@ -650,16 +669,20 @@ end
 
 %% RCMFE
 
+scales = 1:scales(end);
+% num_scales = length(scales);
+
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(RCMFE1, RCMFE2, nPerm, ct, grp_type);
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(RCMFE1, RCMFE2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
-[mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
-    'nonlinear', grp_type, {size(RCMFE1,3) size(RCMFE2,3)}, [], [], [], 'g');
-plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-title("RCMFE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold');
-saveas(gcf, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_main.fig', coarsing)));
-print(gcf, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
-if ~isempty(mask_clusters)
+if any(mask, 'all')
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
+        'nonlinear', grp_type, {size(RCMFE1,3) size(RCMFE2,3)}, [], [], [], 'g');
+    plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
+    title("RCMFE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold');
+    saveas(gcf, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_main.fig', coarsing)));
+    print(gcf, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
+
     writetable(summary_tbl, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_summary.csv', coarsing)));
     hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, scales, chanlocs, 'RCMFE', ...
         'DataType', 'scalp', 'Domain', 'nonlinear');
@@ -690,17 +713,18 @@ end
 % title("dB-norm")
 % legend('eyes-closed','eyes-open')
 
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(10*log10(PSD1), 10*log10(PSD2), nPerm, ct, grp_type);
-% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(PSD1, PSD2, nPerm, ct, grp_type);
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(10*log10(PSD1), 10*log10(PSD2), nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(PSD1, PSD2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
-[mask_clusters, summary_tbl] = pull_clusters(mask, tvals, freqs, chanlocs, ...
-    'frequency', grp_type, {size(PSD1,3) size(PSD2,3)}, [], [], false, 'g');
-plot_results('frequency', 'scalp', freqs, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-title('PSD (raw)')
-set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
-saveas(gcf, fullfile(outputs_path, 'PSD_raw_perm_tfce_main.fig'));
-print(gcf, fullfile(outputs_path, 'PSD_raw_perm_tfce_main.png'), '-dpng', '-r300');
-if ~isempty(mask_clusters)
+if any(mask, 'all')
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, freqs, chanlocs, ...
+        'frequency', grp_type, {size(PSD1,3) size(PSD2,3)}, [], [], [], 'g');
+    plot_results('frequency', 'scalp', freqs, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
+    title('PSD (raw)')
+    set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
+    saveas(gcf, fullfile(outputs_path, 'PSD_raw_perm_tfce_main.fig'));
+    print(gcf, fullfile(outputs_path, 'PSD_raw_perm_tfce_main.png'), '-dpng', '-r300');
+
     writetable(summary_tbl, fullfile(outputs_path, 'PSD_raw_perm_tfce_summary.csv'));
     hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, ...
         chanlocs, 'PSD (raw)', 'DataType', 'scalp','Domain','Frequency');
@@ -727,14 +751,15 @@ end
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(10*log10(PSD_corr1), 10*log10(PSD_corr2), nPerm, ct, grp_type);
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(PSD_corr1, PSD_corr2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
-[mask_clusters, summary_tbl] = pull_clusters(mask, tvals, freqs, chanlocs, ...
-    'frequency', grp_type, {size(PSD_corr1,3) size(PSD_corr2,3)}, [], [], [], 'g');
-plot_results('frequency', 'scalp', freqs, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-title('PSD (aperiodic-corrected)')
-set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
-saveas(gcf, fullfile(outputs_path, 'PSD_corrected_perm_tfce_main.fig'));
-print(gcf, fullfile(outputs_path, 'PSD_corrected_perm_tfce_main.png'), '-dpng', '-r300');
-if ~isempty(mask_clusters)
+if any(mask, 'all')
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, freqs, chanlocs, ...
+        'frequency', grp_type, {size(PSD_corr1,3) size(PSD_corr2,3)}, [], [], [], 'g');
+    plot_results('frequency', 'scalp', freqs, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
+    title('PSD (aperiodic-corrected)')
+    set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
+    saveas(gcf, fullfile(outputs_path, 'PSD_corrected_perm_tfce_main.fig'));
+    print(gcf, fullfile(outputs_path, 'PSD_corrected_perm_tfce_main.png'), '-dpng', '-r300');
+
     writetable(summary_tbl, fullfile(outputs_path, 'PSD_corrected_perm_tfce_summary.csv'));
     % hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, chanlocs, 'PSD (corrected)', 'DataType', 'scalp');
     hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, chanlocs, 'Power', ...
