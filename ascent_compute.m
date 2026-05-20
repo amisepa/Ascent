@@ -382,6 +382,12 @@ end
 % ----------------------------
 if vis
     if nChan > 1
+        % remove scale 1 for std and var coarse-graining 
+        if strcmpi(coarsing, 'std') || strcmpi(coarsing, 'var')
+            entropy(:,1) = [];
+            scales(1) = [];
+        end
+
         switch lower(measure)
             case 'exsent'
                 ascent_plot(HD,  chanlocs, 'SampEn of durations',                    []);
@@ -409,7 +415,7 @@ if vis
                 ascent_plot(entropy, chanlocs, measure, scales);
         end
     else
-        disp('Visualization requires more than 1 channel.');
+        disp("Ascent's visualizations require more than 1 channel.");
     end
 end
 

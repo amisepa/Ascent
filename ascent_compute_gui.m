@@ -37,7 +37,7 @@ end
 % GUI #1 — all measures
 % ---------------------------
 meas = {'SampEn' 'FuzzEn' 'ExSEnt' 'FracDim' 'HigFracDim' 'Aperiodic' ...
-        'MSE' 'mMSE' 'MFE' 'RCMFE' 'RCmvMFE'};
+        'MSE' 'mMSE' 'MFE' 'RCMFE' 'mvFuzzEn' 'RCmvMFE'};
 
 setappdata(0, 'ascent_gui1_cancel', 0);
 oldCloseFcn = get(0, 'DefaultFigureCloseRequestFcn');

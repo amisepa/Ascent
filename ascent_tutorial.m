@@ -133,10 +133,12 @@ EEG = ascent_compute(EEG, 'measure', 'CMFE', ...
 %% Refined Composite Multiscale Fuzzy Entropy (RCMFE)
 
 EEG = ascent_compute(EEG, 'measure', 'RCMFE', ...
-    'coarsing', 'mean', ...     % 'median' 'mean' 'trimmed mean' 'std' 'var'
-    'num_scales', 50, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
+    'coarsing', 'std', ...     % 'median' 'mean' 'trimmed mean' 'std' 'var'
+    'num_scales', 50, ...       % number of scale factors to compute (default = 20; range = 2-100 depending on sample rate)
     'n', 2, ...                 % fuzzy power (default = 2)
     'parallel', true, 'progress', true);
+
+ascent_plot(EEG.ascent.RCMFE.data, EEG.chanlocs,'RCMFE',EEG.ascent.RCMFE.scales)
 
 
 %% Multivariate Fuzzy entropy (mvFuzzEn)
@@ -152,7 +154,7 @@ EEG = ascent_compute(EEG, 'measure', 'mvFuzzEn', 'chanlist', 'Fpz Fz Cz Pz Iz Oz
 % WARNING: scale 1 is much longer than the rest of the scales.
 
 EEG = ascent_compute(EEG, 'measure', 'RCmvMFE', 'chanlist', 'Fpz Fz Cz Pz Iz Oz POz', ...
-    'coarsing', 'mean', ...     % 'median' (default) 'mean' 'trimmed mean' 'std' 'var'
+    'coarsing', 'mean', ...     % 'median' 'mean' 'trimmed mean' 'std' (default) 'var'
     'num_scales', 10, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
     'n', 2, ...                % fuzzy power (default = 2)
     'parallel', true, 'progress', true);

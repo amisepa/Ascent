@@ -22,7 +22,7 @@ function [RCMFE, scales] = compute_RCMFE(data, varargin)
 %
 % Outputs
 %   RCMFE  : [n_channels x num_scales] refined composite multiscale fuzzy entropy
-%   scales : 1:num_scales (all scales are retained)
+%   scales : 2:num_scales (all scales are retained except the 1st one)
 %
 % Notes
 %   • RCMFE pools phi_m and phi_m+1 across all offset-shifted coarse-grained
@@ -33,7 +33,7 @@ function [RCMFE, scales] = compute_RCMFE(data, varargin)
 %     scales where fewer offset samples are available.
 %   • Unlike CMFE, RCMFE does not expose a 'Mode' parameter and always uses
 %     the default 'local' detrending of embedded vectors (classical FuzEn style).
-%   • All scales are retained regardless of coarsing type; scale 1 is
+%   • All scales except 1 are retained regardless of coarsing type; scale 1 is
 %     meaningful because phi is estimated from the raw z-scored signal.
 
 
@@ -96,18 +96,16 @@ for c = 1:nch
 end
 
 cl = lower(strtrim(coarseType));
-if any(strcmp(cl, {'sd','std','standard deviation'}))
-    coarseLabel = 'STD';
-elseif any(strcmp(cl, {'var','variance'}))
-    coarseLabel = 'VAR';
+if any(strcmpi(cl, {'sd','std','standard deviation'}))
+    coarseLabel = 'std';
+elseif any(strcmpi(cl, {'var','variance'}))
+    coarseLabel = 'var';
 elseif strcmp(cl, 'mean')
-    coarseLabel = 'MEAN';
+    coarseLabel = 'mean';
 elseif strcmp(cl, 'median')
-    coarseLabel = 'MEDIAN';
-elseif any(strcmp(cl, {'trimmed mean','trimmed','tmean','trim20'}))
-    coarseLabel = 'TRIM20';
-else
-    coarseLabel = upper(coarseType);
+    coarseLabel = 'median';
+elseif any(strcmp(cl, {'trimmed mean','trimmed','trimmean'}))
+    coarseLabel = 'trimmed mean';
 end
 
 RCMFE = nan(nch, S);
