@@ -22,10 +22,11 @@ eeglab; close;
 % Load provided sample EEG data from the tutorial directory 
 % (2 minutes of resting state eyes-closed, 64-channel Biosemi).
 % Dataset source: 
-%   Cannard, C., Wahbeh, H., & Delorme, A. (2021, December).
+%   Cannard, C., Wahbeh, H., & Delorme, A. (2021).
 %   Validating the wearable MUSE headset for EEG spectral analysis and Frontal 
-%   Alpha Asymmetry. In 2021 IEEE International Conference on Bioinformatics
-%   and Biomedicine (BIBM) (pp. 3603-3610). IEEE.
+%   Alpha Asymmetry. IEEE International Conference on Bioinformatics
+%   and Biomedicine (BIBM) (pp. 3603-3610). 
+
 pluginPath = fileparts(which('eegplugin_ascent.m'));
 addpath(genpath(pluginPath))
 cd(pluginPath)
@@ -163,8 +164,8 @@ if isempty(EEG.icaact)
     EEG.icaact = EEG.icaweights * EEG.icasphere * EEG.data; % sometimes not saved on disk to save space
 end
 
-% [entropy, scales] = compute_MSE(EEG.icaact, 'coarsing', 'mean', 'num_scales', 50);
-[entropy, scales] = compute_RCMFE(EEG.icaact, 'coarsing', 'mean', 'num_scales', 50);
+% [entropy, scales] = compute_MSE(EEG.icaact, 'coarsing', 'mean', 'num_scales', 30);
+[entropy, scales] = compute_RCMFE(EEG.icaact, 'coarsing', 'sd', 'num_scales', 30);
 
 ascent_plot(entropy, EEG.chanlocs, 'RCMFE', scales, ...
     'ICA', true, 'icawinv', EEG.icawinv);

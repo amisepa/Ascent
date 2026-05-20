@@ -10,10 +10,11 @@ function ascent_plot(entropyData, chanlocs, entropyType, scales, varargin)
 %       'ICA',     true/false        — enable ICA back-projection mode
 %       'icawinv', EEG.icawinv       — [nChans x nICs] inverse weight matrix
 %   Aperiodic mode (entropyType contains 'aperiodic'):
-%       varargin{1} = offset        [chan x 1]
+%       varargin{1} = offset        [chan x 1] static | [chan x nTimes] time-varying
 %       varargin{2} = freqs         [1 x freq]
-%       varargin{3} = psd           [chan x freq]  linear
-%       varargin{4} = psd_corrected [chan x freq]  or [] if not computed
+%       varargin{3} = psd           [chan x freq] static | [chan x freq x nTimes] time-varying
+%       varargin{4} = psd_corrected [chan x freq] or [chan x freq x nTimes] or []
+%       varargin{5} = times         [1 x nTimes] window centre times in s (time-varying only)
 %   Time-resolved mode:
 %       varargin{1} = time_sec      [1 x time]
 
@@ -54,6 +55,7 @@ offset_in        = [];
 freqs_in         = [];
 psd_in           = [];
 psd_corrected_in = [];
+times_in         = [];
 
 isAperiodic = contains(lower(entropyType), 'aperiodic');
 
@@ -62,6 +64,7 @@ if isAperiodic
     if numel(varargin) >= 2, freqs_in         = varargin{2}; end
     if numel(varargin) >= 3, psd_in           = varargin{3}; end
     if numel(varargin) >= 4, psd_corrected_in = varargin{4}; end
+    if numel(varargin) >= 5, times_in         = varargin{5}; end
 else
     if ~isempty(varargin), time_sec = varargin{1}; end
 end
@@ -71,7 +74,16 @@ end
 %% =========================================================
 if isAperiodic
 
-    exponent_in = entropyData(:);   % [nIC/nChan x 1]
+    exponent_mat  = entropyData;             % [nChan x 1] static | [nChan x nTimes] time-varying
+    isTimeVarying = size(exponent_mat, 2) > 1;
+
+    if isTimeVarying
+        plot_aperiodic_timecourse(exponent_mat, offset_in, freqs_in, psd_in, ...
+            psd_corrected_in, times_in);
+        return
+    end
+
+    exponent_in = exponent_mat(:);   % [nIC/nChan x 1]
 
     % Style constants
     clrBlue  = [0.18 0.45 0.87];
@@ -550,6 +562,126 @@ elseif multiscale && ~multiChan
 
 else
     error('ascent_plot: data format not recognized.')
+end
+end
+
+
+%% --- Aperiodic time-course subfunction ---
+function plot_aperiodic_timecourse(exponent_t, offset_t, freqs, psd_t, psd_corr_t, times)
+% Time-varying aperiodic visualization from compute_AperiodicFit_sliding.
+% One subplot per standard EEG band (restricted to available freqs range).
+% Left axis : mean band log10 power +- SD across channels over time.
+% Right axis : mean exponent (thin dashed dark) and offset (thin dotted gray).
+% If psd_corr_t is provided, corrected power is overlaid in orange.
+
+bands     = {'Delta','Theta','Alpha','Beta','Gamma'};
+bandEdges = [1 4; 4 8; 8 13; 13 30; 30 40];
+
+fMin = freqs(1);  fMax = freqs(end);
+keep      = bandEdges(:,2) > fMin & bandEdges(:,1) < fMax;
+bands     = bands(keep);
+bandEdges = bandEdges(keep, :);
+nBands    = numel(bands);
+
+if nBands == 0
+    warning('ascent_plot: no standard bands within freqs range [%.1f %.1f Hz].', fMin, fMax);
+    return
+end
+
+[nChan, ~, nTimes] = size(psd_t);
+hasCorrected = ~isempty(psd_corr_t) && size(psd_corr_t, 3) == nTimes;
+
+if isempty(times) || numel(times) ~= nTimes
+    times  = 1:nTimes;
+    xLabel = 'Window';
+else
+    times  = times(:)';
+    xLabel = 'Time (s)';
+end
+
+exp_mean = mean(exponent_t, 1, 'omitnan');   % [1 x nTimes]
+off_mean = mean(offset_t,   1, 'omitnan');   % [1 x nTimes]
+
+clrRaw  = [0.18 0.45 0.87];
+clrCorr = [0.90 0.38 0.15];
+clrExp  = [0.15 0.15 0.15];
+clrOff  = [0.50 0.50 0.50];
+fAlpha  = 0.15;
+
+figH = max(420, 80 + nBands * 130);
+hFig = figure('Color','w','Position',[80 50 920 figH], ...
+    'Name','Aperiodic - Time course','NumberTitle','off', ...
+    'Toolbar','none','Menu','none');
+try icadefs; set(hFig,'color',BACKCOLOR); catch; end
+
+for iBand = 1:nBands
+    ax    = subplot(nBands, 1, iBand);
+    fMask = freqs >= bandEdges(iBand,1) & freqs <= bandEdges(iBand,2);
+
+    if ~any(fMask)
+        title(ax, sprintf('%s (no data in range)', bands{iBand}));
+        axis(ax, 'off'); continue
+    end
+
+    % Mean log10 band power per channel per time window: [nChan x nTimes]
+    psd_band = log10(psd_t(:, fMask, :) + eps);          % [nChan x nF x nTimes]
+    bp_raw   = squeeze(mean(psd_band, 2, 'omitnan'));     % [nChan x nTimes] (or [nTimes] if nChan=1)
+    if nChan == 1, bp_raw = bp_raw(:)'; end
+    mu_raw   = mean(bp_raw, 1, 'omitnan');
+    sd_raw   = std(bp_raw,  0, 1, 'omitnan');
+
+    yyaxis(ax, 'left'); hold(ax, 'on');
+    fill(ax, [times fliplr(times)], [mu_raw+sd_raw fliplr(mu_raw-sd_raw)], ...
+         clrRaw, 'FaceAlpha',fAlpha, 'EdgeColor','none', 'HandleVisibility','off');
+    hRaw = plot(ax, times, mu_raw, '-', 'Color',clrRaw, 'LineWidth',1.8);
+    ax.YColor = clrRaw;
+    ylabel(ax, 'log_{10} \muV^2/Hz', 'FontSize',8.5);
+
+    if hasCorrected
+        psd_cband = log10(psd_corr_t(:, fMask, :) + eps);
+        bp_corr   = squeeze(mean(psd_cband, 2, 'omitnan'));
+        if nChan == 1, bp_corr = bp_corr(:)'; end
+        mu_corr   = mean(bp_corr, 1, 'omitnan');
+        sd_corr   = std(bp_corr,  0, 1, 'omitnan');
+        fill(ax, [times fliplr(times)], [mu_corr+sd_corr fliplr(mu_corr-sd_corr)], ...
+             clrCorr, 'FaceAlpha',fAlpha, 'EdgeColor','none', 'HandleVisibility','off');
+        hCorr = plot(ax, times, mu_corr, '-', 'Color',clrCorr, 'LineWidth',1.8);
+    end
+
+    yyaxis(ax, 'right'); hold(ax, 'on');
+    hExp = plot(ax, times, exp_mean, '--', 'Color',clrExp, 'LineWidth',0.8);
+    hOff = plot(ax, times, off_mean, ':',  'Color',clrOff, 'LineWidth',0.8);
+    ax.YColor = [0.3 0.3 0.3];
+    ylabel(ax, 'Exp. / Offset', 'FontSize',8.5);
+
+    xlim(ax, [times(1) times(end)]);
+    box(ax, 'on'); ax.TickDir = 'out';
+    title(ax, sprintf('%s  (%g - %g Hz)', bands{iBand}, bandEdges(iBand,1), bandEdges(iBand,2)), ...
+          'FontSize',10, 'FontWeight','bold');
+
+    % Legend on first subplot only
+    if iBand == 1
+        if hasCorrected
+            legend(ax, [hRaw hCorr hExp hOff], ...
+                {'Raw PSD','Corrected PSD','Exponent','Offset'}, ...
+                'Location','northeast','Box','off','FontSize',8);
+        else
+            legend(ax, [hRaw hExp hOff], ...
+                {'Raw PSD','Exponent','Offset'}, ...
+                'Location','northeast','Box','off','FontSize',8);
+        end
+    end
+    if iBand == nBands
+        xlabel(ax, xLabel, 'FontSize',10);
+    end
+end
+
+set(findall(hFig,'type','axes'), 'FontSize',9, 'FontWeight','bold');
+try
+    sgtitle(hFig, sprintf('Aperiodic time course  (n = %d channel(s),  mean \\pm SD)', nChan), ...
+        'FontSize',11, 'FontWeight','bold');
+catch
+    % sgtitle requires R2018b+
 end
 end
 
