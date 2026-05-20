@@ -3,9 +3,9 @@
 
 %% Normal figures
 
-cd 'C:\Users\ccann\Documents\MATLAB\Ascent\figures_new\subject_level'
-saveas(gcf, 'fig_rcmfe_mean_ica.fig');
-print(gcf, 'fig_rcmfe_mean_ica.png', '-dpng', '-r300');
+cd 'C:\Users\ccann\Documents\MATLAB\Ascent\figures_new2\subject_level'
+saveas(gcf, 'fig_rcmfe_std.fig');
+print(gcf, 'fig_rcmfe_std.png', '-dpng', '-r300');
 
 
 

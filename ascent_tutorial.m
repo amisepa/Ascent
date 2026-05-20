@@ -133,7 +133,7 @@ EEG = ascent_compute(EEG, 'measure', 'CMFE', ...
 %% Refined Composite Multiscale Fuzzy Entropy (RCMFE)
 
 EEG = ascent_compute(EEG, 'measure', 'RCMFE', ...
-    'coarsing', 'std', ...     % 'median' 'mean' 'trimmed mean' 'std' 'var'
+    'coarsing', 'mean', ...     % 'median' 'mean' 'trimmed mean' 'std' 'var'
     'num_scales', 50, ...       % number of scale factors to compute (default = 20; range = 2-100 depending on sample rate)
     'n', 2, ...                 % fuzzy power (default = 2)
     'parallel', true, 'progress', true);
