@@ -103,9 +103,11 @@ elseif any(strcmpi(cl, {'var','variance'}))
 elseif strcmp(cl, 'mean')
     coarseLabel = 'mean';
 elseif strcmp(cl, 'median')
-    coarseLabel = 'median';
-elseif any(strcmp(cl, {'trimmed mean','trimmed','trimmean'}))
-    coarseLabel = 'trimmed mean';
+    coarseLabel = 'MEDIAN';
+elseif any(strcmp(cl, {'trimmed mean','trimmed','tmean','trim20'}))
+    coarseLabel = 'TRIM20';
+else
+    coarseLabel = lower(coarseType);
 end
 
 RCMFE = nan(nch, S);

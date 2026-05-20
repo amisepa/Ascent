@@ -3,12 +3,15 @@ function ascent_plot(entropyData, chanlocs, entropyType, scales, varargin)
 %
 % entropyData : [chan x scale] or [chan x scale x time]
 % chanlocs    : EEGLAB channel locations
-% entropyType : label, e.g., 'RCMFEσ' or 'MSE (std)'
+% entropyType : label, e.g., 'RCMFEsigma' or 'MSE (std)'
 % scales      : cellstr of scale labels or numeric 1:S
 % varargin    : context-dependent optional inputs:
 %   ICA name-value pairs (can appear anywhere in varargin):
-%       'ICA',     true/false        — enable ICA back-projection mode
-%       'icawinv', EEG.icawinv       — [nChans x nICs] inverse weight matrix
+%       'ICA',          true/false        — enable ICA back-projection mode
+%       'icawinv',      EEG.icawinv       — [nChans x nICs] inverse weight matrix
+%   Cluster name-value pair:
+%       'ClusterThresh', scalar in (0,1)  — percentile threshold for cluster
+%                                           detection (default: 0.75)
 %   Aperiodic mode (entropyType contains 'aperiodic'):
 %       varargin{1} = offset        [chan x 1] static | [chan x nTimes] time-varying
 %       varargin{2} = freqs         [1 x freq]
@@ -18,10 +21,11 @@ function ascent_plot(entropyData, chanlocs, entropyType, scales, varargin)
 %   Time-resolved mode:
 %       varargin{1} = time_sec      [1 x time]
 
-%% --- Strip ICA name-value pairs before positional varargin parsing ---
-isICA   = false;
-icawinv = [];
-rmIdx   = [];
+%% --- Strip ICA + ClusterThresh name-value pairs before positional parsing ---
+isICA        = false;
+icawinv      = [];
+clusterThresh = 0.75;   % default percentile for cluster thresholding
+rmIdx        = [];
 for vi = 1:2:(numel(varargin)-1)
     if ischar(varargin{vi}) || isstring(varargin{vi})
         switch lower(char(varargin{vi}))
@@ -31,6 +35,9 @@ for vi = 1:2:(numel(varargin)-1)
             case 'icawinv'
                 icawinv = varargin{vi+1};
                 rmIdx   = [rmIdx vi vi+1];
+            case 'clusterthresh'
+                clusterThresh = varargin{vi+1};
+                rmIdx         = [rmIdx vi vi+1];
         end
     end
 end
@@ -195,11 +202,11 @@ if isAperiodic
             legend(ax3, [hRaw hSlope hCor hSlopeC], ...
                    {'Raw PSD','1/f slope (raw)','Corrected PSD','1/f slope (corrected)'}, ...
                    'Location','northeast','Box','off','FontSize',fsAx-1);
-            title(ax3,'PSD: raw vs corrected  (mean \pm SD)','FontSize',fsTtl,'FontWeight','bold');
+            title(ax3,'PSD: raw vs corrected  (mean +/- SD)','FontSize',fsTtl,'FontWeight','bold');
         else
             legend(ax3, [hRaw hSlope], {'Raw PSD','1/f slope'}, ...
                    'Location','northeast','Box','off','FontSize',fsAx-1);
-            title(ax3,'Raw PSD + aperiodic fit  (mean \pm SD)','FontSize',fsTtl,'FontWeight','bold');
+            title(ax3,'Raw PSD + aperiodic fit  (mean +/- SD)','FontSize',fsTtl,'FontWeight','bold');
         end
         xlabel(ax3,'Frequency (Hz)','FontSize',fsAx);
         ylabel(ax3,'Power (log_{10} \muV^2/Hz)','FontSize',fsAx);
@@ -242,7 +249,7 @@ if isAperiodic
                     c3 = colorbar(ax_pr,'Location','eastoutside');
                     c3.Label.String = 'log_{10} \muV^2/Hz'; c3.Label.FontSize = fsAx-1; c3.TickDirection = 'out';
                 end
-                title(ax_pr,'Alpha power (8–13 Hz) — raw','FontSize',fsTtl,'FontWeight','bold');
+                title(ax_pr,'Alpha power (8-13 Hz) - raw','FontSize',fsTtl,'FontWeight','bold');
 
                 if ~isempty(psd_corrected_in)
                     alpha_cor = mean(log10(psd_corrected_in(:,aMask)), 2, 'omitnan');
@@ -253,7 +260,7 @@ if isAperiodic
                         c4 = colorbar(ax_pc,'Location','eastoutside');
                         c4.Label.String = 'log_{10} \muV^2/Hz'; c4.Label.FontSize = fsAx-1; c4.TickDirection = 'out';
                     end
-                    title(ax_pc,'Alpha power (8–13 Hz) — corrected','FontSize',fsTtl,'FontWeight','bold');
+                    title(ax_pc,'Alpha power (8-13 Hz) - corrected','FontSize',fsTtl,'FontWeight','bold');
                 else
                     axes(ax_pc); axis off;
                     text(0.5,0.5,'Correction not applied', ...
@@ -262,7 +269,7 @@ if isAperiodic
                 end
             end
         else
-            warning('ascent_plot: alpha band (8-13 Hz) not covered by freqs_in — skipping alpha topos.');
+            warning('ascent_plot: alpha band (8-13 Hz) not covered by freqs_in - skipping alpha topos.');
             axes(ax_pr); axis off;
             axes(ax_pc); axis off;
         end
@@ -271,18 +278,11 @@ if isAperiodic
         axes(ax_pc); axis off;
     end
 
-    % Set colormaps after all topoplot calls to avoid overwrite
-    % colormap(ax1,  parula);
-    % colormap(ax2,  parula);
-    % colormap(ax_pr,parula);
-    % colormap(ax_pc,parula);
     colormap(hFig, parula);
 
-    % Space out subplots to avoid title/xlabel overlap
     allAx = findall(hFig, 'type', 'axes');
     for k = 1:numel(allAx)
         pos = allAx(k).Position;
-        % shrink height by 4%, shift up by 2%
         allAx(k).Position = [pos(1), pos(2)+0.02, pos(3), pos(4)-0.04];
     end
 
@@ -312,7 +312,9 @@ nChan     = size(entropyData,1);
 multiChan = nChan > 1;
 
 if multiscale && multiChan
-    %% --- Multiscale heatmap ---
+    %% -------------------------------------------------------
+    %% Multiscale heatmap with cluster-aware subplots
+    %% -------------------------------------------------------
     hFig2 = figure('Color','w','InvertHardCopy','off', ...
                    'Name','Multiscale entropy visualization', ...
                    'Toolbar','none','Menu','none','NumberTitle','Off');
@@ -320,6 +322,7 @@ if multiscale && multiChan
 
     nScales = size(entropyData,2);
 
+    % --- Heatmap ---
     ax_heat = subplot(3,3,[1 2 4 5 7 8]);
     imagesc(ax_heat, 1:nScales, 1:nChan, entropyData); axis(ax_heat,'tight');
     set(ax_heat,'TickDir','out'); box(ax_heat,'on');
@@ -336,8 +339,7 @@ if multiscale && multiChan
     if iscell(scales)
         Xticks = scales; nX = numel(scales);
     else
-        % Xticks = arrayfun(@(x){num2str(x)},1:nScales); nX = nScales;
-        Xticks = arrayfun(@(x){num2str(x)}, scales); nX = numel(scales); % Use actual scale values, not 1:nScales
+        Xticks = arrayfun(@(x){num2str(x)}, scales); nX = numel(scales);
     end
     newX = 1:nX;
     if nX > 30, newX = round(linspace(1,nX,20)); end
@@ -358,76 +360,149 @@ if multiscale && multiChan
     ylabel(ax_heat, ifelse(isICA,'ICs','EEG channels'));
     title(ax_heat, entropyType,'Interpreter','none');
 
-    % Find peak
+    % Check we have something to work with
     finiteMask = isfinite(entropyData);
     if ~any(finiteMask(:))
         warning('ascent_plot: all values are NaN; nothing to plot.');
         return
     end
-    tmp = entropyData; tmp(~finiteMask) = -Inf;
-    [peak_value, linear_idx] = max(tmp(:));
-    [peak_channel, peak_scale] = ind2sub(size(tmp), linear_idx);
-    if ~any(isfinite(entropyData(:,peak_scale)))
-        [~, peak_scale] = max(sum(isfinite(entropyData),1));
-    end
-    if iscell(scales), sclabel = scales{peak_scale}; else, sclabel = num2str(peak_scale); end
 
-    if isICA
-        fprintf('Peak entropy: %.3f at Scale %s (index %d), IC%d.\n', ...
-            peak_value, sclabel, peak_scale, peak_channel);
+    % --- Cluster detection ---
+    % Returns: clusterMask [nChan x nScale], usedCluster flag,
+    %          peak_channel and peak_scale (centroid if cluster, peak if not)
+    [clusterMask, usedCluster, peak_channel, peak_scale] = ...
+        find_entropy_cluster(entropyData, clusterThresh);
+
+    % Overlay cluster boundary on heatmap
+    if usedCluster
+        hold(ax_heat, 'on');
+        contour(ax_heat, 1:nScales, 1:nChan, double(clusterMask), [0.5 0.5], ...
+                'w', 'LineWidth', 1.8);
+        hold(ax_heat, 'off');
+    end
+
+    % Derive scale label for titles
+    scaleMask = any(clusterMask, 1);   % [1 x nScale], scales in cluster
+    chanMask  = any(clusterMask, 2);   % [nChan x 1], chans in cluster
+    if iscell(scales)
+        sclabel = scales{peak_scale};
     else
-        fprintf('Peak entropy: %.3f at Scale %s (index %d), Channel %s.\n', ...
-            peak_value, sclabel, peak_scale, chanlocs(peak_channel).labels);
+        sclabel = num2str(scales(peak_scale));
     end
 
-    % Subplot 6: per-channel/IC entropy curve at peak scale
+    % Topo values: mean entropy across cluster scales per channel.
+    % Falls back to single scale column when no cluster was found.
+    if usedCluster
+        topo_vals  = mean(entropyData(:, scaleMask), 2, 'omitnan');   % [nChan x 1]
+        curve_vals = mean(entropyData(chanMask, :),  1, 'omitnan');   % [1 x nScale]
+        nClustChan = sum(chanMask);
+        nClustScl  = sum(scaleMask);
+        modeStr    = sprintf('[cluster: %d ch x %d sc]', nClustChan, nClustScl);
+    else
+        topo_vals  = entropyData(:, peak_scale);
+        curve_vals = entropyData(peak_channel, :);
+        modeStr    = '[peak fallback]';
+    end
+
+    % Print summary
+    if usedCluster
+        if isICA
+            fprintf('Cluster: %d ICs x %d scales  (centroid: IC%d, scale %s). %s\n', ...
+                nClustChan, nClustScl, peak_channel, sclabel, modeStr);
+        else
+            fprintf('Cluster: %d channels x %d scales  (centroid: %s, scale %s). %s\n', ...
+                nClustChan, nClustScl, chanlocs(peak_channel).labels, sclabel, modeStr);
+        end
+    else
+        if isICA
+            fprintf('No cluster found - using peak: IC%d, scale %s.\n', peak_channel, sclabel);
+        else
+            fprintf('No cluster found - using peak: channel %s, scale %s.\n', ...
+                chanlocs(peak_channel).labels, sclabel);
+        end
+    end
+
+    % --- Subplot 6: entropy curve (cluster-mean across channels, or peak channel) ---
     ax6 = subplot(3,3,6); hold(ax6,'on'); box(ax6,'on');
-    row = entropyData(peak_channel,:);
-    if all(~isfinite(row)), row = nan(1,nScales); end
+    if all(~isfinite(curve_vals)), curve_vals = nan(1,nScales); end
     if isnumeric(scales)
         xvals6 = scales;
     else
         xvals6 = 1:nScales;
     end
-    plot(ax6, xvals6, row, 'LineWidth',2);
-    xlim(ax6,[xvals6(1) xvals6(end)]);   
-    xlabel(ax6,'Scale'); ylabel(ax6,'Entropy');
-    title(ax6, ifelse(isICA, sprintf('IC%d',peak_channel), ...
-          sprintf('Channel %s',chanlocs(peak_channel).labels)), 'Interpreter','none');
+    plot(ax6, xvals6, curve_vals, 'LineWidth', 2);
 
-    % Subplot 3: bar chart (ICA) | entropy topo at peak scale (chan)
-    vals = entropyData(:, peak_scale);
-    ax3  = subplot(3,3,3);
-    if isICA
-        bar(ax3, vals, 'FaceColor',[0.18 0.45 0.87],'EdgeColor','none');
-        hold(ax3,'on');
-        bar(ax3, peak_channel, vals(peak_channel), 'FaceColor','r','EdgeColor','none');
-        xlabel(ax3,'IC'); ylabel(ax3,'Entropy');
-        title(ax3, sprintf('All ICs @ scale %s',sclabel),'Interpreter','none');
-        box(ax3,'on');
+    % Shade cluster scale extent on curve plot
+    if usedCluster && isnumeric(scales)
+        clust_x = scales(scaleMask);
+        if any(clust_x)
+            yl6 = ylim(ax6);
+            patch(ax6, [min(clust_x) max(clust_x) max(clust_x) min(clust_x)], ...
+                  [yl6(1) yl6(1) yl6(2) yl6(2)], ...
+                  [0.18 0.45 0.87], 'FaceAlpha', 0.12, 'EdgeColor', 'none');
+        end
+    end
+
+    xlim(ax6, [xvals6(1) xvals6(end)]);
+    xlabel(ax6, 'Scale'); ylabel(ax6, 'Entropy');
+    if usedCluster
+        curveTitle = ifelse(isICA, ...
+            sprintf('Cluster mean (%d ICs)', nClustChan), ...
+            sprintf('Cluster mean (%d ch)', nClustChan));
     else
-        finiteVals = vals(isfinite(vals));
+        curveTitle = ifelse(isICA, sprintf('IC%d', peak_channel), ...
+            sprintf('Channel %s', chanlocs(peak_channel).labels));
+    end
+    title(ax6, curveTitle, 'Interpreter', 'none');
+
+    % --- Subplot 3: topo at cluster-mean (chan mode) | bar over ICs (ICA mode) ---
+    ax3 = subplot(3,3,3);
+    if isICA
+        % Bar chart over all ICs; highlight cluster ICs in a darker shade
+        bar(ax3, topo_vals, 'FaceColor', [0.18 0.45 0.87], 'EdgeColor', 'none');
+        hold(ax3, 'on');
+        if usedCluster
+            clusterIC_idx = find(chanMask);
+            bar(ax3, clusterIC_idx, topo_vals(clusterIC_idx), ...
+                'FaceColor', [0.05 0.25 0.65], 'EdgeColor', 'none');
+            bar(ax3, peak_channel, topo_vals(peak_channel), ...
+                'FaceColor', 'r', 'EdgeColor', 'none');
+        else
+            bar(ax3, peak_channel, topo_vals(peak_channel), ...
+                'FaceColor', 'r', 'EdgeColor', 'none');
+        end
+        xlabel(ax3, 'IC'); ylabel(ax3, 'Entropy');
+        barTitle = ifelse(usedCluster, ...
+            sprintf('ICs - cluster @ scale %s', sclabel), ...
+            sprintf('All ICs @ scale %s', sclabel));
+        title(ax3, barTitle, 'Interpreter', 'none');
+        box(ax3, 'on');
+    else
+        finiteVals = topo_vals(isfinite(topo_vals));
         if isempty(finiteVals)
-            axis(ax3,'off');
-            text(0.5,0.5,sprintf('No finite values @ scale %s',sclabel), ...
-                'Parent',ax3,'HorizontalAlignment','center', ...
-                'VerticalAlignment','middle','FontWeight','bold');
+            axis(ax3, 'off');
+            text(0.5, 0.5, sprintf('No finite values @ scale %s', sclabel), ...
+                'Parent', ax3, 'HorizontalAlignment', 'center', ...
+                'VerticalAlignment', 'middle', 'FontWeight', 'bold');
         else
             try
-                axes(ax3); topoplot(vals, chanlocs, 'emarker',{'.','k',8,1},'electrodes','on');
+                axes(ax3); topoplot(topo_vals, chanlocs, 'emarker', {'.','k',8,1}, 'electrodes', 'on');
                 lo = min(finiteVals); hi = max(finiteVals);
-                if isfinite(lo) && isfinite(hi) && lo < hi, clim(ax3,[lo hi]); end
-                colormap(ax3,'parula');
-                title(ax3, sprintf('%s @ scale %s',entropyType,sclabel),'Interpreter','none');
+                if isfinite(lo) && isfinite(hi) && lo < hi, clim(ax3, [lo hi]); end
+                colormap(ax3, 'parula');
+                topoTitle = ifelse(usedCluster, ...
+                    sprintf('%s - cluster mean', entropyType), ...
+                    sprintf('%s @ scale %s', entropyType, sclabel));
+                title(ax3, topoTitle, 'Interpreter', 'none');
             catch
-                bar(ax3, vals); xlim(ax3,[0 numel(vals)+1]); box(ax3,'on');
-                title(ax3, sprintf('Entropy @ scale %s',sclabel),'Interpreter','none');
-                ylabel(ax3,'Entropy');
+                bar(ax3, topo_vals); xlim(ax3, [0 numel(topo_vals)+1]); box(ax3, 'on');
+                title(ax3, sprintf('Entropy @ scale %s', sclabel), 'Interpreter', 'none');
+                ylabel(ax3, 'Entropy');
             end
         end
     end
 
-    % Subplot 9: time course | back-projected topo (ICA) | off (chan)
+    % --- Subplot 9: time course | back-projected topo (ICA) | off (chan) ---
     ax9 = subplot(3,3,9);
     if isTimeResolved
         hold(ax9,'on'); box(ax9,'on');
@@ -445,20 +520,24 @@ if multiscale && multiChan
             end
             plot(ax9, t, tr, 'LineWidth',1.5);
             ylabel(ax9,'Entropy');
-            title(ax9, ifelse(isICA, ...
-                  sprintf('IC%d, scale %s — time course',peak_channel,sclabel), ...
-                  sprintf('Time course @ %s, scale %s',chanlocs(peak_channel).labels,sclabel)), ...
-                  'Interpreter','none');
+            tcTitle = ifelse(isICA, ...
+                sprintf('IC%d, scale %s - time course', peak_channel, sclabel), ...
+                sprintf('Time course @ %s, scale %s', chanlocs(peak_channel).labels, sclabel));
+            title(ax9, tcTitle, 'Interpreter', 'none');
         end
     elseif isICA
-        bp_vals = icawinv * vals(:);
+        % Back-project cluster-mean topo vector
+        bp_vals = icawinv * topo_vals(:);
         finBP   = bp_vals(isfinite(bp_vals));
         if ~isempty(finBP)
             axes(ax9); topoplot(bp_vals, chanlocs, 'emarker',{'.','k',8,1},'electrodes','on');
             lo = min(finBP); hi = max(finBP);
             if isfinite(lo) && isfinite(hi) && lo < hi, clim(ax9,[lo hi]); end
             colormap(ax9,'parula');
-            title(ax9, sprintf('Back-projected entropy @ scale %s',sclabel),'Interpreter','none');
+            bpTitle = ifelse(usedCluster, ...
+                'Back-projected entropy (cluster mean)', ...
+                sprintf('Back-projected entropy @ scale %s', sclabel));
+            title(ax9, bpTitle, 'Interpreter', 'none');
         else
             axis(ax9,'off');
         end
@@ -497,7 +576,6 @@ elseif ~multiscale && multiChan
             end
             title(ax_uni, entropyType,'Interpreter','none');
         end
-        % colormap(ax_uni,'parula');
         colormap(hFig3, parula);
         c = colorbar(ax_uni);
         c.Label.String = 'Entropy'; c.Label.FontSize = 11; c.Label.FontWeight = 'bold';
@@ -505,23 +583,26 @@ elseif ~multiscale && multiChan
     set(findall(hFig3,'type','axes'),'FontSize',10,'FontWeight','bold');
 
 elseif multiscale && ~multiChan
-    % Single channel/IC curve 
-    hFig4 = figure('Color','w','InvertHardCopy','off');
+    %% --- Single channel/IC curve ---
+    hFig4 = figure('Color','w','InvertHardCopy','off', ...
+                   'Name', entropyType, ...
+                   'Toolbar','none','Menu','none','NumberTitle','Off');
     try icadefs; set(hFig4,'color',BACKCOLOR); catch; end
+    ax_s = axes(hFig4);
     if isnumeric(scales)
         xvals = scales;
     else
-        xvals = 1:numel(scales);  % cell array fallback
+        xvals = 1:numel(scales);
     end
     plot(ax_s, xvals, entropyData, 'LineWidth', 2);
     xlabel(ax_s, 'Scale');
-    ylabel(ax_s,'Entropy'); 
-    title(ax_s, entropyType,'Interpreter','none');
-    axis(ax_s,'tight');
+    ylabel(ax_s, 'Entropy');
+    title(ax_s, entropyType, 'Interpreter', 'none');
+    axis(ax_s, 'tight');
     set(findall(hFig4,'type','axes'),'FontSize',10,'FontWeight','bold');
 
-    elseif ~multiscale && ~multiChan
-    % Scalar (e.g. mvFuzzEn)
+elseif ~multiscale && ~multiChan
+    %% --- Scalar (e.g. mvFuzzEn) ---
     hFig5 = figure('Color','w','InvertHardCopy','off', ...
                    'Name', entropyType, ...
                    'Toolbar','none','Menu','none','NumberTitle','Off', ...
@@ -549,7 +630,6 @@ elseif multiscale && ~multiChan
             'Interpreter','none', 'FontSize', 13, 'FontWeight','bold');
         ylim(ax_sc, [min(0, val*1.2), max(0, val*1.2)]);
         box(ax_sc, 'on');
-        % Note negative values are valid for mvFuzzEn
         if val < 0
             text(1, val*0.5, 'negative entropy is valid', ...
                 'Parent', ax_sc, ...
@@ -566,7 +646,82 @@ end
 end
 
 
-%% --- Aperiodic time-course subfunction ---
+%% =========================================================
+%% CLUSTER DETECTION SUBFUNCTION
+%% =========================================================
+function [clusterMask, usedCluster, peak_channel, peak_scale] = ...
+        find_entropy_cluster(data, thresh_pct)
+% find_entropy_cluster  Find the dominant 2-D connected region of high entropy.
+%
+% Thresholds the [nChan x nScale] matrix at thresh_pct (0-1, e.g. 0.75 =
+% 75th percentile of finite values), identifies 4-connected blobs, and
+% selects the largest by summed entropy mass. If the winning blob contains
+% fewer than 3 cells, or if no toolbox is available for connected components,
+% the function falls back to returning the single global peak.
+%
+% Outputs
+%   clusterMask   [nChan x nScale] logical
+%   usedCluster   true if a valid cluster was found and used
+%   peak_channel  centroid channel index (or peak row index on fallback)
+%   peak_scale    centroid scale  index  (or peak col index on fallback)
+
+[nChan, nScale] = size(data);
+clusterMask = false(nChan, nScale);
+usedCluster = false;
+finiteMask  = isfinite(data);
+
+% --- Always compute the global peak as a safe fallback ---
+tmp = data; tmp(~finiteMask) = -Inf;
+[~, li] = max(tmp(:));
+[peak_channel, peak_scale] = ind2sub([nChan nScale], li);
+
+if sum(finiteMask(:)) < 3
+    return   % not enough data; return peak
+end
+
+% --- Threshold ---
+thresh  = prctile(data(finiteMask), thresh_pct * 100);
+binary  = data >= thresh & finiteMask;   % [nChan x nScale] logical
+
+% --- Connected components ---
+hasBWCC = (exist('bwconncomp','file') == 2) || (exist('bwconncomp','builtin') == 5);
+
+if hasBWCC
+    CC = bwconncomp(binary, 4);
+    if CC.NumObjects == 0, return; end
+
+    % Select blob with largest summed entropy mass
+    masses  = cellfun(@(idx) sum(data(idx), 'omitnan'), CC.PixelIdxList);
+    [~, bi] = max(masses);
+    blobIdx = CC.PixelIdxList{bi};
+
+    if numel(blobIdx) < 3, return; end   % too small; keep peak
+
+    clusterMask(blobIdx) = true;
+    usedCluster = true;
+else
+    % No IPT: use the thresholded mask directly if it is large enough
+    if sum(binary(:)) < 3, return; end
+    clusterMask = binary;
+    usedCluster = true;
+end
+
+% --- Weighted centroid ---
+[rowIdx, colIdx] = find(clusterMask);
+weights   = data(clusterMask);
+wSum      = sum(weights, 'omitnan');
+if wSum == 0 || ~isfinite(wSum), return; end
+
+peak_channel = round(sum(rowIdx .* weights, 'omitnan') / wSum);
+peak_scale   = round(sum(colIdx .* weights, 'omitnan') / wSum);
+peak_channel = max(1, min(nChan,  peak_channel));
+peak_scale   = max(1, min(nScale, peak_scale));
+end
+
+
+%% =========================================================
+%% APERIODIC TIME-COURSE SUBFUNCTION
+%% =========================================================
 function plot_aperiodic_timecourse(exponent_t, offset_t, freqs, psd_t, psd_corr_t, times)
 % Time-varying aperiodic visualization from compute_AperiodicFit_sliding.
 % One subplot per standard EEG band (restricted to available freqs range).
@@ -599,8 +754,8 @@ else
     xLabel = 'Time (s)';
 end
 
-exp_mean = mean(exponent_t, 1, 'omitnan');   % [1 x nTimes]
-off_mean = mean(offset_t,   1, 'omitnan');   % [1 x nTimes]
+exp_mean = mean(exponent_t, 1, 'omitnan');
+off_mean = mean(offset_t,   1, 'omitnan');
 
 clrRaw  = [0.18 0.45 0.87];
 clrCorr = [0.90 0.38 0.15];
@@ -623,9 +778,8 @@ for iBand = 1:nBands
         axis(ax, 'off'); continue
     end
 
-    % Mean log10 band power per channel per time window: [nChan x nTimes]
-    psd_band = log10(psd_t(:, fMask, :) + eps);          % [nChan x nF x nTimes]
-    bp_raw   = squeeze(mean(psd_band, 2, 'omitnan'));     % [nChan x nTimes] (or [nTimes] if nChan=1)
+    psd_band = log10(psd_t(:, fMask, :) + eps);
+    bp_raw   = squeeze(mean(psd_band, 2, 'omitnan'));
     if nChan == 1, bp_raw = bp_raw(:)'; end
     mu_raw   = mean(bp_raw, 1, 'omitnan');
     sd_raw   = std(bp_raw,  0, 1, 'omitnan');
@@ -656,10 +810,9 @@ for iBand = 1:nBands
 
     xlim(ax, [times(1) times(end)]);
     box(ax, 'on'); ax.TickDir = 'out';
-    title(ax, sprintf('%s  (%g - %g Hz)', bands{iBand}, bandEdges(iBand,1), bandEdges(iBand,2)), ...
+    title(ax, sprintf('%s  (%g-%g Hz)', bands{iBand}, bandEdges(iBand,1), bandEdges(iBand,2)), ...
           'FontSize',10, 'FontWeight','bold');
 
-    % Legend on first subplot only
     if iBand == 1
         if hasCorrected
             legend(ax, [hRaw hCorr hExp hOff], ...
@@ -678,10 +831,9 @@ end
 
 set(findall(hFig,'type','axes'), 'FontSize',9, 'FontWeight','bold');
 try
-    sgtitle(hFig, sprintf('Aperiodic time course  (n = %d channel(s),  mean \\pm SD)', nChan), ...
+    sgtitle(hFig, sprintf('Aperiodic time course  (n = %d channel(s),  mean +/- SD)', nChan), ...
         'FontSize',11, 'FontWeight','bold');
 catch
-    % sgtitle requires R2018b+
 end
 end
 

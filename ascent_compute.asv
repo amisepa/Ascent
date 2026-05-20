@@ -382,8 +382,7 @@ end
 % ----------------------------
 if vis
     if nChan > 1
-        % remove scale 1 for std and var coarse-graining 
-        if strcmpi(coarsing, 'std') || strcmpi(coarsing, 'var')
+                if strcmpi(coarsing, 'std') || strcmpi(coarsing, 'var')
             entropy(:,1) = [];
             scales(1) = [];
         end
