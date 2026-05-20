@@ -19,7 +19,7 @@ function [exponent_t, offset_t, times, freqs, psd_t, psd_corrected_t] = ...
 %                       (default: slidWinSec / 2; must be <= slidWinSec)
 %   'psdOverlap'      - Welch fractional overlap 0-1 (default: 0.5)
 %   'aperiodicMode'   - 'fixed' | 'knee' (default: 'fixed')
-%   'maxPeaks'        - max Gaussian peaks per fit (default: 3)
+%   'maxPeaks'        - max Gaussian peaks per fit (default: 6)
 %   'minPeakHeight'   - minimum peak height above aperiodic, log10 units (default: 0.05)
 %   'peakThreshold'   - peak detection threshold in SD of flattened spectrum (default: 2.0)
 %   'peakWidthLimits' - [min max] peak width in Hz (default: [1 12])
@@ -75,7 +75,7 @@ addParameter(p, 'freqRange',       [1 40],  @(x) isnumeric(x) && numel(x)==2);
 addParameter(p, 'psdWinSec',       [],      @(x) isempty(x) || (isnumeric(x) && isscalar(x) && x > 0));
 addParameter(p, 'psdOverlap',      0.5,     @(x) isnumeric(x) && x >= 0 && x < 1);
 addParameter(p, 'aperiodicMode',   'fixed', @(s) ischar(s) || isstring(s));
-addParameter(p, 'maxPeaks',        3,       @(x) isnumeric(x) && isscalar(x) && x >= 0);
+addParameter(p, 'maxPeaks',        6,       @(x) isnumeric(x) && isscalar(x) && x >= 0);
 addParameter(p, 'minPeakHeight',   0.05,    @(x) isnumeric(x) && isscalar(x) && x >= 0);
 addParameter(p, 'peakThreshold',   2.0,     @(x) isnumeric(x) && isscalar(x) && x > 0);
 addParameter(p, 'peakWidthLimits', [1 12],  @(x) isnumeric(x) && numel(x)==2);

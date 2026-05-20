@@ -13,10 +13,10 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %
 %   General:
 %     'measure'          - Complexity measure to compute. One of:
-%                          'SampEn', 'FuzzEn' (default), 'ExSEnt', 'FracDim',
+%                          'SampEn', 'FuzzEn', 'ExSEnt', 'FracDim',
 %                          'HigFracDim', 'Aperiodic', 'MSE', 'mMSE',
-%                          'MFE', 'CMFE', 'RCMFE', 'RCmvMFE'
-%     'chanlist'         - Channel labels, e.g. {'Fz','Cz'} or 'all' (default: all)
+%                          'MFE', 'CMFE', 'RCMFE', 'mvFuzzEn', 'RCmvMFE'
+%     'chanlist'         - Channel labels, e.g. {'Fz','Cz', 'POz'} or 'all' (default: all)
 %     'tau'              - Time lag for embedding (default: 1)
 %     'm'                - Embedding dimension (default: 2)
 %     'r'                - Similarity bound as fraction of SD (default: 0.15)
@@ -46,6 +46,7 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %     'peakthreshold'    - Peak detection threshold in SDs (default: 2.0)
 %     'peakwidthlimits'  - [min max] peak width in Hz (default: [1 12])
 %     'correctaperiodic' - Subtract aperiodic model from PSD, logical (default: true)
+%                          Important: only valid with aperiodicmode = fixed.
 %
 % OUTPUTS:
 %   EEG.ascent.(measure).data               - computed measure [channels x scales]
@@ -268,12 +269,12 @@ switch lower(measure)
             disp('Aperiodic component subtracted from PSD.');
         end
 
-		% Time-resolved version
-		[exp_t, off_t, times, freqs, psd_t, psd_corr_t] = compute_AperiodicFit_sliding(EEG.data, EEG.srate, ...
-			'slidWinSec',      4,   ...   % 4 s window
-			'slidStepSec',     1,   ...   % 1 s step
-			'freqRange',       [1 40], ...
-			'correctAperiodic', true);
+		% % Time-resolved version
+		% [exp_t, off_t, times, freqs, psd_t, psd_corr_t] = compute_AperiodicFit_sliding(EEG.data, EEG.srate, ...
+		% 	'slidWinSec',      4,   ...   % 4 s window
+		% 	'slidStepSec',     1,   ...   % 1 s step
+		% 	'freqRange',       [1 40], ...
+		% 	'correctAperiodic', true);
 	
     case 'mse'
         % Multiscale Entropy — Costa et al. (2002)
@@ -386,12 +387,15 @@ if vis
                 ascent_plot(HD,  chanlocs, 'SampEn of durations',                    []);
                 ascent_plot(HA,  chanlocs, 'SampEn of amplitudes',                   []);
                 ascent_plot(HDA, chanlocs, 'Joint SampEn of durations & amplitudes', []);
+            
             case 'aperiodic'
                 if correctAperiodic
                     ascent_plot(exponent, chanlocs, 'Aperiodic', [], offset, freqs, psd, psd_corrected);
                 else
                     ascent_plot(exponent, chanlocs, 'Aperiodic', [], offset, freqs, psd);
                 end
+                ascent_plot(exp_t, chanlocs, 'Aperiodic', [], off_t, freqs, psd_t, psd_corr_t, times); % time-resolved plot
+
             case 'mmse'
                 hasTime = exist('info','var') && isstruct(info) && isfield(info,'mse_time') ...
                           && ~isempty(info.mse_time);

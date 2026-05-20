@@ -47,7 +47,7 @@ uigeom = { [0.5 0.5] [0.5 0.35 0.15] [0.34 0.33 0.33] };
 
 uilist = {
     {'style' 'text'      'string' 'Measure to compute:'        'fontweight' 'bold'}   % 1
-    {'style' 'popupmenu' 'string' meas 'value' 2}                                      % 2  default: FuzzEn
+    {'style' 'popupmenu' 'string' meas 'value' 10}                                    % 2 (default 10 = RCMFE)
 
     {'style' 'text'      'string' 'M/EEG channels selection:'  'fontweight' 'bold'}   % 3
     {'style' 'edit'      'string' ''}                                                  % 4
@@ -95,7 +95,7 @@ if isMS || isFZ
     if isMS, enMS = 'on'; else, enMS = 'off'; end
     if isFZ, enFZ = 'on'; else, enFZ = 'off'; end
 
-    cTypes = {'Mean' 'Median' 'Std' 'Variance'};
+    cTypes = {'Mean' 'Median' 'Trimmed mean' 'Std' 'Variance'};
 
     uigeom2 = { [0.5 0.5] [1] [0.5 0.5] [1] [0.5 0.5] [1] [0.5 0.5] [1] [0.5 0.5] };
 
@@ -107,7 +107,7 @@ if isMS || isFZ
         {'style' 'edit' 'string' '2'}                                              % 5
         {}                                                                         % 6
         {'style' 'text'      'string' 'Coarse graining method:' 'fontweight' 'bold' 'enable' enMS}   % 7
-        {'style' 'popupmenu' 'string' cTypes 'value' 1                             'enable' enMS}    % 8
+        {'style' 'popupmenu' 'string' cTypes 'value' 4                             'enable' enMS}    % 8
         {}                                                                         % 9
         {'style' 'text'      'string' 'Number of scale factors:' 'fontweight' 'bold' 'enable' enMS}  % 10
         {'style' 'edit'      'string' '30'                                         'enable' enMS}    % 11
@@ -143,6 +143,29 @@ if isMS || isFZ
 
     return;
 end
+
+%   GUI #2a (entropy)   : tau, m  (SampEn, ExSEnt only)
+% FracDim and HigFracDim require no parameter GUI
+if any(strcmpi(measType, {'SampEn', 'ExSEnt'}))
+
+    uigeom_tm = { [0.5 0.5] [1] [0.5 0.5] };
+    uilist_tm = {
+        {'style' 'text' 'string' 'Time lag (tau):'          'fontweight' 'bold'}
+        {'style' 'edit' 'string' '1'}
+        {}
+        {'style' 'text' 'string' 'Embedding dimension (m):' 'fontweight' 'bold'}
+        {'style' 'edit' 'string' '2'}
+        };
+    param_tm = inputgui(uigeom_tm, uilist_tm, 'pophelp(''ascent_compute'')', 'Ascent EEGLAB plugin', EEG);
+    if isempty(param_tm)
+        measType = [];
+        return;
+    end
+    tau = str2double(param_tm{1});
+    m   = str2double(param_tm{2});
+end
+
+coarseType = []; nScales = []; n = []; extraParams = [];
 
 % ---------------------------
 % GUI #2c — Aperiodic parameters (no tau/m needed)
@@ -187,7 +210,7 @@ if strcmpi(measType, 'Aperiodic')
         {'style' 'edit' 'string' '2.0'}
 
         {'style' 'text' 'string' 'Peak width limits (Hz):'}
-        {'style' 'edit' 'string' '0.5 12'}
+        {'style' 'edit' 'string' '1 12'}
 
         % --- Correction ---
         {}
@@ -231,31 +254,5 @@ if strcmpi(measType, 'Aperiodic')
     coarseType = []; nScales = []; n = [];
     return;
 end
-
-% ---------------------------
-% GUI #2a — all other entropy measures (SampEn, ExSEnt, FracDim, HigFracDim)
-% just tau and m
-% ---------------------------
-uigeom_tm = { [0.5 0.5] [1] [0.5 0.5] };
-
-uilist_tm = {
-    {'style' 'text' 'string' 'Time lag (tau):'          'fontweight' 'bold'}
-    {'style' 'edit' 'string' '1'}
-    {}
-    {'style' 'text' 'string' 'Embedding dimension (m):' 'fontweight' 'bold'}
-    {'style' 'edit' 'string' '2'}
-    };
-
-param_tm = inputgui(uigeom_tm, uilist_tm, 'pophelp(''ascent_compute'')', 'Ascent EEGLAB plugin', EEG);
-
-if isempty(param_tm)
-    measType = [];
-    return;
-end
-
-tau = str2double(param_tm{1});
-m   = str2double(param_tm{2});
-
-coarseType = []; nScales = []; n = []; extraParams = [];
 
 end

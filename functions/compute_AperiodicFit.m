@@ -4,8 +4,8 @@ function [exponent, offset, info] = compute_AperiodicFit(freqs, psd, varargin)
 %
 %   [exponent, offset, info] = compute_AperiodicFit(freqs, psd, ...
 %       'FreqRange', [1 40], 'AperiodicMode', 'fixed', ...
-%       'MaxPeaks', 6, 'MinPeakHeight', 0.05, 'PeakThreshold', 2.0, ...
-%       'PeakWidthLimits', [0.5 12], ...
+%       'MaxPeaks', 3, 'MinPeakHeight', 0.05, 'PeakThreshold', 2.0, ...
+%       'PeakWidthLimits', [1 12], ...
 %       'Parallel', true, 'Progress', true)
 %
 % Inputs
@@ -17,7 +17,7 @@ function [exponent, offset, info] = compute_AperiodicFit(freqs, psd, varargin)
 %     'AperiodicMode'   : 'fixed' (default) | 'knee'
 %                         'fixed'  — log P = offset - exponent * log F
 %                         'knee'   — log P = offset - log(knee + F^exponent)
-%     'MaxPeaks'        : maximum number of Gaussian peaks to fit (default 3)
+%     'MaxPeaks'        : maximum number of Gaussian peaks to fit (default 6)
 %     'MinPeakHeight'   : minimum peak height above aperiodic, in log10 power
 %                         units (default 0.05)
 %     'PeakThreshold'   : peak detection threshold in units of SD of the
@@ -82,7 +82,7 @@ p.addRequired('freqs', @(x) isnumeric(x) && isvector(x));
 p.addRequired('psd',   @(x) isnumeric(x) && ismatrix(x));
 p.addParameter('FreqRange',       [1 40],      @(x) isnumeric(x) && numel(x)==2);
 p.addParameter('AperiodicMode',   'fixed',     @(s) ischar(s) || isstring(s));
-p.addParameter('MaxPeaks',        3,           @(x) isnumeric(x) && isscalar(x) && x >= 0);
+p.addParameter('MaxPeaks',        6,           @(x) isnumeric(x) && isscalar(x) && x >= 0);
 p.addParameter('MinPeakHeight',   0.05,        @(x) isnumeric(x) && isscalar(x) && x >= 0);
 p.addParameter('PeakThreshold',   2.0,         @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('PeakWidthLimits', [1 12],     @(x) isnumeric(x) && numel(x)==2);

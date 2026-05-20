@@ -1,4 +1,99 @@
-% ascent_group_analysis
+% ascent_group_analysis - Group-level statistical analysis script for the ASCENT EEGLAB plugin.
+%
+% This script preprocesses 64-channel EEG data (Biosemi) for two conditions 
+%(eyes-closed and eyes-open), computes a broad range of entropy, complexity, 
+% and aperiodic measures using the ASCENT plugin, and performs nonparametric 
+% group-level statistical comparisons with multiple comparison correction (MCC). 
+% Results are saved as figures and CSV summary tables.
+%
+% USAGE:
+%   Run section by section or as a full script after setting data_path and
+%   parameters at the top. Preprocessed .set files must already exist in
+%   the eyes_closed/ and eyes_open/ subdirectories of data_path.
+%
+% WORKFLOW:
+%   1. Compute all ASCENT measures per subject for each condition
+%   2. Save outputs to .mat files per condition
+%   3. Reload, reorganize electrode order (front-to-back), and align conditions
+%   4. Run nonparametric paired permutation t-tests per measure
+%   5. Apply MCC (cluster-based or TFCE) and visualize significant effects
+%   6. Export figures (.fig, .png) and cluster summary tables (.csv)
+%
+% KEY PARAMETERS (set at top of script):
+%   num_scales  - number of scale factors for multiscale measures (default: 30)
+%   num_chan    - number of EEG channels (default: 64)
+%   coarsing    - coarse-graining operator: 'sd' (standard deviation, default),
+%                 'mean', 'median', 'var' (see ASCENT documentation)
+%   nPerm       - number of permutations for null distribution (default: 5000)
+%   alpha       - significance threshold (default: 0.01)
+%   ct          - central tendency for test statistic: 'mean' (standard
+%                 paired t-test) or 'trimmed mean' (Yuen t-test)
+%   grp_type    - 'dpt' (dependent/paired) or 'idpt' (independent)
+%   mcc_type    - MCC method: 0=uncorrected, 1=t-max, 2=cluster, 3=TFCE
+%
+% MEASURES COMPUTED:
+%   Single-scale : SampEn, FuzzEn, ExSEnt (HD, HA, HDA), HigFracDim,
+%                  Aperiodic exponent and offset, raw and corrected PSD
+%   Multiscale   : MSE, mMSE, MFE, RCMFE
+%   (Multivariate measures RCmvMFE are available but commented out to
+%    reduce computation time and they are not directly comparable to the other measures)
+%
+% REQUIREMENTS:
+%   - MATLAB R2019b or later (for tiledlayout, arguments blocks, pyenv)
+%   - EEGLAB (Delorme & Makeig, 2004): https://sccn.ucsd.edu/eeglab
+%       Plugins required: clean_rawdata, ICLabel, Picard (for preprocessing)
+%   - ASCENT EEGLAB plugin (Cannard & Delorme, 2025): https://github.com/amisepa/ascent
+%       Provides: ascent_compute, ascent_plot, run_stats_permutation,
+%                 compute_mcc, pull_clusters, plot_results, plot_clusters
+%   - EEG Robust Statistics toolbox (Cannard, 2025): https://github.com/amisepa/eeg_robust_statistics
+%       Provides: run_stats_permutation, compute_mcc, pull_clusters,
+%                 plot_results, plot_clusters, progressbar
+%   - No additional MATLAB toolboxes required (Parallel Computing Toolbox
+%     optional for faster entropy computation via ascent_compute)
+%
+% OUTPUTS:
+%   ascent_outputs_EC_<coarsing>_new.mat  - EC condition measures (all subjects)
+%   ascent_outputs_EO_<coarsing>_new.mat  - EO condition measures (all subjects)
+%   figures_new2/group_results/           - figures (.fig, .png) and cluster
+%                                           summary tables (.csv) per measure
+%
+% NOTES:
+%   - Scale s=1 is excluded from all multiscale outputs (MSE, mMSE, MFE);
+%     RCMFE(:,1,:) is additionally removed before statistics to align scales.
+%   - mMSE scale labels reflect bandpass frequency bounds (Hz) derived from
+%     the filt-skip scheme (Kosciessa et al., 2020).
+%   - Statistics are run on linear PSD values; dB-normalized alternatives
+%     are available as commented-out lines.
+%   - The aperiodic correction is applied in fixed mode only (no knee).
+%
+% REFERENCES:
+%   Cannard, C., & Delorme, A. (2025). Introducing the ASCENT EEGLAB plugin:
+%     Aperiodic Signal Complexity Estimation for Neurophysiological Time series.
+%     Entropy.
+%
+%   Delorme, A., & Makeig, S. (2004). EEGLAB: An open source toolbox for
+%     analysis of single-trial EEG dynamics including independent component
+%     analysis. Journal of Neuroscience Methods, 134, 9-21.
+%
+%   Groppe, D.M., Urbach, T.P., & Kutas, M. (2011). Mass univariate analysis
+%     of event-related brain potentials/fields I: A critical tutorial review.
+%     Psychophysiology, 48, 1711-1725.
+%
+%   Maris, E., & Oostenveld, R. (2007). Nonparametric statistical testing of
+%     EEG- and MEG-data. Journal of Neuroscience Methods, 164, 177-190.
+%
+%   Pernet, C.R., et al. (2015). Cluster-based computational methods for mass
+%     univariate analyses of event-related brain potentials/fields: A simulation
+%     study. Journal of Neuroscience Methods, 250, 85-93.
+%
+%   Smith, S.M., & Nichols, T.E. (2009). Threshold-free cluster enhancement:
+%     Addressing problems of smoothing, threshold dependence and localisation
+%     in cluster inference. NeuroImage, 44, 83-98.
+%
+% Author  : Cedric Cannard, 2025 - ASCENT EEGLAB Plugin
+% Contact : ccannard@pm.me
+% GitHub  : https://github.com/amisepa/ascent
+
 clear; close all; clc
 
 data_path = 'C:\Users\ccann\Documents\biosemi_data';
@@ -7,14 +102,14 @@ addpath(genpath(pluginPath))
 cd(pluginPath)
 eeglab; close
 
-%%%%%%%%%%%%%%%%%%%%%%%%%% parameters %%%%%%%%%%%%%%%%%%%%%%%%%%
-num_scales = 30;
-num_chan = 64;
-coarsing = 'sd';
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 
 %% Compute on whole group - Eyes closed (EC) condition
+
+%------ PARAMETERS -------------------------
+num_scales 	= 30; 		% 30 scales were run for the paper
+num_chan 	= 64;
+coarsing 	= 'mean'; 	% 'mean' and 'sd' were run for the paper
+% ------------------------------------------
 
 cd(fullfile(data_path, 'eyes_closed'))
 filenames = {dir('*.bdf').name}';
@@ -36,7 +131,7 @@ MFE = nan(num_chan, num_scales-1, num_files);
 RCMFE = nan(num_chan, num_scales, num_files);
 % RCmvMFE = nan(num_chan, num_scales, num_files);
 progressbar('Prosessing and computing measures for eyes-closed condition')
-for iFile = 1:num_files
+for iFile = 2:num_files
 
     disp('')
     fprintf('--------------------------------------------------------\n')
@@ -250,8 +345,6 @@ gong
 
 %% Load, separate the data by condition, & reorganize electrodes
 
-% coarsing = 'sd';
-
 % Load chanlocs only
 load(fullfile(data_path, sprintf('ascent_outputs_EC_%s_new.mat', coarsing)), 'chanlocs')
 cd(data_path)
@@ -328,27 +421,24 @@ mMSE2    = mMSE(order_idx, :, :);
 RCMFE2   = RCMFE(order_idx, :, :);
 % RCmvMFE2   = RCmvMFE(order_idx, :, :);
 
-% scales = scales(1:end);  % avoid frequencies filtered out by lowpass filter
-% scales_bounds = scales_bounds(3:end);  % avoid frequencies filtered out by lowpass filter
-% num_scales = numel(scales);  % update
+%% --------- PARAMETERS ---------------------------------------
 
-%% Stats
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-nPerm = 1000;          % number of permutations for H0
-alpha = 0.05;           % NaN to show maps of p-values
+nPerm = 5000;          % number of permutations for H0
+alpha = 0.01;           % NaN to show maps of p-values
 ct = 'mean';            % central tendency method ('mean' for normal t-test, 'trimmed mean' for Yuen t-test)
 grp_type = 'dpt';       % groupe is dependent ('dpt') or independent ('idpt')
 mcc_type = 2;   % 0 = uncorrected; 1 = t-max; 2 = cluster; 3 = TFCE
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+outputs_path = fullfile(pluginPath, 'figures_new2', 'group_results'); mkdir(outputs_path)
 
 % load(fullfile(data_path,'chanlocs_reorganized.mat'), 'chanlocs')
-outputs_path = fullfile(pluginPath, 'figures_new', 'group_results'); mkdir(outputs_path)
 % load colormap_bwr.mat; dmap(1,:) = [0.9 0.9 0.9]; % set NaNs to grey
 rdbu_cmap    = interp1([1;128;256],[0.698 0.094 0.168;1 1 1;0.129 0.400 0.675],(1:256)','linear');
 dmap    = flipud(max(0,min(1,rdbu_cmap)));
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%%%%%%%%%%%%%%%%%%%% UNISCALES %%%%%%%%%%%%%%%%%%%%%
+%% --------- UNISCALES ---------------------------------------
 
 figure('Color','w','ToolBar','none','MenuBar','none');
 
@@ -521,14 +611,15 @@ print(gcf, fullfile(outputs_path, 'fig_uniscales.png'), '-dpng', '-r300');
 %% %%%%%%%%%%%%%%%%%%%% MULTISCALES %%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-coarsing = 'mean';
-nPerm = 1000;          % number of permutations for H0
-alpha = 0.05;           % NaN to show maps of p-values
-ct = 'mean';            % central tendency method ('mean' for normal t-test, 'trimmed mean' for Yuen t-test)
-grp_type = 'dpt';       % groupe is dependent ('dpt') or independent ('idpt')
-mcc_type = 3;         % 0 = uncorrected; 1 = t-max; 2 = cluster; 3 = TFCE
+% coarsing = 'sd';
+% nPerm = 1000;          % number of permutations for H0
+% alpha = 0.05;           % NaN to show maps of p-values
+% ct = 'mean';            % central tendency method ('mean' for normal t-test, 'trimmed mean' for Yuen t-test)
+% grp_type = 'dpt';       % groupe is dependent ('dpt') or independent ('idpt')
+mcc_type = 2;         % 0 = uncorrected; 1 = t-max; 2 = cluster; 3 = TFCE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% scales = scales(2:end);  % avoid frequencies filtered out by lowpass filter
 
 %% MSE
 
@@ -547,9 +638,9 @@ if ~isempty(mask_clusters)
     hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, scales, chanlocs, 'MSE', ...
         'DataType', 'scalp', 'Domain', 'nonlinear');
     for i = 1:numel(hs.curve)
+        xlim(findobj(hs.curve{i}, 'Type', 'axes'), [2 num_scales]);
         saveas(hs.topo{i}, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_cluster-%g_topo.fig', coarsing, i)));
         print(hs.topo{i}, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
-        xlim(findobj(hs.curve{i}, 'Type', 'axes'), [1 num_scales]);
         saveas(hs.curve{i}, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_cluster-%g_curve.fig', coarsing, i)));
         print(hs.curve{i}, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_cluster-%g_curve.png', coarsing, i)),'-dpng','-r300');
     end
@@ -610,7 +701,7 @@ if any(mask, 'all')
     [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
         'nonlinear', grp_type, {size(mMSE1,3) size(mMSE2,3)}, [], [], [], 'g');
     plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-    title("mMSE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold');
+    title("mMSE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold'); 
     ax = findobj(hs.curve{i}, 'Type', 'axes');
     xlim([1 num_scales]);
     tick_idx = 1:2:num_scales;
@@ -619,15 +710,15 @@ if any(mask, 'all')
     xticklabels(fmt_labels);
     xtickangle(45);
     set(gca, 'FontSize', 14, 'LineWidth', 1.2);
-    saveas(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_main.fig', coarsing)));
-    print(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
+    saveas(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_main.fig', coarsing)));
+    print(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_main.png', coarsing)), '-dpng', '-r300');
 
-    writetable(summary_tbl, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_summary.csv', coarsing)));
+    writetable(summary_tbl, fullfile(outputs_path, sprintf('mMSE_%s_perm_summary.csv', coarsing)));
     hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, scales, chanlocs, 'mMSE', ...
         'DataType', 'scalp', 'Domain', 'nonlinear');
     for i = 1:numel(hs.curve)
-        saveas(hs.topo{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_cluster-%g_topo.fig', coarsing, i)));
-        print(hs.topo{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
+        saveas(hs.topo{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_cluster-%g_topo.fig', coarsing, i)));
+        print(hs.topo{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
         ax = findobj(hs.curve{i}, 'Type', 'axes');
         xlim(ax, [1 num_scales]);
         tick_idx = 1:2:num_scales;
@@ -669,9 +760,10 @@ end
 
 %% RCMFE
 
-scales = 1:scales(end);
+% scales = 1:scales(end);
 % num_scales = length(scales);
-
+RCMFE1(:,1,:) = [];
+RCMFE2(:,1,:) = [];
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(RCMFE1, RCMFE2, nPerm, ct, grp_type);
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(RCMFE1, RCMFE2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
@@ -718,16 +810,16 @@ end
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 if any(mask, 'all')
     [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, freqs, chanlocs, ...
-        'frequency', grp_type, {size(PSD1,3) size(PSD2,3)}, [], [], [], 'g');
+        'frequency', grp_type, {size(PSD1,3) size(PSD2,3)}, 1, [], [], 'g');
     plot_results('frequency', 'scalp', freqs, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-    title('PSD (raw)')
+    title('Eyes closed vs. Eyes open (raw)'); 
     set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
     saveas(gcf, fullfile(outputs_path, 'PSD_raw_perm_tfce_main.fig'));
     print(gcf, fullfile(outputs_path, 'PSD_raw_perm_tfce_main.png'), '-dpng', '-r300');
 
     writetable(summary_tbl, fullfile(outputs_path, 'PSD_raw_perm_tfce_summary.csv'));
     hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, ...
-        chanlocs, 'PSD (raw)', 'DataType', 'scalp','Domain','Frequency');
+        chanlocs, 'Power (uV^2/Hz)', 'DataType', 'scalp','Domain','Frequency');
     for i = 1:numel(hs.curve)
         saveas(hs.topo{i},  fullfile(outputs_path, sprintf('PSD_raw_perm_tfce_cluster-%g_topo.fig', i)));
         print(hs.topo{i},   fullfile(outputs_path, sprintf('PSD_raw_perm_tfce_cluster-%g_topo.png', i)), '-dpng', '-r300');
@@ -748,22 +840,22 @@ end
 % % title("dB-norm")
 % legend('eyes-closed','eyes-open')
 
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(10*log10(PSD_corr1), 10*log10(PSD_corr2), nPerm, ct, grp_type);
-% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(PSD_corr1, PSD_corr2, nPerm, ct, grp_type);
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(10*log10(PSD_corr1), 10*log10(PSD_corr2), nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(PSD_corr1, PSD_corr2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 if any(mask, 'all')
     [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, freqs, chanlocs, ...
-        'frequency', grp_type, {size(PSD_corr1,3) size(PSD_corr2,3)}, [], [], [], 'g');
+        'frequency', grp_type, {size(PSD_corr1,3) size(PSD_corr2,3)}, 1, [], [], 'g');
     plot_results('frequency', 'scalp', freqs, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-    title('PSD (aperiodic-corrected)')
+    title('Eyes closed vs. Eyes open (aperiodic-corrected)')
     set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
     saveas(gcf, fullfile(outputs_path, 'PSD_corrected_perm_tfce_main.fig'));
     print(gcf, fullfile(outputs_path, 'PSD_corrected_perm_tfce_main.png'), '-dpng', '-r300');
 
     writetable(summary_tbl, fullfile(outputs_path, 'PSD_corrected_perm_tfce_summary.csv'));
     % hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, chanlocs, 'PSD (corrected)', 'DataType', 'scalp');
-    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, chanlocs, 'Power', ...
-        'DataType', 'scalp', 'Domain', 'frequency');
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, chanlocs, ...
+        'Power (uV^2/Hz)', 'DataType', 'scalp', 'Domain', 'frequency');
     for i = 1:numel(hs.curve)
         saveas(hs.topo{i},  fullfile(outputs_path, sprintf('PSD_corrected_perm_tfce_cluster-%g_topo.fig', i)));
         print(hs.topo{i},   fullfile(outputs_path, sprintf('PSD_corrected_perm_tfce_cluster-%g_topo.png', i)), '-dpng', '-r300');
@@ -776,39 +868,6 @@ end
 
 %% Local helper
 
-function EEG = reorder_channels(EEG)
-
-% Reorder to have Front-to-back of head order for better imagesc
-% visualization
-desired_order = {
-    'Fp1','FPz','FP2', ...
-    'AF7','AF3','AFz','AF4','AF8', ...
-    'F7','F5','F3','F1','Fz','F2','F4','F6','F8', ...
-    'FT7','FT8', ...
-    'FC5','FC3','FC1','FCz','FC2','FC4','FC6', ...
-    'T7','T8', ...
-    'C5','C3','C1','Cz','C2','C4','C6', ...
-    'TP7','TP8', ...
-    'CP5','CP3','CP1','CPz','CP2','CP4','CP6', ...
-    'P9','P7','P5','P3','P1','Pz','P2','P4','P6','P8','P10', ...
-    'PO7','PO3','POz','PO4','PO8', ...
-    'O1','Oz','Iz','O2'
-    };
-
-current_labels = {EEG.chanlocs.labels};
-[found, loc_in_desired] = ismember(lower(current_labels), lower(desired_order));
-
-if ~all(found)
-    missing = current_labels(~found);
-    error('Missing in desired_order: %s', strjoin(missing, ', '));
-end
-
-[~, order_idx] = sort(loc_in_desired, 'ascend');
-
-EEG.chanlocs = EEG.chanlocs(order_idx);
-EEG.data = EEG.data(order_idx,:);
-
-end
 
 function lbl = format_scale_label(s)
     nums = regexp(s, '[\d.]+', 'match');
@@ -818,8 +877,6 @@ function lbl = format_scale_label(s)
         lbl = sprintf('HP>%.2f Hz', str2double(nums{1}));
     end
 end
-
-
 
 function elec = chanlocs2ft(chanlocs)
     elec.label  = {chanlocs.labels}';

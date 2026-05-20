@@ -18,7 +18,7 @@ function p = ascent_get_params(EEG, varargin)
 %   General:
 %     p.measure       'RCMFE' | 'SampEn' | 'FuzzEn' | 'ExSEnt' | 'FracDim' |
 %                     'HigFracDim' | 'Aperiodic' | 'MSE' | 'mMSE' |
-%                     'MFE' | 'RCmvMFE'                       (default: 'FuzzEn')
+%                     'MFE' | | RCMFE |'RCmvMFE'              (default: 'RCMFE')
 %     p.chanlist       cell array of channel labels           (default: all)
 %     p.tau            time lag for embedding                 (default: 1)
 %     p.m              embedding dimension                    (default: 2)
@@ -42,7 +42,7 @@ function p = ascent_get_params(EEG, varargin)
 %
 %   Aperiodic:
 %     p.freqRange      PSD frequency range [fMin fMax] Hz     (default: [1 40])
-%     p.winSec         Welch segment length (s)               (default: 2)
+%     p.winSec         Welch segment length (s)               (default: 4)
 %     p.psdOverlap     Welch segment overlap fraction         (default: 0.5)
 %     p.windowType     taper window type                      (default: 'hann')
 %     p.aperiodicMode  'fixed' | 'knee'                       (default: 'fixed')
@@ -50,7 +50,7 @@ function p = ascent_get_params(EEG, varargin)
 %     p.maxPeaks       max number of spectral peaks to fit    (default: 6)
 %     p.minPeakHeight  min peak height above aperiodic (log)  (default: 0.05)
 %     p.peakThreshold  peak detection threshold (SDs)         (default: 2.0)
-%     p.peakWidthLimits [min max] peak width in Hz            (default: [0.5 12])
+%     p.peakWidthLimits [min max] peak width in Hz            (default: [1 12])
 %     p.correctAperiodic subtract aperiodic model from PSD    (default: true)
 % ----------------------------
 % Initialize all fields to []
@@ -211,8 +211,8 @@ end
 % Multiscale defaults
 if contains(lower(p.measure), {'mse','mmse','mfe','cmfe','rcmfe','rcmvmfe'})
     if isempty(p.coarsing)
-        disp('No coarse-graining method selected: using mean (default).');
-        p.coarsing = 'mean';
+        disp('No coarse-graining method selected: using Standard Deviation (default).');
+        p.coarsing = 'sd';
     end
     if isempty(p.num_scales)
         disp('Number of scales not set: using 30 (default).');
@@ -261,7 +261,7 @@ end
 % Aperiodic defaults
 if strcmpi(p.measure, 'aperiodic')
     if isempty(p.freqRange),        p.freqRange        = [1 40];     end
-    if isempty(p.winSec),           p.winSec           = 2;          end
+    if isempty(p.winSec),           p.winSec           = 4;          end
     if isempty(p.psdOverlap),       p.psdOverlap       = 0.5;        end
     if isempty(p.windowType),       p.windowType       = 'hann';     end
     if isempty(p.aperiodicMode),    p.aperiodicMode    = 'fixed';    end
@@ -269,6 +269,6 @@ if strcmpi(p.measure, 'aperiodic')
     if isempty(p.maxPeaks),         p.maxPeaks         = 6;          end
     if isempty(p.minPeakHeight),    p.minPeakHeight    = 0.05;       end
     if isempty(p.peakThreshold),    p.peakThreshold    = 2.0;        end
-    if isempty(p.peakWidthLimits),  p.peakWidthLimits  = [0.5 12];  end
+    if isempty(p.peakWidthLimits),  p.peakWidthLimits  = [1 12];  end
     if isempty(p.correctAperiodic), p.correctAperiodic = true;      end
 end
