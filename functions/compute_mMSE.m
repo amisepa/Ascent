@@ -209,7 +209,7 @@ if useParScales
 
             [CG, nBins] = coarsegrain_stat(Y, actualScale, ct);
             cg_len_s    = nBins;
-            if nBins >= max(o.MinSamplesPerBin, o.m+1)
+            if nBins >= max([o.MinSamplesPerBin, o.m+1, o.MinWinSamples])
                 % Scale-wise r: normalize CG to unit variance per channel
                 CG_std = std(CG, 0, 2);
                 CG_std(CG_std < 1e-10) = 1;

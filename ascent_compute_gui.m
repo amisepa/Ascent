@@ -7,7 +7,8 @@ function [measType, chanlist, tau, m, coarseType, nScales, extraParams, n, vis, 
 %   GUI #1 (always)     : measure, channels, vis/progress/parallel
 %   GUI #2a (entropy)   : tau, m  (SampEn, ExSEnt, FracDim, HigFracDim)
 %   GUI #2b (MS/fuzzy)  : tau, m, coarse-graining, scale factors, fuzzy power
-%   GUI #2c (Aperiodic) : PSD settings, aperiodic fitting, correction toggle
+%   GUI #2c (Aperiodic) : PSD settings, aperiodic fitting, correction toggle,
+%                         time-resolved toggle
 %
 % X / Cancel on any GUI aborts and returns measType = [].
 %
@@ -36,7 +37,7 @@ end
 % ---------------------------
 % GUI #1 — all measures
 % ---------------------------
-meas = {'SampEn' 'FuzzEn' 'ExSEnt' 'FracDim' 'HigFracDim' 'Aperiodic' ...
+meas = {'Aperiodic' 'SampEn' 'FuzzEn' 'ExSEnt' 'FracDim' 'HigFracDim' ...
         'MSE' 'mMSE' 'MFE' 'RCMFE' 'mvFuzzEn' 'RCmvMFE'};
 
 setappdata(0, 'ascent_gui1_cancel', 0);
@@ -144,7 +145,7 @@ if isMS || isFZ
     return;
 end
 
-%   GUI #2a (entropy)   : tau, m  (SampEn, ExSEnt only)
+% GUI #2a — tau and m only (SampEn, ExSEnt)
 % FracDim and HigFracDim require no parameter GUI
 if any(strcmpi(measType, {'SampEn', 'ExSEnt'}))
 
@@ -174,15 +175,25 @@ if strcmpi(measType, 'Aperiodic')
 
     apModes  = {'Fixed (default)' 'Knee'};
 
+    % Callback on the mode popupmenu: disable correction checkbox when Knee
+    % is selected (correction is not valid for the knee model).
+    apModeCallback = [ ...
+        'apVal = get(gcbo,''value''); ' ...
+        'hCB = findobj(gcbf,''style'',''checkbox''); ' ...
+        'correctCB = hCB(arrayfun(@(h) ~isempty(strfind(get(h,''string''),''Subtract'')),hCB)); ' ...
+        'if apVal == 2, set(correctCB,''value'',0,''enable'',''off''); ' ...
+        'else, set(correctCB,''enable'',''on''); end' ];
+
     uigeomAP = { [1] ...
                  [0.55 0.45] [0.55 0.45] ...
                  [1] [1] ...
                  [0.55 0.45] [0.55 0.45] [0.55 0.45] [0.55 0.45] [0.55 0.45] [0.55 0.45] ...
+                 [1] [1] [1] ...
                  [1] [1] [1] };
 
     uilistAP = {
         % --- PSD settings ---
-        {'style' 'text' 'string' '— PSD settings —' 'fontweight' 'bold' 'fontsize' 10}
+        {'style' 'text' 'string' '— PSD settings —' 'fontweight' 'bold' 'fontsize' 12}
 
         {'style' 'text' 'string' 'Frequency range (Hz):'}
         {'style' 'edit' 'string' '1 40'}
@@ -192,10 +203,10 @@ if strcmpi(measType, 'Aperiodic')
 
         % --- Aperiodic fitting ---
         {}
-        {'style' 'text' 'string' '— Aperiodic fitting —' 'fontweight' 'bold' 'fontsize' 10}
+        {'style' 'text' 'string' '— Aperiodic fitting (classic fooof/specparam) —' 'fontweight' 'bold' 'fontsize' 12}
 
         {'style' 'text' 'string' 'Aperiodic mode:'}
-        {'style' 'popupmenu' 'string' apModes 'value' 1}
+        {'style' 'popupmenu' 'string' apModes 'value' 1 'callback' apModeCallback}
 
         {'style' 'text' 'string' 'Fitting freq range (Hz):'}
         {'style' 'edit' 'string' '1 40'}
@@ -214,9 +225,15 @@ if strcmpi(measType, 'Aperiodic')
 
         % --- Correction ---
         {}
-        {'style' 'text'     'string' '— Aperiodic correction —' 'fontweight' 'bold' 'fontsize' 10}
+        {'style' 'text'     'string' '— Aperiodic correction —' 'fontweight' 'bold' 'fontsize' 12}
         {'style' 'checkbox' 'string' 'Subtract aperiodic component from PSD' ...
-                            'value' 1 'fontweight' 'bold'}
+         'value' 1 'fontweight' 'normal'}
+
+        % --- Time-resolved ---
+        {}
+        {'style' 'text'     'string' '— Time-resolved aperiodic fit (SPRiNT) —' 'fontweight' 'bold' 'fontsize' 12}
+        {'style' 'checkbox' 'string' 'Compute' ...
+         'value' 0 'fontweight' 'normal'}
         };
 
     paramAP = inputgui(uigeomAP, uilistAP, 'pophelp(''ascent_compute'')', ...
@@ -227,7 +244,8 @@ if strcmpi(measType, 'Aperiodic')
         return;
     end
 
-    % Parse — positions match uilistAP control order above
+    % Parse — positions match uilistAP control order (headers and spacers
+    % do not produce output entries; only interactive controls do)
     psdFreqRange = str2num(paramAP{1});                         %#ok<ST2NM>
     winSec       = str2double(paramAP{2});
     apModeStr    = strtrim(strsplit(lower(apModes{paramAP{3}}), ' (')); apModeStr = apModeStr{1};
@@ -237,20 +255,25 @@ if strcmpi(measType, 'Aperiodic')
     peakThresh   = str2double(paramAP{7});
     peakWidths   = str2num(paramAP{8});                         %#ok<ST2NM>
     correctAP    = logical(paramAP{9});
+    timeResolved = logical(paramAP{10});
 
     % Pack into struct for ascent_get_params
-    extraParams.freqRange        = psdFreqRange;
-    extraParams.winSec           = winSec;
-    extraParams.overlap          = 0.5;        % fixed default; tune via command line
-    extraParams.window           = 'hann';     % fixed default; tune via command line
-    extraParams.aperiodicMode    = apModeStr;
-    extraParams.fitFreqRange     = fitFreqRange;
-    extraParams.maxPeaks         = maxPeaks;
-    extraParams.minPeakHeight    = minPeakHt;
-    extraParams.peakThreshold    = peakThresh;
-    extraParams.peakWidthLimits  = peakWidths;
-    extraParams.correctAperiodic = correctAP;
-
+    extraParams.freqRange            = psdFreqRange;
+    extraParams.winSec               = winSec;
+    extraParams.overlap              = 0.5;
+    extraParams.window               = 'hann';
+    extraParams.aperiodicMode        = apModeStr;
+    extraParams.fitFreqRange         = fitFreqRange;
+    extraParams.maxPeaks             = maxPeaks;
+    extraParams.minPeakHeight        = minPeakHt;
+    extraParams.peakThreshold        = peakThresh;
+    extraParams.peakWidthLimits      = peakWidths;
+    extraParams.correctAperiodic     = correctAP;
+    extraParams.timeResolved         = timeResolved;
+    extraParams.slidWinSec           = 2;
+    extraParams.slidOverlap          = 0.5;
+    extraParams.slidNAvg             = 5;
+    extraParams.slidPeakWidthLimits  = [2 8];
     coarseType = []; nScales = []; n = [];
     return;
 end
