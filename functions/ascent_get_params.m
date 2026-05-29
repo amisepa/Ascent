@@ -18,14 +18,14 @@ function p = ascent_get_params(EEG, varargin)
 %   General:
 %     p.measure       'RCMFE' | 'SampEn' | 'FuzzEn' | 'ExSEnt' | 'FracDim' |
 %                     'HigFracDim' | 'Aperiodic' | 'MSE' | 'mMSE' |
-%                     'MFE' | | RCMFE |'RCmvMFE'              (default: 'RCMFE')
+%                     'MFE' | 'RCMFE' | 'RCmvMFE'             (default: 'RCMFE')
 %     p.chanlist       cell array of channel labels           (default: all)
 %     p.tau            time lag for embedding                 (default: 1)
 %     p.m              embedding dimension                    (default: 2)
 %     p.r              similarity bound (fraction of SD)      (default: 0.15)
 %     p.vis            plot outputs                           (default: true)
 %     p.parallel       use parallel computing                 (default: true)
-%     p.progress      print progress to console              (default: true)
+%     p.progress       print progress to console              (default: true)
 %
 %   Multiscale (MSE, mMSE, MFE, RCMFE, RCmvMFE):
 %     p.coarsing         coarse-graining: 'mean'|'median'|'std'|'var'   (default: 'mean')
@@ -39,6 +39,7 @@ function p = ascent_get_params(EEG, varargin)
 %     p.n              fuzzy power                            (default: 2)
 %     p.kernel_meth    kernel type: 'exponential'|...         (default: 'exponential')
 %     p.blocksize      block size for fuzzy computation       (default: 256)
+%     p.fuzzy_mode     'local' | ...                          (default: 'local')
 %
 %   Aperiodic:
 %     p.freqRange      PSD frequency range [fMin fMax] Hz     (default: [1 40])
@@ -52,6 +53,8 @@ function p = ascent_get_params(EEG, varargin)
 %     p.peakThreshold  peak detection threshold (SDs)         (default: 2.0)
 %     p.peakWidthLimits [min max] peak width in Hz            (default: [1 12])
 %     p.correctAperiodic subtract aperiodic model from PSD    (default: true)
+%     p.timeResolved   sliding-window aperiodic fit           (default: false)
+
 % ----------------------------
 % Initialize all fields to []
 % ----------------------------
@@ -62,7 +65,7 @@ p.m                = [];
 p.r                = [];
 p.vis              = [];
 p.parallel         = [];
-p.progress        = [];
+p.progress         = [];
 
 % Multiscale
 p.coarsing         = [];
@@ -76,7 +79,7 @@ p.TimeOnly         = [];
 p.n                = [];
 p.kernel_meth      = [];
 p.blocksize        = [];
-p.fuzzy_mode        = [];
+p.fuzzy_mode       = [];
 
 % Aperiodic
 p.freqRange        = [];
@@ -90,6 +93,11 @@ p.minPeakHeight    = [];
 p.peakThreshold    = [];
 p.peakWidthLimits  = [];
 p.correctAperiodic = [];
+p.timeResolved     = [];  
+p.slidWinSec       = [];
+p.slidOverlap      = [];
+p.slidNAvg         = [];
+p.slidPeakWidthLimits = [];
 
 % ----------------------------
 % GUI or name-value parsing
@@ -118,6 +126,11 @@ if isempty(varargin) || (numel(varargin) == 1 && isempty(varargin{1}))
         p.peakThreshold    = extraParams.peakThreshold;
         p.peakWidthLimits  = extraParams.peakWidthLimits;
         p.correctAperiodic = extraParams.correctAperiodic;
+        p.timeResolved     = extraParams.timeResolved;
+        p.slidWinSec       = extraParams.slidWinSec;
+        p.slidOverlap      = extraParams.slidOverlap;
+        p.slidNAvg         = extraParams.slidNAvg;
+        p.slidPeakWidthLimits = extraParams.slidPeakWidthLimits;
     end
 
 else
@@ -130,7 +143,7 @@ else
         key = lower(string(varargin{k}));
         val = varargin{k+1};
         switch key
-            case 'measure',          p.measure       = val;
+            case 'measure',          p.measure          = val;
             case 'chanlist'
                 if ischar(val) || isstring(val)
                     if strcmpi(string(val), 'all')
@@ -138,7 +151,7 @@ else
                     else
                         p.chanlist = regexp(char(val), '[^,\s]+', 'match')';
                     end
-                elseif iscell(val),  p.chanlist       = val(:);
+                elseif iscell(val),  p.chanlist         = val(:);
                 else, error('chanlist must be ''all'', a string, or a cellstr.');
                 end
             case 'tau',              p.tau              = double(val);
@@ -146,7 +159,7 @@ else
             case 'r',                p.r                = double(val);
             case 'vis',              p.vis              = logical(val);
             case 'parallel',         p.parallel         = logical(val);
-            case 'progress',         p.progress        = logical(val);
+            case 'progress',         p.progress         = logical(val);
             case 'coarsing',         p.coarsing         = val;
             case 'num_scales',       p.num_scales       = double(val);
             case 'filter_mode',      p.filter_mode      = val;
@@ -168,6 +181,12 @@ else
             case 'peakthreshold',    p.peakThreshold    = double(val);
             case 'peakwidthlimits',  p.peakWidthLimits  = double(val);
             case 'correctaperiodic', p.correctAperiodic = logical(val);
+            case 'timeresolved',     p.timeResolved     = logical(val);
+            case 'slidwinsec',       p.slidWinSec       = double(val);
+            case 'slidoverlap',      p.slidOverlap      = double(val);
+            case 'slidnavg',         p.slidNAvg         = double(val);
+            case 'slidPeakWidthLimits', p.slidPeakWidthLimits         = double(val);
+                
             otherwise
                 error('Unknown option: %s', key);
         end
@@ -218,7 +237,6 @@ if contains(lower(p.measure), {'mse','mmse','mfe','cmfe','rcmfe','rcmvmfe'})
         disp('Number of scales not set: using 30 (default).');
         p.num_scales = 30;
     end
-
     if isempty(p.filter_mode)
         if strcmpi(p.measure, 'mmse')
             p.filter_mode = 'narrowband';
@@ -227,15 +245,9 @@ if contains(lower(p.measure), {'mse','mmse','mfe','cmfe','rcmfe','rcmvmfe'})
             p.filter_mode = 'none';
         end
     end
-    if isempty(p.TimeWin)
-        p.TimeWin = [];
-    end
-    if isempty(p.TimeStep)
-        p.TimeStep = [];
-    end
-    if isempty(p.TimeOnly)
-        p.TimeOnly = false;
-    end
+    if isempty(p.TimeWin),  p.TimeWin  = []; end
+    if isempty(p.TimeStep), p.TimeStep = []; end
+    if isempty(p.TimeOnly), p.TimeOnly = false; end
 end
 
 % Fuzzy defaults
@@ -260,15 +272,21 @@ end
 
 % Aperiodic defaults
 if strcmpi(p.measure, 'aperiodic')
-    if isempty(p.freqRange),        p.freqRange        = [1 40];     end
-    if isempty(p.winSec),           p.winSec           = 4;          end
-    if isempty(p.psdOverlap),       p.psdOverlap       = 0.5;        end
-    if isempty(p.windowType),       p.windowType       = 'hann';     end
-    if isempty(p.aperiodicMode),    p.aperiodicMode    = 'fixed';    end
-    if isempty(p.fitFreqRange),     p.fitFreqRange     = p.freqRange;end
-    if isempty(p.maxPeaks),         p.maxPeaks         = 6;          end
-    if isempty(p.minPeakHeight),    p.minPeakHeight    = 0.05;       end
-    if isempty(p.peakThreshold),    p.peakThreshold    = 2.0;        end
-    if isempty(p.peakWidthLimits),  p.peakWidthLimits  = [1 12];  end
-    if isempty(p.correctAperiodic), p.correctAperiodic = true;      end
+    if isempty(p.freqRange),        p.freqRange        = [1 40];       end
+    if isempty(p.winSec),           p.winSec           = 4;            end
+    if isempty(p.psdOverlap),       p.psdOverlap       = 0.5;          end
+    if isempty(p.windowType),       p.windowType       = 'hann';       end
+    if isempty(p.aperiodicMode),    p.aperiodicMode    = 'fixed';      end
+    if isempty(p.fitFreqRange),     p.fitFreqRange     = p.freqRange;  end
+    if isempty(p.maxPeaks),         p.maxPeaks         = 6;            end
+    if isempty(p.minPeakHeight),    p.minPeakHeight    = 0.05;         end
+    if isempty(p.peakThreshold),    p.peakThreshold    = 2.0;          end
+    if isempty(p.peakWidthLimits),  p.peakWidthLimits  = [1 12];       end
+    if isempty(p.correctAperiodic), p.correctAperiodic = true;         end
+    if isempty(p.timeResolved),     p.timeResolved     = false;        end
+    if isempty(p.slidWinSec),       p.slidWinSec       = 2;            end
+    if isempty(p.slidOverlap),      p.slidOverlap      = 0.5;          end
+    if isempty(p.slidNAvg),         p.slidNAvg         = 5;            end
+    if isempty(p.slidPeakWidthLimits), p.slidPeakWidthLimits = [2 8]; end
+
 end

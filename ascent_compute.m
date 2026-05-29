@@ -32,7 +32,7 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %     'TimeWin'          - Window length for time-resolved mMSE (default: [])
 %     'TimeStep'         - Step between time windows for time-resolved mMSE
 %                           (default: []). Setting this value to TimeWin/2
-%                           gives 50% overlap (default). 
+%                           gives 50% overlap (default).
 %
 %   Fuzzy measures (FuzzEn, MFE, RCMFE, RCmvMFE):
 %     'n'                - Fuzzy power (default: 2)
@@ -47,6 +47,9 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %     'peakwidthlimits'  - [min max] peak width in Hz (default: [1 12])
 %     'correctaperiodic' - Subtract aperiodic model from PSD, logical (default: true)
 %                          Important: only valid with aperiodicmode = fixed.
+%     'timeresolved'     - Compute sliding-window aperiodic fit, logical (default: false)
+%                          slidWinSec (2 s) and slidOverlap (.5 for 50%).
+%                          expose via GUI or name-value pairs in a future version.
 %
 % OUTPUTS:
 %   EEG.ascent.(measure).data               - computed measure [channels x scales]
@@ -58,6 +61,12 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %   EEG.ascent.aperiodic.data.psd           - raw PSD [channels x freqs]
 %   EEG.ascent.aperiodic.data.freqs         - frequency vector
 %   EEG.ascent.aperiodic.data.psd_corrected - aperiodic-corrected PSD (if requested)
+%   EEG.ascent.aperiodic.data.exp_slid      - time-resolved exponent [channels x times]
+%   EEG.ascent.aperiodic.data.off_slid      - time-resolved offset   [channels x times]
+%   EEG.ascent.aperiodic.data.times_slid    - window centre times (s) [1 x times]
+%   EEG.ascent.aperiodic.data.freqs_slid    - frequency vector for sliding PSD
+%   EEG.ascent.aperiodic.data.psd_slid      - sliding PSD [channels x freqs x times]
+%   EEG.ascent.aperiodic.data.psd_corr_slid - sliding corrected PSD (if requested)
 %
 % REFERENCES:
 %   Sample Entropy:
@@ -137,6 +146,11 @@ minPeakHeight    = p.minPeakHeight;
 peakThreshold    = p.peakThreshold;
 peakWidthLimits  = p.peakWidthLimits;
 correctAperiodic = p.correctAperiodic;
+timeResolved     = p.timeResolved;
+slidWinSec       = p.slidWinSec;
+slidOverlap      = p.slidOverlap;
+slidNAvg         = p.slidNAvg;
+slidPeakWidthLimits = p.slidPeakWidthLimits;
 
 % ----------------------------
 % Parpool management
@@ -192,7 +206,7 @@ switch lower(measure)
     case 'fuzzen'
         % Fuzzy Entropy — Chen et al. (2009)
         entropy = compute_FuzzEn(data, 'm', m, 'tau', tau, 'n', n, 'r', r, ...
-            'Kernel', kernel_meth, ... 'exponential' (default) or 'gaussian'
+            'Kernel', kernel_meth, ...
             'Parallel', parallel, 'Progress', progress);
 
     case 'exsent'
@@ -203,21 +217,9 @@ switch lower(measure)
 
     case 'mvfuzzen'
         % Multivariate Fuzzy Entropy
-        % tic
         [entropy, ~, ~] = compute_mvFuzzEn(data, 'm', m, 'tau', tau, 'n', n, 'r', r, ...
             'Kernel', kernel_meth, 'BlockSize', blocksize, ...
             'Parallel', parallel, 'Progress', progress);
-        % toc
-
-        % % Azami original algo
-        % tic
-        % [MFuzz, B0, Bt, B1] = MvFuzzEn_ori(data.', ...
-        %     'm',   repmat(m,   size(data,1), 1), ...  % vector of length n_channels
-        %     'tau', repmat(tau, size(data,1), 1), ...  % vector of length n_channels
-        %     'r',   [r, n], ...                         % [r, exponent] as two-element vector
-        %     'Fx',  'default', ...                      % equivalent to your exponential kernel
-        %     'Norm', false);                            % you're already z-scoring beforehand
-        % toc
 
     case 'fracdim'
         % Box-counting Fractal Dimension — Esteller et al. (2001)
@@ -237,29 +239,29 @@ switch lower(measure)
 
         % Step 1: Welch PSD (linear, µV²/Hz)
         [psd, freqs] = compute_psd(EEG.data, EEG.srate, ...
-            'freqRange', freqRange, ...
-            'winSec',    winSec,    ...
-            'overlap',   psdOverlap, ...
-            'window',    windowType, ...
-            'detrend',   true,       ...
-            'Parallel',  parallel,   ...
+            'freqRange', freqRange,   ...
+            'winSec',    winSec,      ...
+            'overlap',   psdOverlap,  ...
+            'window',    windowType,  ...
+            'detrend',   true,        ...
+            'Parallel',  parallel,    ...
             'Progress',  progress);
 
         % Step 2: Fit aperiodic model
         [exponent, offset, info] = compute_AperiodicFit(freqs, psd, ...
-            'FreqRange',       fitFreqRange,   ...
-            'AperiodicMode',   aperiodicMode,  ...
-            'MaxPeaks',        maxPeaks,       ...
-            'MinPeakHeight',   minPeakHeight,  ...
-            'PeakThreshold',   peakThreshold,  ...
+            'FreqRange',       fitFreqRange,    ...
+            'AperiodicMode',   aperiodicMode,   ...
+            'MaxPeaks',        maxPeaks,        ...
+            'MinPeakHeight',   minPeakHeight,   ...
+            'PeakThreshold',   peakThreshold,   ...
             'PeakWidthLimits', peakWidthLimits, ...
-            'Parallel',        parallel,       ...
+            'Parallel',        parallel,        ...
             'Progress',        progress);
 
-        % Step 3 (optional): subtract aperiodic model from PSD
-        % Model (fixed mode): L(f) = offset - exponent * log10(f)
-        % Correction:  log10(psd_corrected) = log10(psd) - L(f)
-        if correctAperiodic
+        % Step 3: subtract aperiodic model from static PSD (ONLY VALID FOR FIXED MODE)
+        % Model: L(f) = offset - exponent * log10(f)
+        % Correction: log10(psd_corrected) = log10(psd) - L(f)
+        if correctAperiodic && strcmpi(aperiodicMode, 'fixed')
             log_freqs = log10(freqs);
             psd_corrected = nan(size(psd));
             for iChan = 1:nChan
@@ -267,15 +269,28 @@ switch lower(measure)
                 psd_corrected(iChan,:) = 10.^(log10(psd(iChan,:)) - ap_model);
             end
             disp('Aperiodic component subtracted from PSD.');
+        else
+            warning('Aperiodic correction is only valid for fixed mode. Skipping correction.');
         end
 
-		% % Time-resolved version
-		% [exp_t, off_t, times, freqs, psd_t, psd_corr_t] = compute_AperiodicFit_sliding(EEG.data, EEG.srate, ...
-		% 	'slidWinSec',      4,   ...   % 4 s window
-		% 	'slidStepSec',     1,   ...   % 1 s step
-		% 	'freqRange',       [1 40], ...
-		% 	'correctAperiodic', true);
-	
+        % Step 4 (optional): sliding-window (time-resolved) aperiodic fit.
+        if timeResolved
+                [exp_slid, off_slid, times_slid, freqs_slid, psd_slid, psd_corr_slid, fiterr_slid, peaks_slid] = ...
+                    compute_AperiodicFit_sliding(EEG.data, EEG.srate, ...
+                    'freqRange',        freqRange,        ...
+                    'aperiodicMode',    aperiodicMode,    ...
+                    'maxPeaks',         maxPeaks,         ...
+                    'minPeakHeight',    minPeakHeight,    ...
+                    'peakThreshold',    peakThreshold,    ...
+                    'peakWidthLimits',  slidPeakWidthLimits,  ...
+                    'correctAperiodic', correctAperiodic, ...
+                    'winSec',           slidWinSec,       ...
+                    'winOverlap',       slidOverlap,      ...
+                    'nAvg',             slidNAvg,         ...
+                    'Parallel',         parallel,         ...
+                    'Progress',         progress);
+        end
+
     case 'mse'
         % Multiscale Entropy — Costa et al. (2002)
         [entropy, scales] = compute_MSE(data, 'm', m, 'tau', tau, ...
@@ -287,7 +302,7 @@ switch lower(measure)
         [entropy, scales, info] = compute_mMSE(data, 'Fs', fs, ...
             'm', m, 'tau', tau, 'r', r, 'num_scales', num_scales, 'coarsing', coarsing, ...
             'filter_mode', filter_mode, ...
-            'TimeWin', TimeWin,  'TimeStep', TimeStep, 'TimeOnly', TimeOnly, ... % for time-resolved mode
+            'TimeWin', TimeWin, 'TimeStep', TimeStep, 'TimeOnly', TimeOnly, ...
             'Parallel', parallel, 'Progress', progress);
 
     case 'mfe'
@@ -313,25 +328,6 @@ switch lower(measure)
         [entropy, scales] = compute_RCmvMFE(data, 'm', m, 'tau', tau, 'r', r, ...
             'coarsing', coarsing, 'num_scales', num_scales, ...
             'Parallel', parallel, 'Progress', progress);
-        
-        % % original version fro comparison
-        % tic
-        % Xcmp = zscore(data, 0, 2);      % data is channels x samples
-        % Xcmp = Xcmp.';                  % EntropyHub wants samples x channels
-        % nChan = size(data,1);
-        % Mobj = struct();
-        % Mobj.Func = @MvFuzzEn;
-        % Mobj.m    = m   * ones(nChan,1);
-        % Mobj.tau  = tau * ones(nChan,1);
-        % Mobj.r    = [r, n];
-        % Mobj.Fx   = 'default';
-        % Mobj.Norm = logical(false);
-        % [entropy, ~] = MvMSEn(Xcmp, Mobj, ...
-        %     'Scales', num_scales, ...
-        %     'Methodx', 'coarse');
-        % 
-        % scales = 1:num_scales;
-        % toc
 
     otherwise
         error('Unknown measure: %s. See help ascent_compute for valid options.', measure);
@@ -361,8 +357,19 @@ switch lower(measure)
         EEG.ascent.(measure).params.minPeakHeight   = minPeakHeight;
         EEG.ascent.(measure).params.peakThreshold   = peakThreshold;
         EEG.ascent.(measure).params.peakWidthLimits = peakWidthLimits;
+        EEG.ascent.(measure).params.timeResolved    = timeResolved;
         if correctAperiodic
             EEG.ascent.(measure).data.psd_corrected = psd_corrected;
+        end
+        if timeResolved
+            EEG.ascent.(measure).data.exp_slid      = exp_slid;
+            EEG.ascent.(measure).data.off_slid      = off_slid;
+            EEG.ascent.(measure).data.times_slid    = times_slid;
+            EEG.ascent.(measure).data.freqs_slid    = freqs_slid;
+            EEG.ascent.(measure).data.psd_slid      = psd_slid;
+            EEG.ascent.(measure).data.psd_corr_slid = psd_corr_slid;
+            EEG.ascent.(measure).data.fiterr_slid = fiterr_slid;
+            EEG.ascent.(measure).data.peaks_slid  = peaks_slid;
         end
     otherwise
         EEG.ascent.(measure).data = entropy;
@@ -373,17 +380,16 @@ if contains(lower(measure), {'mse','mmse','mfe','rcmfe','rcmvmfe'})
     EEG.ascent.(measure).scales = scales;
 end
 if exist('info','var')
-    EEG.ascent.(measure).info = info; % additional outputs from some algos 
+    EEG.ascent.(measure).info = info;
 end
-
 
 % ----------------------------
 % VISUALIZATIONS | PLOTS
 % ----------------------------
 if vis
     if nChan > 1
-        % remove scale 1 for std and var coarse-graining 
-        if strcmpi(coarsing, 'std') || strcmpi(coarsing, 'var')
+        % Remove scale 1 for std and var coarse-graining
+        if ~isempty(coarsing) && contains(coarsing, {'std' 'sd' 'standard deviation' 'var' 'variance'})
             entropy(:,1) = [];
             scales(1) = [];
         end
@@ -393,14 +399,17 @@ if vis
                 ascent_plot(HD,  chanlocs, 'SampEn of durations',                    []);
                 ascent_plot(HA,  chanlocs, 'SampEn of amplitudes',                   []);
                 ascent_plot(HDA, chanlocs, 'Joint SampEn of durations & amplitudes', []);
-            
+
             case 'aperiodic'
                 if correctAperiodic
                     ascent_plot(exponent, chanlocs, 'Aperiodic', [], offset, freqs, psd, psd_corrected);
                 else
                     ascent_plot(exponent, chanlocs, 'Aperiodic', [], offset, freqs, psd);
                 end
-                ascent_plot(exp_t, chanlocs, 'Aperiodic', [], off_t, freqs, psd_t, psd_corr_t, times); % time-resolved plot
+                if timeResolved
+                    ascent_plot(exp_slid, chanlocs, 'Aperiodic', [], off_slid, ...
+                        freqs_slid, psd_slid, psd_corr_slid, times_slid);
+                end
 
             case 'mmse'
                 hasTime = exist('info','var') && isstruct(info) && isfield(info,'mse_time') ...
@@ -410,7 +419,7 @@ if vis
                 end
                 if ~TimeOnly && ~all(isnan(entropy(:)))
                     ascent_plot(entropy, chanlocs, measure, scales);
-                end    
+                end
             otherwise
                 ascent_plot(entropy, chanlocs, measure, scales);
         end
@@ -421,11 +430,39 @@ end
 
 
 % ----------------------------
-% Command history
+% Command history (eegh)
+% Build chanlist as a valid MATLAB cell-array literal so that replaying
+% history from eegh reproduces the exact channel selection.
 % ----------------------------
-com = sprintf("EEG = ascent_compute(EEG, 'measure', '%s', 'chanlist', '%s', " + ...
-              "'tau', %d, 'm', %d, 'vis', %d);", ...
-              measure, strjoin(chanlist, ','), tau, m, vis);
+chanlist_str = ['{' strjoin(cellfun(@(c) sprintf('''%s''', c), cellstr(chanlist), ...
+    'UniformOutput', false), ',') '}'];
+
+if strcmpi(measure, 'aperiodic')
+    com = sprintf( ...
+        ['EEG = ascent_compute(EEG, ''measure'', ''%s'', ''chanlist'', %s, '       ...
+         '''vis'', %d, ''parallel'', %d, ''progress'', %d, '                       ...
+         '''freqrange'', [%g %g], ''slidWinSec'', %g, ''slidOverlap'', %g, '               ...
+         '''aperiodicmode'', ''%s'', ''fitfreqrange'', [%g %g], '                   ...
+         '''maxpeaks'', %d, ''minpeakheight'', %g, ''peakthreshold'', %g, '        ...
+         '''peakwidthlimits'', [%g %g], ''correctaperiodic'', %d, '                ...
+         '''timeresolved'', %d;'],                                                   ...
+        measure, chanlist_str, vis, parallel, progress,                             ...
+        freqRange(1), freqRange(2), slidWinSec, slidOverlap,                            ...
+        aperiodicMode, fitFreqRange(1), fitFreqRange(2),                            ...
+        maxPeaks, minPeakHeight, peakThreshold,                                     ...
+        peakWidthLimits(1), peakWidthLimits(2),                                     ...
+        correctAperiodic, timeResolved);
+else
+    com = sprintf( ...
+        ['EEG = ascent_compute(EEG, ''measure'', ''%s'', ''chanlist'', %s, ' ...
+         '''tau'', %d, ''m'', %d, ''r'', %.3f, '                             ...
+         '''vis'', %d, ''parallel'', %d, ''progress'', %d);'],               ...
+        measure, chanlist_str, tau, m, r, vis, parallel, progress);
+end
+
+% Save dataset with new outputs
+disp("Overwriting .set dataset to save the ASCENT outputs you computed. Note that this does not affect the rest of your EEG dataset.")
+EEG = pop_saveset(EEG, 'filename', EEG.filename, 'filepath', EEG.filepath);
 
 disp('Done!');
 fprintf('Time to compute: %.2f minutes.\n', toc(tstart)/60);

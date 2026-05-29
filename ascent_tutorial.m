@@ -20,7 +20,7 @@ eeglab; close;
 % or donwload the github repo and unzip it in the EEGLAB plugins folder
 
 % Load provided sample EEG data from the tutorial directory 
-% (2 minutes of resting state eyes-closed, 64-channel Biosemi).
+% (~1.25 minutes of resting state eyes-closed, 64-channel Biosemi).
 % Dataset source: 
 %   Cannard, C., Wahbeh, H., & Delorme, A. (2021).
 %   Validating the wearable MUSE headset for EEG spectral analysis and Frontal 
@@ -73,6 +73,7 @@ EEG = ascent_compute(EEG, 'measure', 'FuzzEn', ...
 
 EEG = ascent_compute(EEG, 'measure', 'ExSEnt', 'r', .15);
 
+EEG = ascent_compute(EEG, 'measure', 'ExSEnt', 'r', .15);
 
 %% Fractal dimension
 
@@ -80,7 +81,12 @@ EEG = ascent_compute(EEG, 'measure', 'HigFracDim');  % 'HigFracDim' = Higushi ve
 
 %% Aperiodic exponent (i.e. slope) and offset
 
+% normal mode
 EEG = ascent_compute(EEG, 'measure', 'Aperiodic');
+
+% time-resolved mode
+EEG = ascent_compute(EEG, 'measure', 'Aperiodic', 'timeResolved', true,...
+    'slidWinSec', 2, 'slidOverlap', .5, 'slidnAvg', 5);
 
 %% Multiscale entropy (MSE)
 
@@ -101,9 +107,8 @@ EEG = ascent_compute(EEG, 'measure', 'mMSE', ...
 % ascent_plot(EEG.ascent.mMSE.data, EEG.chanlocs,'mMSE',EEG.ascent.mMSE.scales)
 
 
-%% Modified MSE (mMSE) - Time-course mode 
-
-% on contninuous resting-state data
+% Modified MSE (mMSE) - Time-resolved mode (on contninuous resting-state
+% data)
 EEG = ascent_compute(EEG, 'measure', 'mMSE', ...
     'num_scales', 9, ...
     'TimeWin',    8, ...   % 10 s: stable through scale ~25 at 256 Hz
@@ -133,18 +138,19 @@ EEG = ascent_compute(EEG, 'measure', 'CMFE', ...
 %% Refined Composite Multiscale Fuzzy Entropy (RCMFE)
 
 EEG = ascent_compute(EEG, 'measure', 'RCMFE', ...
-    'coarsing', 'mean', ...     % 'median' 'mean' 'trimmed mean' 'std' 'var'
+    'coarsing', 'sd', ...     % 'median' 'mean' 'trimmed mean' 'std' 'var'
     'num_scales', 50, ...       % number of scale factors to compute (default = 20; range = 2-100 depending on sample rate)
     'n', 2, ...                 % fuzzy power (default = 2)
     'parallel', true, 'progress', true);
 
-ascent_plot(EEG.ascent.RCMFE.data, EEG.chanlocs,'RCMFE',EEG.ascent.RCMFE.scales)
-
+clustThresh = .5; % cluster percentile threshold for visualization (default 0.75)
+ascent_plot(EEG.ascent.RCMFE.data, EEG.chanlocs,'RCMFE', EEG.ascent.RCMFE.scales, ...
+    'ClusterThresh', clustThresh)
 
 %% Multivariate Fuzzy entropy (mvFuzzEn)
 % WARNING: use only for low-channel count (e.g. <10 EEG channels) or on few
-% PCA components, ROIs, or very short segments, otherwise, extremely long to
-% compute. 
+% PCA components, ROIs, or very short segments, otherwise, can be extremely
+% long to compute. 
 
 % EEG = ascent_compute(EEG, 'measure', 'mvFuzzEn');  % all channels
 
@@ -154,24 +160,30 @@ EEG = ascent_compute(EEG, 'measure', 'mvFuzzEn', 'chanlist', 'Fpz Fz Cz Pz Iz Oz
 % WARNING: scale 1 is much longer than the rest of the scales.
 
 EEG = ascent_compute(EEG, 'measure', 'RCmvMFE', 'chanlist', 'Fpz Fz Cz Pz Iz Oz POz', ...
-    'coarsing', 'mean', ...     % 'median' 'mean' 'trimmed mean' 'std' (default) 'var'
+    'coarsing', 'std', ...     % 'median' 'mean' 'trimmed mean' 'std' (default) 'var'
     'num_scales', 10, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
     'n', 2, ...                % fuzzy power (default = 2)
     'parallel', true, 'progress', true);
 
-%% Multiscale entropy on indepent components (ICs) instead of 
-% scalp channel signals. note: ICA was precomputed on the sample dataset.
+%% RCMFE on indepent components (ICs) instead of channel. 
+% Note: ICA was precomputed on the sample dataset using the Picard algorithm. 
 
-if isempty(EEG.icaact)
-    EEG.icaact = EEG.icaweights * EEG.icasphere * EEG.data; % sometimes not saved on disk to save space
-end
+% % Compute ICA with Picard algorithm and effective rank reduction (if not
+% % already done)
+% dataRank = sum(eig(cov(double(EEG.data'))) > 1e-7);
+% EEG = pop_runica(EEG, 'icatype', 'picard', 'mode', 'standard', ...
+%     'maxiter', 500, 'pca', dataRank);
+% % if isempty(EEG.icaact)
+% %     EEG.icaact = EEG.icaweights * EEG.icasphere * EEG.data; % sometimes not saved on disk to save space
+% % end
 
-% [entropy, scales] = compute_MSE(EEG.icaact, 'coarsing', 'mean', 'num_scales', 30);
-[entropy, scales] = compute_RCMFE(EEG.icaact, 'coarsing', 'sd', 'num_scales', 30);
+% [rcmfe, scales] = compute_MSE(EEG.icaact, 'coarsing', 'mean', 'num_scales', 30);
+[rcmfe_ica, scales] = compute_RCMFE(EEG.icaact, 'coarsing', 'sd', 'num_scales', 30);
 
-ascent_plot(entropy, EEG.chanlocs, 'RCMFE', scales, ...
-    'ICA', true, 'icawinv', EEG.icawinv);
-% xlim([2:size(entropy,2)])
+clustThresh = .75; % cluster percentile threshold for visualization (default 0.75)
+rcmfe_ica(:,1) = []; scales(:,1) = []; % can always ingore scale 1 for SD or VAR coarse-graining
+ascent_plot(rcmfe_ica, EEG.chanlocs, 'RCMFE', scales, ... 
+    'ICA', true, 'icawinv', EEG.icawinv, 'ClusterThresh', clustThresh);
 
 %% Aperiodic parametrization on indepent components (ICs) instead of 
 % scalp channel signals. note: ICA was precomputed on the sample dataset.
@@ -195,12 +207,49 @@ for iChan = 1:size(psd,1)
     ap_model = offset(iChan) - exponent(iChan) .* log_freqs;
     psd_corrected(iChan,:) = 10.^(log10(psd(iChan,:)) - ap_model);
 end
+figure('color','w','ToolBar','none'); hold on
+plot(freqs, mean(10*log10(psd)), 'linewidth',3)
+plot(freqs, mean(10*log10(psd_corrected)), 'linewidth',3)
+legend('normal PSD', 'Aperiodic-corrected PSD')
+ylabel("Power (dB)"); xlabel("Frequency (Hz)"); 
+title("IC-domain Aperiodic correction (mean across channels)")
+axis tight; box on; 
 
-% fallback plot with bar graph instead of topos (and EEG channels instead
-% of components)
-ascent_plot(exponent, EEG.chanlocs, 'mfe', scales);
-
-% Plot with back-projected IC topographies
+% Main Aperiodic plot on the IC data and using back-projected IC topographies
 ascent_plot(exponent, EEG.chanlocs, 'aperiodic', [], ...
     offset, freqs, psd, psd_corrected, ...
     'ICA', true, 'icawinv', EEG.icawinv);
+
+
+% Time-resolved mode
+[exp_slid, off_slid, times_slid, freqs_slid, psd_slid, psd_corr_slid, fiterr_slid, peaks_slid] = ...
+    compute_AperiodicFit_sliding(EEG.icaact, EEG.srate, ...
+    'winSec',           2,       ...
+    'winOverlap',       .5,      ...
+    'nAvg',             5);
+
+% Time-resolved plot on the IC data
+ascent_plot(exp_slid, EEG.chanlocs, 'Aperiodic', [], off_slid, ...
+    freqs_slid, psd_slid, psd_corr_slid, times_slid, 'ICA', true);
+
+
+%% Run DIPFIT on ICA components and pass results to ascent_plot so that
+% dipole sources are examined on the back-projected entropy topography.
+%
+% Prerequisites: EEGLAB open, ICA already run on EEG (EEG.icaweights etc.)
+
+% DIPFIT setup + fitting
+dipfitPath = fileparts(which('dipfitdefs'));
+EEG = pop_dipfit_settings(EEG, 'hdmfile', fullfile(dipfitPath,'standard_BEM','standard_vol.mat'), ...
+    'coordformat','MNI','mrifile',fullfile(dipfitPath,'standard_BEM','standard_mri.mat'), ...
+    'chanfile',fullfile(dipfitPath,'standard_BEM','elec','standard_1005.elc'),'chansel',1:EEG.nbchan);
+EEG = pop_multifit(EEG, 1:size(EEG.icaweights,1), 'threshold',100, 'dipplot','off'); % include all ICs (ascent_plot does the classic selection with RV<15)
+EEG = pop_saveset(EEG, 'filepath', EEG.filepath, 'filename', EEG.filename);
+
+% % Compute RCMFE on ICs (if not already done above)
+% [rcmfe, scales] = compute_RCMFE(EEG.icaact, 'coarsing','sd','num_scales',30);
+
+% Visualize with dipole overlay, to compare entropy across brain regions (RV < 15% ICs only)
+ascent_plot(rcmfe_ica, EEG.chanlocs, 'RCMFE', scales, ...
+    'ICA', true, 'icawinv', EEG.icawinv, 'dipfit', EEG.dipfit);
+

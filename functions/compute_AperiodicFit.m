@@ -76,7 +76,7 @@ function [exponent, offset, info] = compute_AperiodicFit(freqs, psd, varargin)
 % License: GNU GPL v2 or later
 % -------------------------------------------------------------------------
 
-%% ---------- Parse inputs ----------
+% Parse inputs
 p = inputParser;
 p.addRequired('freqs', @(x) isnumeric(x) && isvector(x));
 p.addRequired('psd',   @(x) isnumeric(x) && ismatrix(x));
@@ -97,7 +97,7 @@ if ~ismember(opts.AperiodicMode, {'fixed','knee'})
         'AperiodicMode must be ''fixed'' or ''knee''.');
 end
 
-%% ---------- Shape inputs ----------
+% Shape inputs 
 freqs = freqs(:).';              % row
 if size(psd,2) ~= numel(freqs)
     if size(psd,1) == numel(freqs)
@@ -109,7 +109,7 @@ if size(psd,2) ~= numel(freqs)
 end
 [nchan, ~] = size(psd);
 
-%% ---------- Frequency trimming ----------
+% Frequency trimming
 fmask = freqs >= opts.FreqRange(1) & freqs <= opts.FreqRange(2);
 if sum(fmask) < 4
     error('compute_AperiodicFit:tooFewFreqs', ...
@@ -128,10 +128,9 @@ if opts.PeakWidthLimits(1) < 2 * freq_res
         opts.PeakWidthLimits(1), 2*freq_res);
 end
 
-%% ---------- Pre-allocate outputs ----------
+% Pre-allocate outputs 
 exponent = nan(nchan,1);
 offset   = nan(nchan,1);
-
 info             = struct();
 info.knee        = cell(nchan,1);
 info.ap_fit      = cell(nchan,1);
@@ -144,14 +143,14 @@ info.freqs_used  = f_use;
 info.flags       = cell(nchan,1);
 info.params      = opts;
 
-%% ---------- Progress header ----------
+% Progress header
 if opts.Progress
     parStr = 'off'; if opts.Parallel, parStr = 'on'; end
     fprintf('AperiodicFit: %d channel(s) | mode=%s | freqs=[%.0f %.0f] Hz | parallel=%s\n', ...
         nchan, opts.AperiodicMode, opts.FreqRange(1), opts.FreqRange(2), parStr);
 end
 
-%% ---------- Iterate channels ----------
+% Iterate channels
 if opts.Parallel && ~isempty(ver('parallel'))
 
     knee_all   = cell(nchan,1);
@@ -224,13 +223,15 @@ end
 end
 
 
-%% ===================== Single-spectrum worker ===================== %%
+%% Helpers
+
+% Single-spectrum worker
 function [exp_out, off_out, out] = fooof_single(logf, logp, opts)
 % logf, logp: [nFit x 1] column vectors (log10 scale)
 
 out = init_out();
 
-%% Step 1 — Initial aperiodic fit (robust, ignores peaks)
+% Initial aperiodic fit (robust, ignores peaks)
 ap0 = fit_aperiodic(logf, logp, opts.AperiodicMode);
 if any(~isfinite(ap0))
     out.flags.fitFailed = true;
@@ -238,34 +239,29 @@ if any(~isfinite(ap0))
     return
 end
 
-%% Step 2 — Flatten spectrum by subtracting initial aperiodic
+% Flatten spectrum by subtracting initial aperiodic
 ap_spec0  = aperiodic_model(logf, ap0, opts.AperiodicMode);
 flat_spec = logp - ap_spec0;
 
-%% Step 3 — Iterative Gaussian peak detection on flattened spectrum
+% Iterative Gaussian peak detection on flattened spectrum
 gauss_params = find_peaks(logf, flat_spec, opts);  % [nPeaks x 3]: [mu amp sigma]
 
-%% Step 4 — Robust aperiodic re-fit after removing peak regions
-% Zero out frequency bins within 2*sigma of each peak center
-peak_mask = false(size(logf));
-for pk = 1:size(gauss_params,1)
-    mu    = gauss_params(pk,1);
-    sigma = gauss_params(pk,3);
-    peak_mask = peak_mask | (logf >= mu - 2*sigma & logf <= mu + 2*sigma);
-end
-logf_ap = logf(~peak_mask);
-logp_ap = logp(~peak_mask);
-
-if numel(logf_ap) >= 2 + strcmp(opts.AperiodicMode,'knee')
-    ap_params = fit_aperiodic(logf_ap, logp_ap, opts.AperiodicMode);
+% Create peak-removed spectrum; re-fit aperiodic (Donoghue et al. 2020)
+% Subtract the full joint-refit peak model from the original log PSD.
+if ~isempty(gauss_params)
+    peak_model = zeros(size(logf));
+    for pk = 1:size(gauss_params,1)
+        peak_model = peak_model + gauss_params(pk,2) .* ...
+            exp(-0.5 .* ((logf - gauss_params(pk,1)) ./ gauss_params(pk,3)).^2);
+    end
+    logp_rm_peaks = logp - peak_model;   % peak-removed spectrum
+    ap_params = fit_aperiodic(logf, logp_rm_peaks, opts.AperiodicMode);
+    if any(~isfinite(ap_params)), ap_params = ap0; end
 else
-    ap_params = ap0;   % fallback to initial fit
-end
-if any(~isfinite(ap_params))
     ap_params = ap0;
 end
 
-%% Step 5 — Compute final full model and goodness of fit
+% Compute final full model and goodness of fit
 ap_fit   = aperiodic_model(logf, ap_params, opts.AperiodicMode);
 gauss_fit = zeros(size(logf));
 for pk = 1:size(gauss_params,1)
@@ -273,13 +269,12 @@ for pk = 1:size(gauss_params,1)
         exp(-0.5 * ((logf - gauss_params(pk,1)) ./ gauss_params(pk,3)).^2);
 end
 full_fit = ap_fit + gauss_fit;
-
 ss_res = sum((logp - full_fit).^2);
 ss_tot = sum((logp - mean(logp)).^2);
 r2  = 1 - ss_res / max(ss_tot, eps);
 mae = mean(abs(logp - full_fit));
 
-%% Step 6 — Convert Gaussian params to peak params (CF, power, BW)
+% Convert Gaussian params to peak params (CF, power, BW)
 % CF    = mu  (Hz, convert from log10)
 % power = height of model above aperiodic at CF (log10 power units)
 % BW    = 2 * sigma in log10 freq → convert back to Hz approximation
@@ -295,10 +290,9 @@ for pk = 1:size(gauss_params,1)
     peak_params(pk,:) = [cf_hz, pw - ap_at_cf, bw_hz]; %#ok<FNDSB>
 end
 
-%% Pack outputs
+% Pack outputs
 exp_out = ap_params(end);    % last param is always the exponent
 off_out = ap_params(1);
-
 out.knee         = ap_params;   % full param vector; knee is ap_params(2) if knee mode
 out.ap_fit       = ap_fit;
 out.flat_spec    = flat_spec;
@@ -312,7 +306,7 @@ out.flags.noConverge = any(~isfinite(ap_params));
 end
 
 
-%% ===================== Aperiodic model ===================== %%
+% Aperiodic model
 function ap = aperiodic_model(logf, params, mode)
 % params for 'fixed': [offset, exponent]
 % params for 'knee' : [offset, knee, exponent]
@@ -326,7 +320,7 @@ end
 end
 
 
-%% ===================== Aperiodic fitting ===================== %%
+% Aperiodic fitting
 function params = fit_aperiodic(logf, logp, mode)
 % Least-squares fit of the aperiodic model in log10 space.
 % Uses MATLAB's lsqcurvefit if available, otherwise OLS (fixed mode only).
@@ -368,7 +362,7 @@ end
 end
 
 
-%% ===================== Peak detection ===================== %%
+% Peak detection
 function gauss_params = find_peaks(logf, flat_spec, opts)
 % Iteratively find and fit Gaussians on the flattened spectrum.
 % Returns [nPeaks x 3]: [log10(CF), amplitude, sigma_log10]
@@ -461,7 +455,6 @@ end
 end
 
 
-%% ===================== Helpers ===================== %%
 function y = eval_gaussians(params, x, n)
 % Sum of n Gaussians; params = [mu1 amp1 sig1  mu2 amp2 sig2 ...]
 params = reshape(params, 3, n);

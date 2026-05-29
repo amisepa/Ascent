@@ -20,10 +20,10 @@ function ascent_plot(entropyData, chanlocs, entropyType, scales, varargin)
 %   Time-resolved:
 %       varargin{1} = time_sec      [1 x time]
 
-%% --- Strip named pairs before positional parsing ---
+% Strip named pairs before positional parsing
 isICA         = false;
 icawinv       = [];
-clusterThresh = 0.50;
+clusterThresh = 0.85;
 rmIdx         = [];
 for vi = 1:2:(numel(varargin)-1)
     if ischar(varargin{vi}) || isstring(varargin{vi})
@@ -52,7 +52,7 @@ if isICA
     end
 end
 
-%% --- Positional varargin ---
+% Positional varargin
 time_sec=[];  offset_in=[];  freqs_in=[];
 psd_in=[];    psd_corrected_in=[];  times_in=[];
 
@@ -67,9 +67,9 @@ else
     if ~isempty(varargin), time_sec = varargin{1}; end
 end
 
-%% =========================================================
-%% APERIODIC BRANCH
-%% =========================================================
+% =========================================================
+% APERIODIC BRANCH
+% =========================================================
 if isAperiodic
     exponent_mat  = entropyData;
     isTimeVarying = size(exponent_mat,2) > 1;
@@ -80,7 +80,7 @@ if isAperiodic
     exponent_in = exponent_mat(:);
 
     clrBlue=[0.18 0.45 0.87]; clrOrang=[0.90 0.38 0.15]; clrReg=[0.65 0.08 0.08];
-    fAlpha=0.18; lw=2; fsAx=11; fsTtl=12; bgCol=[0.97 0.97 0.97];
+    fAlpha=0.18; lw=2; fsAx=12; fsTtl=12; bgCol=[0.97 0.97 0.97];
 
     hFig=figure('Color','w','Position',[100 50 820 980],...
                 'Name','Aperiodic visualization','NumberTitle','off',...
@@ -156,18 +156,18 @@ if isAperiodic
         fill(ax3,[freqs_in fliplr(freqs_in)],...
              [mu_raw+std(log_psd,0,1,'omitnan') fliplr(mu_raw-std(log_psd,0,1,'omitnan'))],...
              clrBlue,'FaceAlpha',fAlpha,'EdgeColor','none');
-        hRaw  =plot(ax3,freqs_in,mu_raw,'-','Color',clrBlue,'LineWidth',lw);
+        hRaw  = plot(ax3,freqs_in,mu_raw,'-','Color',clrBlue,'LineWidth',lw);
         ap_mean=mean(offset_in,'omitnan')-mean(exponent_in,'omitnan').*log_f;
         hSlope=plot(ax3,freqs_in,ap_mean,'--','Color',clrBlue,'LineWidth',lw-0.4);
         if ~isempty(psd_corrected_in)
             log_pc=log10(psd_corrected_in); mu_c=mean(log_pc,1,'omitnan'); sd_c=std(log_pc,0,1,'omitnan');
             fill(ax3,[freqs_in fliplr(freqs_in)],[mu_c+sd_c fliplr(mu_c-sd_c)],...
                  clrOrang,'FaceAlpha',fAlpha,'EdgeColor','none');
-            hCor  =plot(ax3,freqs_in,mu_c,'-','Color',clrOrang,'LineWidth',lw);
-            hSlopeC=plot(ax3,freqs_in,zeros(size(freqs_in)),'--','Color',clrOrang,'LineWidth',lw-0.4);
-            legend(ax3,[hRaw hSlope hCor hSlopeC],...
-                   {'Raw PSD','1/f slope (raw)','Corrected PSD','1/f slope (corrected)'},...
-                   'Location','northeast','Box','off','FontSize',fsAx-1);
+            hCor  = plot(ax3,freqs_in,mu_c,'-','Color',clrOrang,'LineWidth',lw);
+            hSlopeC= plot(ax3,freqs_in,zeros(size(freqs_in)),'--','Color',clrOrang,'LineWidth',lw-0.4);
+            legend(ax3, [hRaw hSlope hCor hSlopeC], ...
+                   {'Raw PSD', '1/f slope (raw)', 'Corrected PSD', '1/f slope (corrected)'}, ...
+                   'Location', 'eastoutside', 'Box', 'off', 'FontSize', fsAx-1);
             title(ax3,'PSD: raw vs corrected  (mean +/- SD)','FontSize',fsTtl,'FontWeight','bold');
         else
             legend(ax3,[hRaw hSlope],{'Raw PSD','1/f slope'},...
@@ -246,9 +246,9 @@ if isAperiodic
 end
 
 
-%% =========================================================
-%% ALL OTHER MEASURES
-%% =========================================================
+% =========================================================
+% ALL OTHER MEASURES
+% =========================================================
 
 isTimeResolved = ndims(entropyData)==3;
 if isTimeResolved
@@ -262,13 +262,13 @@ nChan     = size(entropyData,1);
 multiChan = nChan>1;
 
 if multiscale && multiChan
-    %% -------------------------------------------------------
-    %% Multiscale + multichannel
-    %% Layout: 3 rows x 4 cols
-    %%   Cols 1-2 (all rows): heatmap
-    %%   Col 3-4, row k:      topo | curve for cluster k
-    %%   Up to 3 clusters shown; unused rows are blanked.
-    %% -------------------------------------------------------
+    % -------------------------------------------------------
+    % Multiscale + multichannel
+    % Layout: 3 rows x 4 cols
+    %   Cols 1-2 (all rows): heatmap
+    %   Col 3-4, row k:      topo | curve for cluster k
+    %   Up to 3 clusters shown; unused rows are blanked.
+    % -------------------------------------------------------
 
     finiteMask=isfinite(entropyData);
     if ~any(finiteMask(:))
@@ -327,21 +327,22 @@ if multiscale && multiChan
     ylabel(ax_heat,ifelse(isICA,'ICs','EEG channels'));
     title(ax_heat,entropyType,'Interpreter','none');
 
-    % Overlay cluster bounding boxes (colour-coded).
-    % A bounding box (min-to-max channel row, min-to-max scale) is used
-    % instead of contour() to avoid multiple separate loops appearing when
-    % channel membership inside a scale-range segment is non-contiguous.
+    % Overlay cluster boundaries as smooth contours.
+    % The binary mask is Gaussian-smoothed before contouring so that small
+    % gaps in channel membership (which previously caused multiple disconnected
+    % loops) are filled, giving a single organic boundary per cluster.
+    % conv2 is used so no Image Processing Toolbox is required.
     if usedCluster
+        sigma = 1.5;
+        hw    = ceil(3 * sigma);
+        [gx, gy] = meshgrid(-hw:hw, -hw:hw);
+        kern  = exp(-(gx.^2 + gy.^2) / (2 * sigma^2));
+        kern  = kern / sum(kern(:));
         hold(ax_heat,'on');
         for k = 1:nShow
-            rows_in = find(any(clusterMasks(:,:,k), 2));   % channels present
-            cols_in = find(any(clusterMasks(:,:,k), 1));   % scales present
-            if isempty(rows_in) || isempty(cols_in), continue; end
-            rectangle(ax_heat, ...
-                'Position', [cols_in(1)-0.5,  rows_in(1)-0.5, ...
-                             cols_in(end)-cols_in(1)+1, rows_in(end)-rows_in(1)+1], ...
-                'EdgeColor', clrBoundary{k}, 'LineWidth', 2, 'FaceColor', 'none', ...
-                'Curvature', [0.12 0.12]);
+            mk_smooth = conv2(double(clusterMasks(:,:,k)), kern, 'same');
+            contour(ax_heat, 1:nScales, 1:nChan, mk_smooth, [0.35 0.35], ...
+                    'Color', clrBoundary{k}, 'LineWidth', 1.8);
         end
         hold(ax_heat,'off');
     end
@@ -418,18 +419,27 @@ if multiscale && multiChan
             end
         end
 
-        %% -- Topo / bar --
+        % Topo / bar
         finV = topo_vals_k(isfinite(topo_vals_k));
         if isICA
             axes(ax_topo); %#ok<LAXES>
-            bar(ax_topo, topo_vals_k,'FaceColor',[0.18 0.45 0.87],'EdgeColor','none');
-            hold(ax_topo,'on');
+            % bar(ax_topo, topo_vals_k,'FaceColor',[0.18 0.45 0.87],'EdgeColor','none');
+            % hold(ax_topo,'on');
+            % if usedCluster
+            %     ic_idx=find(chanMask_k);
+            %     bar(ax_topo,ic_idx,topo_vals_k(ic_idx),...
+            %         'FaceColor',[0.05 0.25 0.65],'EdgeColor','none');
+            % end
+            % bar(ax_topo,pc_k,topo_vals_k(pc_k),'FaceColor','r','EdgeColor','none');
+            bar(ax_topo, topo_vals_k, 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none');  % all ICs: grey
+            hold(ax_topo, 'on');
             if usedCluster
-                ic_idx=find(chanMask_k);
-                bar(ax_topo,ic_idx,topo_vals_k(ic_idx),...
-                    'FaceColor',[0.05 0.25 0.65],'EdgeColor','none');
+                ic_idx = find(chanMask_k);
+                bar(ax_topo, ic_idx, topo_vals_k(ic_idx), ...
+                    'FaceColor', [0.18 0.45 0.87], 'EdgeColor', 'none');   % cluster ICs: blue
             end
-            bar(ax_topo,pc_k,topo_vals_k(pc_k),'FaceColor','r','EdgeColor','none');
+            bar(ax_topo, pc_k, topo_vals_k(pc_k), 'FaceColor', 'r', 'EdgeColor', 'none');   % centroid: red
+
             xlabel(ax_topo,'IC'); ylabel(ax_topo,'Entropy');
             title(ax_topo,rowLabel,'Interpreter','none','FontSize',9);
             box(ax_topo,'on');
@@ -454,7 +464,7 @@ if multiscale && multiChan
             end
         end
 
-        %% -- Curve --
+        % Curve
         axes(ax_curve); %#ok<LAXES>
         hold(ax_curve,'on'); box(ax_curve,'on');
         if all(~isfinite(curve_k)), curve_k=nan(1,nScales); end
@@ -491,7 +501,7 @@ if multiscale && multiChan
     set(findall(hFig2,'type','axes'),'FontSize',9,'FontWeight','bold');
 
 elseif ~multiscale && multiChan
-    %% --- Uniscale topo ---
+    % Uniscale topo
     hFig3=figure('Color','w','InvertHardCopy','off',...
                  'Name','Uniscale entropy visualization',...
                  'Toolbar','none','Menu','none','NumberTitle','Off');
@@ -522,7 +532,7 @@ elseif ~multiscale && multiChan
     set(findall(hFig3,'type','axes'),'FontSize',10,'FontWeight','bold');
 
 elseif multiscale && ~multiChan
-    %% --- Single channel/IC curve ---
+    % Single channel/IC curve
     hFig4=figure('Color','w','InvertHardCopy','off',...
                  'Name',entropyType,'Toolbar','none','Menu','none','NumberTitle','Off');
     try icadefs; set(hFig4,'color',BACKCOLOR); catch; end
@@ -535,7 +545,7 @@ elseif multiscale && ~multiChan
     set(findall(hFig4,'type','axes'),'FontSize',10,'FontWeight','bold');
 
 elseif ~multiscale && ~multiChan
-    %% --- Scalar ---
+    % Scalar
     hFig5=figure('Color','w','InvertHardCopy','off','Name',entropyType,...
                  'Toolbar','none','Menu','none','NumberTitle','Off','Position',[200 200 400 300]);
     try icadefs; set(hFig5,'color',BACKCOLOR); catch; end
@@ -565,9 +575,7 @@ end
 end
 
 
-%% =========================================================
-%% CLUSTER DETECTION  (scale-first, channel-order agnostic)
-%% =========================================================
+%% Cluster detection (scale-first, channel-order agnostic)
 function [clusterMasks, nClusters, centroids, usedCluster] = ...
         find_entropy_clusters(data, thresh_pct, maxClusters)
 % find_entropy_clusters  Scale-first, channel-order-agnostic clustering.
@@ -682,74 +690,178 @@ end
 %% =========================================================
 %% APERIODIC TIME-COURSE SUBFUNCTION
 %% =========================================================
-function plot_aperiodic_timecourse(exponent_t,offset_t,freqs,psd_t,psd_corr_t,times)
-bands={'Delta','Theta','Alpha','Beta','Gamma'};
-bandEdges=[1 4;4 8;8 13;13 30;30 40];
-fMin=freqs(1); fMax=freqs(end);
-keep=bandEdges(:,2)>fMin & bandEdges(:,1)<fMax;
-bands=bands(keep); bandEdges=bandEdges(keep,:); nBands=numel(bands);
-if nBands==0
-    warning('ascent_plot: no standard bands within freqs range [%.1f %.1f Hz].',fMin,fMax); return
-end
-[nChan,~,nTimes]=size(psd_t);
-hasCorrected=~isempty(psd_corr_t)&&size(psd_corr_t,3)==nTimes;
-if isempty(times)||numel(times)~=nTimes
-    times=1:nTimes; xLabel='Window';
+%% =========================================================
+%% APERIODIC TIME-COURSE SUBFUNCTION  (SPRiNT-style)
+%% =========================================================
+function plot_aperiodic_timecourse(exponent_t, offset_t, freqs, psd_t, psd_corr_t, times)
+% Layout (single figure):
+%   Row 1       : Raw PSD spectrogram heatmap     (freq x time, mean across channels)
+%   Row 2       : Corrected PSD spectrogram heatmap (if available)
+%   Row 3       : Exponent(t) +/- SD [left axis] | Offset(t) +/- SD [right axis]
+%   Row 4       : Band-averaged PSD time courses — theta / alpha / beta overlaid
+
+[nChan, ~, nTimes] = size(psd_t);
+hasCorrected = ~isempty(psd_corr_t) && size(psd_corr_t, 3) == nTimes;
+
+if isempty(times) || numel(times) ~= nTimes
+    times  = 1:nTimes;
+    xLabel = 'Window';
 else
-    times=times(:)'; xLabel='Time (s)';
-end
-exp_mean=mean(exponent_t,1,'omitnan'); off_mean=mean(offset_t,1,'omitnan');
-clrRaw=[0.18 0.45 0.87]; clrCorr=[0.90 0.38 0.15];
-clrExp=[0.15 0.15 0.15]; clrOff=[0.50 0.50 0.50]; fAlpha=0.15;
-figH=max(420,80+nBands*130);
-hFig=figure('Color','w','Position',[80 50 920 figH],...
-    'Name','Aperiodic - Time course','NumberTitle','off','Toolbar','none','Menu','none');
-try icadefs; set(hFig,'color',BACKCOLOR); catch; end
-for iBand=1:nBands
-    ax=subplot(nBands,1,iBand);
-    fMask=freqs>=bandEdges(iBand,1)&freqs<=bandEdges(iBand,2);
-    if ~any(fMask), title(ax,sprintf('%s (no data)',bands{iBand})); axis(ax,'off'); continue; end
-    psd_band=log10(psd_t(:,fMask,:)+eps);
-    bp_raw=squeeze(mean(psd_band,2,'omitnan')); if nChan==1, bp_raw=bp_raw(:)'; end
-    mu_raw=mean(bp_raw,1,'omitnan'); sd_raw=std(bp_raw,0,1,'omitnan');
-    yyaxis(ax,'left'); hold(ax,'on');
-    fill(ax,[times fliplr(times)],[mu_raw+sd_raw fliplr(mu_raw-sd_raw)],...
-         clrRaw,'FaceAlpha',fAlpha,'EdgeColor','none','HandleVisibility','off');
-    hRaw=plot(ax,times,mu_raw,'-','Color',clrRaw,'LineWidth',1.8);
-    ax.YColor=clrRaw; ylabel(ax,'log_{10} \muV^2/Hz','FontSize',8.5);
-    if hasCorrected
-        psd_cband=log10(psd_corr_t(:,fMask,:)+eps);
-        bp_corr=squeeze(mean(psd_cband,2,'omitnan')); if nChan==1, bp_corr=bp_corr(:)'; end
-        mu_corr=mean(bp_corr,1,'omitnan'); sd_corr=std(bp_corr,0,1,'omitnan');
-        fill(ax,[times fliplr(times)],[mu_corr+sd_corr fliplr(mu_corr-sd_corr)],...
-             clrCorr,'FaceAlpha',fAlpha,'EdgeColor','none','HandleVisibility','off');
-        hCorr=plot(ax,times,mu_corr,'-','Color',clrCorr,'LineWidth',1.8);
-    end
-    yyaxis(ax,'right'); hold(ax,'on');
-    hExp=plot(ax,times,exp_mean,'--','Color',clrExp,'LineWidth',0.8);
-    hOff=plot(ax,times,off_mean,':','Color',clrOff,'LineWidth',0.8);
-    ax.YColor=[0.3 0.3 0.3]; ylabel(ax,'Exp. / Offset','FontSize',8.5);
-    xlim(ax,[times(1) times(end)]); box(ax,'on'); ax.TickDir='out';
-    title(ax,sprintf('%s  (%g-%g Hz)',bands{iBand},bandEdges(iBand,1),bandEdges(iBand,2)),...
-          'FontSize',10,'FontWeight','bold');
-    if iBand==1
-        if hasCorrected
-            legend(ax,[hRaw hCorr hExp hOff],{'Raw PSD','Corrected PSD','Exponent','Offset'},...
-                'Location','northeast','Box','off','FontSize',8);
-        else
-            legend(ax,[hRaw hExp hOff],{'Raw PSD','Exponent','Offset'},...
-                'Location','northeast','Box','off','FontSize',8);
-        end
-    end
-    if iBand==nBands, xlabel(ax,xLabel,'FontSize',10); end
-end
-set(findall(hFig,'type','axes'),'FontSize',9,'FontWeight','bold');
-try
-    sgtitle(hFig,sprintf('Aperiodic time course  (n = %d channel(s),  mean +/- SD)',nChan),...
-        'FontSize',11,'FontWeight','bold');
-catch; end
+    times  = times(:)';
+    xLabel = 'Time (s)';
 end
 
+% Mean log PSD across channels for heatmap
+log_psd_mean  = squeeze(mean(log10(psd_t + eps), 1, 'omitnan'));   % [nFreqs x nTimes]
+if hasCorrected
+    log_corr_mean = squeeze(mean(log10(psd_corr_t + eps), 1, 'omitnan'));
+end
+
+% Aperiodic parameter statistics across channels
+exp_mean = mean(exponent_t, 1, 'omitnan');
+exp_sd   = std(exponent_t,  0, 1, 'omitnan');
+off_mean = mean(offset_t,   1, 'omitnan');
+off_sd   = std(offset_t,    0, 1, 'omitnan');
+
+clrExp   = [0.18 0.45 0.87];
+clrOff   = [0.40 0.40 0.40];
+fAlpha   = 0.15;
+
+nRows = 3 + hasCorrected;   % 3 always + 1 optional corrected heatmap
+figH  = 160 + nRows * 170;
+
+hFig = figure('Color', 'w', 'Position', [80 50 920 figH], ...
+    'Name', 'Aperiodic time course (SPRiNT-style)', ...
+    'NumberTitle', 'off', 'Toolbar', 'none', 'Menu', 'none');
+try icadefs; set(hFig, 'color', BACKCOLOR); catch; end %#ok<NODEF>
+
+row = 0;
+
+%% --- Row 1: Raw PSD spectrogram ---
+row  = row + 1;
+ax1  = subplot(nRows, 1, row);
+imagesc(ax1, times, freqs, log_psd_mean);
+axis(ax1, 'xy');                            % frequency increases upward
+set(ax1, 'TickDir', 'out');
+ylabel(ax1, 'Frequency (Hz)');
+title(ax1, sprintf('Raw PSD  (mean across %d channel(s))', nChan), 'FontWeight', 'bold');
+cb1 = colorbar(ax1, 'Location', 'eastoutside');
+ylabel(cb1, 'log_{10} \muV^2/Hz', 'FontSize', 8);
+colormap(ax1, 'parula');
+xlim(ax1, [times(1) times(end)]);
+
+%% --- Row 2: Corrected PSD spectrogram (optional) ---
+if hasCorrected
+    row  = row + 1;
+    ax2  = subplot(nRows, 1, row);
+    imagesc(ax2, times, freqs, log_corr_mean);
+    axis(ax2, 'xy');
+    set(ax2, 'TickDir', 'out');
+    ylabel(ax2, 'Frequency (Hz)');
+    title(ax2, 'Corrected PSD  (aperiodic component removed)', 'FontWeight', 'bold');
+    cb2 = colorbar(ax2, 'Location', 'eastoutside');
+    ylabel(cb2, 'log_{10} \muV^2/Hz', 'FontSize', 8);
+    colormap(ax2, 'parula');
+    xlim(ax2, [times(1) times(end)]);
+end
+
+%% --- Row 3: Exponent + Offset time series ---
+row  = row + 1;
+ax3  = subplot(nRows, 1, row);
+hold(ax3, 'on');
+
+yyaxis(ax3, 'left');
+fill(ax3, [times fliplr(times)], ...
+     [exp_mean + exp_sd  fliplr(exp_mean - exp_sd)], ...
+     clrExp, 'FaceAlpha', fAlpha, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+hExp = plot(ax3, times, exp_mean, '-', 'Color', clrExp, 'LineWidth', 2, 'DisplayName', 'Exponent');
+ylabel(ax3, 'Exponent');
+ax3.YColor = clrExp;
+
+yyaxis(ax3, 'right');
+fill(ax3, [times fliplr(times)], ...
+     [off_mean + off_sd  fliplr(off_mean - off_sd)], ...
+     clrOff, 'FaceAlpha', fAlpha, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+hOff = plot(ax3, times, off_mean, '--', 'Color', clrOff, 'LineWidth', 2, 'DisplayName', 'Offset');
+ylabel(ax3, 'Offset');
+ax3.YColor = clrOff;
+
+legend(ax3, [hExp hOff], 'Location', 'eastoutside', 'Box', 'off', 'FontSize', 10);
+title(ax3, 'Aperiodic parameters  (mean \pm SD across channels)', 'FontWeight', 'bold');
+xlim(ax3, [times(1) times(end)]);
+set(ax3, 'TickDir', 'out'); box(ax3, 'on');
+
+%% --- Row 4: Simplified band time courses (theta / alpha / beta) ---
+row  = row + 1;
+ax4  = subplot(nRows, 1, row);
+hold(ax4, 'on');
+
+bandNames  = {'Theta', 'Alpha', 'Beta'};
+bandEdges  = [4 8; 8 13; 13 30];
+clrBands   = {[0.47 0.67 0.19], [0.85 0.33 0.10], [0.49 0.18 0.56]};
+src        = psd_t;
+srcLabel   = 'Raw';
+if hasCorrected
+    src      = psd_corr_t;
+    srcLabel = 'Corrected';
+end
+
+hLinesRaw  = gobjects(1, 3);
+hLines     = gobjects(1, 3);
+for ib = 1:3
+    fMask = freqs >= bandEdges(ib, 1) & freqs <= bandEdges(ib, 2);
+    if ~any(fMask), continue; end
+
+    % --- Raw (plotted first, underneath) ---
+    band_raw_avg = squeeze(mean(log10(psd_t(:, fMask, :) + eps), 2, 'omitnan'));
+    if nChan == 1, band_raw_avg = band_raw_avg(:)'; end
+    raw_mean = mean(band_raw_avg, 1, 'omitnan');
+    raw_sd   = std(band_raw_avg,  0, 1, 'omitnan');
+    fill(ax4, [times fliplr(times)], ...
+         [raw_mean + raw_sd  fliplr(raw_mean - raw_sd)], ...
+         clrBands{ib} * 0.55 + 0.45, 'FaceAlpha', fAlpha, ...
+         'EdgeColor', 'none', 'HandleVisibility', 'off');
+    hLinesRaw(ib) = plot(ax4, times, raw_mean, '--', ...
+        'Color', clrBands{ib} * 0.55 + 0.45, ...
+        'LineWidth', 1.2, 'DisplayName', bandNames{ib});
+
+    % --- Corrected (plotted on top) ---
+    if hasCorrected
+        band_freq_avg = squeeze(mean(log10(src(:, fMask, :) + eps), 2, 'omitnan'));
+        if nChan == 1, band_freq_avg = band_freq_avg(:)'; end
+        band_mean = mean(band_freq_avg, 1, 'omitnan');
+        band_sd   = std(band_freq_avg,  0, 1, 'omitnan');
+        fill(ax4, [times fliplr(times)], ...
+             [band_mean + band_sd  fliplr(band_mean - band_sd)], ...
+             clrBands{ib}, 'FaceAlpha', fAlpha, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+        hLines(ib) = plot(ax4, times, band_mean, '-', 'Color', clrBands{ib}, ...
+            'LineWidth', 1.8, 'DisplayName', [bandNames{ib} ' (corrected)']);
+    end
+end
+
+% Legend: raw first, then corrected — placed outside to the right
+validRaw  = isgraphics(hLinesRaw);
+validCorr = isgraphics(hLines);
+allH = [hLinesRaw(validRaw) hLines(validCorr)];
+if ~isempty(allH)
+    leg = legend(ax4, allH, 'Location', 'eastoutside', 'Box', 'off', 'FontSize', 10);
+end
+
+xlabel(ax4, xLabel);
+ylabel(ax4, 'log_{10} \muV^2/Hz');
+title(ax4, sprintf('%s PSD band averages  (mean \\pm SD)', srcLabel), 'FontWeight', 'bold');
+xlim(ax4, [times(1) times(end)]);
+set(ax4, 'TickDir', 'out'); box(ax4, 'on');
+
+%% --- Final styling ---
+set(findall(hFig, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
+colormap(hFig, 'parula');
+try
+    sgtitle(hFig, ...
+        sprintf('Aperiodic time course  (n = %d channel(s),  mean \\pm SD)', nChan), ...
+        'FontSize', 14, 'FontWeight', 'bold');
+catch; end
+end
 
 %% --- Local helper ---
 function out = ifelse(cond,a,b)

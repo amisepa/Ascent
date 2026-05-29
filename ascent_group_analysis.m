@@ -102,13 +102,13 @@ addpath(genpath(pluginPath))
 cd(pluginPath)
 eeglab; close
 
+coarsing 	= 'sd'; 	% 'mean' and 'sd' were run for the paper
 
 %% Compute on whole group - Eyes closed (EC) condition
 
 %------ PARAMETERS -------------------------
 num_scales 	= 30; 		% 30 scales were run for the paper
 num_chan 	= 64;
-coarsing 	= 'mean'; 	% 'mean' and 'sd' were run for the paper
 % ------------------------------------------
 
 cd(fullfile(data_path, 'eyes_closed'))
@@ -423,8 +423,8 @@ RCMFE2   = RCMFE(order_idx, :, :);
 
 %% --------- PARAMETERS ---------------------------------------
 
-nPerm = 5000;          % number of permutations for H0
-alpha = 0.01;           % NaN to show maps of p-values
+nPerm = 1000;          % number of permutations for H0
+alpha = 0.05;           % NaN to show maps of p-values
 ct = 'mean';            % central tendency method ('mean' for normal t-test, 'trimmed mean' for Yuen t-test)
 grp_type = 'dpt';       % groupe is dependent ('dpt') or independent ('idpt')
 mcc_type = 2;   % 0 = uncorrected; 1 = t-max; 2 = cluster; 3 = TFCE
@@ -437,6 +437,8 @@ outputs_path = fullfile(pluginPath, 'figures_new2', 'group_results'); mkdir(outp
 rdbu_cmap    = interp1([1;128;256],[0.698 0.094 0.168;1 1 1;0.129 0.400 0.675],(1:256)','linear');
 dmap    = flipud(max(0,min(1,rdbu_cmap)));
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% num_scales = 1:scales(end);
 
 %% --------- UNISCALES ---------------------------------------
 
@@ -612,14 +614,15 @@ print(gcf, fullfile(outputs_path, 'fig_uniscales.png'), '-dpng', '-r300');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % coarsing = 'sd';
-% nPerm = 1000;          % number of permutations for H0
-% alpha = 0.05;           % NaN to show maps of p-values
+nPerm = 1000;          % number of permutations for H0
+alpha = 0.05;           % NaN to show maps of p-values
 % ct = 'mean';            % central tendency method ('mean' for normal t-test, 'trimmed mean' for Yuen t-test)
 % grp_type = 'dpt';       % groupe is dependent ('dpt') or independent ('idpt')
-mcc_type = 2;         % 0 = uncorrected; 1 = t-max; 2 = cluster; 3 = TFCE
+mcc_type = 3;         % 0 = uncorrected; 1 = t-max; 2 = cluster; 3 = TFCE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % scales = scales(2:end);  % avoid frequencies filtered out by lowpass filter
+num_scales = length(scales);
 
 %% MSE
 
@@ -638,7 +641,7 @@ if ~isempty(mask_clusters)
     hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, scales, chanlocs, 'MSE', ...
         'DataType', 'scalp', 'Domain', 'nonlinear');
     for i = 1:numel(hs.curve)
-        xlim(findobj(hs.curve{i}, 'Type', 'axes'), [2 num_scales]);
+        xlim(findobj(hs.curve{i}, 'Type', 'axes'), [2 scales(end)]);
         saveas(hs.topo{i}, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_cluster-%g_topo.fig', coarsing, i)));
         print(hs.topo{i}, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
         saveas(hs.curve{i}, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_cluster-%g_curve.fig', coarsing, i)));
@@ -646,6 +649,190 @@ if ~isempty(mask_clusters)
     end
     % close([hs.topo{:} hs.curve{:}]) % to close figures
 end
+
+
+%% mMSE
+
+% scales_bounds(1) = []; 
+
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(mMSE1, mMSE2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(mMSE1, mMSE2, nPerm, ct, grp_type);
+mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
+if any(mask, 'all')
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
+        'nonlinear', grp_type, {size(mMSE1,3) size(mMSE2,3)}, [], [], [], 'g');
+    plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
+    title("mMSE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold'); 
+    ax = findobj(hs.curve{i}, 'Type', 'axes');
+    xlim([1 scales(end)]);
+    tick_idx = 1:2:scales(end);
+    xticks(tick_idx);
+    fmt_labels = cellfun(@(s) format_scale_label(s), scales_bounds(tick_idx), 'UniformOutput', false);
+    xticklabels(fmt_labels);
+    xtickangle(45);
+    set(gca, 'FontSize', 14, 'LineWidth', 1.2);
+    saveas(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_main_uncorrected.fig', coarsing)));
+    print(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_main_uncorrected.png', coarsing)), '-dpng', '-r300');
+
+    writetable(summary_tbl, fullfile(outputs_path, sprintf('mMSE_%s_perm_summary_uncorrected.csv', coarsing)));
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, scales, chanlocs, 'mMSE', ...
+        'DataType', 'scalp', 'Domain', 'nonlinear');
+    for i = 1:numel(hs.curve)
+        saveas(hs.topo{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_cluster-%g_topo_uncorrected.fig', coarsing, i)));
+        print(hs.topo{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_cluster-%g_topo_uncorrected.png', coarsing, i)),'-dpng','-r300');
+        ax = findobj(hs.curve{i}, 'Type', 'axes');
+        xlim(ax, [1 scales(end)]);
+        tick_idx = 1:2:scales(end);
+        xticks(ax, tick_idx);
+        fmt_labels = cellfun(@(s) format_scale_label(s), scales_bounds(tick_idx), 'UniformOutput', false);
+        xticklabels(ax, fmt_labels);
+        xtickangle(ax, 45);
+        set(gca, 'FontSize', 14, 'LineWidth', 1.2);
+        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_cluster-%g_curve_uncorrected.fig', coarsing, i)));
+        print(hs.curve{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_cluster-%g_curve_uncorrected.png', coarsing, i)),'-dpng','-r300');
+    end
+    % close([hs.topo{:} hs.curve{:}]) % to close figures
+end
+
+%% MFE
+
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(MFE1, MFE2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(MFE1, MFE2, nPerm, ct, grp_type);
+mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
+if any(mask, 'all')
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
+        'nonlinear', grp_type, {size(MFE1,3) size(MFE2,3)}, [], [], [], 'g');
+    plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
+    title("MFE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold');
+    saveas(gcf, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_main.fig', coarsing)));
+    print(gcf, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
+
+    writetable(summary_tbl, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_summary.csv', coarsing)));
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, scales, chanlocs, 'MFE', ...
+        'DataType', 'scalp', 'Domain', 'nonlinear');
+    for i = 1:numel(hs.curve)
+        xlim(findobj(hs.curve{i}, 'Type', 'axes'), [2 scales(end)]);
+        saveas(hs.topo{i}, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_cluster-%g_topo.fig', coarsing, i)));
+        print(hs.topo{i}, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
+        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_cluster-%g_curve.fig', coarsing, i)));
+        print(hs.curve{i}, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_cluster-%g_curve.png', coarsing, i)),'-dpng','-r300');
+    end
+    close([hs.topo{:} hs.curve{:}]) % to close figures
+end
+
+%% RCMFE
+
+if contains(coarsing, {'mean', 'median', 'trimmed mean'})
+    scales = 1:scales(end);
+    num_scales = length(scales);
+    xlims_curve_plot = [1 scales(end)];
+else
+    RCMFE1(:,1,:) = [];
+    RCMFE2(:,1,:) = [];
+    xlims_curve_plot = [2 scales(end)];
+end
+
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(RCMFE1, RCMFE2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(RCMFE1, RCMFE2, nPerm, ct, grp_type);
+mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
+if any(mask, 'all')
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
+        'nonlinear', grp_type, {size(RCMFE1,3) size(RCMFE2,3)}, [], [], [], 'g');
+    plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
+    title("RCMFE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold');
+    saveas(gcf, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_main.fig', coarsing)));
+    print(gcf, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
+
+    writetable(summary_tbl, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_summary.csv', coarsing)));
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, scales, chanlocs, 'RCMFE', ...
+        'DataType', 'scalp', 'Domain', 'nonlinear');
+    for i = 1:numel(hs.curve)
+        xlim(findobj(hs.curve{i}, 'Type', 'axes'), xlims_curve_plot);
+        saveas(hs.topo{i}, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_cluster-%g_topo.fig', coarsing, i)));
+        print(hs.topo{i}, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
+        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_cluster-%g_curve.fig', coarsing, i)));
+        print(hs.curve{i}, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_cluster-%g_curve.png', coarsing, i)),'-dpng','-r300');
+    end
+    % close([hs.topo{:} hs.curve{:}]) % to close figures
+end
+
+
+%% PSD (raw)
+
+% PSD1 = log10(PSD1);
+% PSD2 = log10(PSD2);
+% fprintf('PSD1 negative/zero values: %d\n', sum(PSD1(:) <= 0));
+% fprintf('PSD2 negative/zero values: %d\n', sum(PSD2(:) <= 0));
+
+% figure('color','w'); hold on 
+% % plot(freqs, mean(mean(PSD1,3),1),'LineWidth',2)
+% % plot(freqs, mean(mean(PSD2,3),1),'LineWidth',2)
+% % title("Linear")
+% plot(freqs, mean(mean(10*log10(PSD1),3),1),'LineWidth',2)
+% plot(freqs, mean(mean(10*log10(PSD2),3),1),'LineWidth',2)
+% title("dB-norm")
+% legend('eyes-closed','eyes-open')
+
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(10*log10(PSD1), 10*log10(PSD2), nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(PSD1, PSD2, nPerm, ct, grp_type);
+mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
+if any(mask, 'all')
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, freqs, chanlocs, ...
+        'frequency', grp_type, {size(PSD1,3) size(PSD2,3)}, 1.5, [], [], 'g');
+    plot_results('frequency', 'scalp', freqs, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
+    title('Eyes closed vs. Eyes open - Classic PSD'); 
+    set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
+    saveas(gcf, fullfile(outputs_path, 'PSD_raw_perm_tfce_main.fig'));
+    print(gcf, fullfile(outputs_path, 'PSD_raw_perm_tfce_main.png'), '-dpng', '-r300');
+
+    writetable(summary_tbl, fullfile(outputs_path, 'PSD_raw_perm_tfce_summary.csv'));
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, ...
+        chanlocs, 'Power (\muV^2/Hz)', 'DataType', 'scalp','Domain','Frequency');
+    for i = 1:numel(hs.curve)
+        saveas(hs.topo{i},  fullfile(outputs_path, sprintf('PSD_raw_perm_tfce_cluster-%g_topo.fig', i)));
+        print(hs.topo{i},   fullfile(outputs_path, sprintf('PSD_raw_perm_tfce_cluster-%g_topo.png', i)), '-dpng', '-r300');
+        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('PSD_raw_perm_tfce_cluster-%g_curve.fig', i)));
+        print(hs.curve{i},  fullfile(outputs_path, sprintf('PSD_raw_perm_tfce_cluster-%g_curve.png', i)), '-dpng', '-r300');
+    end
+    % close([hs.topo{:} hs.curve{:}])
+end
+
+%% PSD (aperiodic-corrected)
+
+% figure('color','w'); hold on 
+% plot(freqs, mean(mean(PSD_corr1,3),1),'LineWidth',2)
+% plot(freqs, mean(mean(PSD_corr2,3),1),'LineWidth',2)
+% title("Linear")
+% % plot(freqs, mean(mean(10*log10(PSD_corr1),3),1),'LineWidth',2)
+% % plot(freqs, mean(mean(10*log10(PSD_corr2),3),1),'LineWidth',2)
+% % title("dB-norm")
+% legend('eyes-closed','eyes-open')
+
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(10*log10(PSD_corr1), 10*log10(PSD_corr2), nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(PSD_corr1, PSD_corr2, nPerm, ct, grp_type);
+mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
+if any(mask, 'all')
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, freqs, chanlocs, ...
+        'frequency', grp_type, {size(PSD_corr1,3) size(PSD_corr2,3)}, 1.5, [], [], 'g');
+    plot_results('frequency', 'scalp', freqs, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
+    title('Eyes closed vs. Eyes open - Aperiodic-corrected PSD')
+    set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
+    saveas(gcf, fullfile(outputs_path, 'PSD_corrected_perm_tfce_main.fig'));
+    print(gcf, fullfile(outputs_path, 'PSD_corrected_perm_tfce_main.png'), '-dpng', '-r300');
+
+    writetable(summary_tbl, fullfile(outputs_path, 'PSD_corrected_perm_tfce_summary.csv'));
+    % hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, chanlocs, 'PSD (corrected)', 'DataType', 'scalp');
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, chanlocs, ...
+        'Power (\muV^2/Hz)', 'DataType', 'scalp', 'Domain', 'frequency');
+    for i = 1:numel(hs.curve)
+        saveas(hs.topo{i},  fullfile(outputs_path, sprintf('PSD_corrected_perm_tfce_cluster-%g_topo.fig', i)));
+        print(hs.topo{i},   fullfile(outputs_path, sprintf('PSD_corrected_perm_tfce_cluster-%g_topo.png', i)), '-dpng', '-r300');
+        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('PSD_corrected_perm_tfce_cluster-%g_curve.fig', i)));
+        print(hs.curve{i},  fullfile(outputs_path, sprintf('PSD_corrected_perm_tfce_cluster-%g_curve.png', i)), '-dpng', '-r300');
+    end
+    % close([hs.topo{:} hs.curve{:}])
+end
+
 
 %% Same but with eeglab/fieldtrip
 
@@ -691,179 +878,6 @@ end
 % % stat.mask         → [64 x 50] logical significant mask
 % % stat.posclusters  → struct with cluster-level p-values
 % % stat.negclusters  → same for negative clusters
-
-%% mMSE
-
-% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(mMSE1, mMSE2, nPerm, ct, grp_type);
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(mMSE1, mMSE2, nPerm, ct, grp_type);
-mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
-if any(mask, 'all')
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
-        'nonlinear', grp_type, {size(mMSE1,3) size(mMSE2,3)}, [], [], [], 'g');
-    plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-    title("mMSE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold'); 
-    ax = findobj(hs.curve{i}, 'Type', 'axes');
-    xlim([1 num_scales]);
-    tick_idx = 1:2:num_scales;
-    xticks(tick_idx);
-    fmt_labels = cellfun(@(s) format_scale_label(s), scales_bounds(tick_idx), 'UniformOutput', false);
-    xticklabels(fmt_labels);
-    xtickangle(45);
-    set(gca, 'FontSize', 14, 'LineWidth', 1.2);
-    saveas(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_main.fig', coarsing)));
-    print(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_main.png', coarsing)), '-dpng', '-r300');
-
-    writetable(summary_tbl, fullfile(outputs_path, sprintf('mMSE_%s_perm_summary.csv', coarsing)));
-    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, scales, chanlocs, 'mMSE', ...
-        'DataType', 'scalp', 'Domain', 'nonlinear');
-    for i = 1:numel(hs.curve)
-        saveas(hs.topo{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_cluster-%g_topo.fig', coarsing, i)));
-        print(hs.topo{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
-        ax = findobj(hs.curve{i}, 'Type', 'axes');
-        xlim(ax, [1 num_scales]);
-        tick_idx = 1:2:num_scales;
-        xticks(ax, tick_idx);
-        fmt_labels = cellfun(@(s) format_scale_label(s), scales_bounds(tick_idx), 'UniformOutput', false);
-        xticklabels(ax, fmt_labels);
-        xtickangle(ax, 45);
-        set(gca, 'FontSize', 14, 'LineWidth', 1.2);
-        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_cluster-%g_curve.fig', coarsing, i)));
-        print(hs.curve{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_tfce_cluster-%g_curve.png', coarsing, i)),'-dpng','-r300');
-    end
-    % close([hs.topo{:} hs.curve{:}]) % to close figures
-end
-
-%% MFE
-
-% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(MFE1, MFE2, nPerm, ct, grp_type);
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(MFE1, MFE2, nPerm, ct, grp_type);
-mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
-if any(mask, 'all')
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
-        'nonlinear', grp_type, {size(MFE1,3) size(MFE2,3)}, [], [], [], 'g');
-    plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-    title("MFE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold');
-    saveas(gcf, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_main.fig', coarsing)));
-    print(gcf, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
-
-    writetable(summary_tbl, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_summary.csv', coarsing)));
-    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, scales, chanlocs, 'MFE', ...
-        'DataType', 'scalp', 'Domain', 'nonlinear');
-    for i = 1:numel(hs.curve)
-        saveas(hs.topo{i}, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_cluster-%g_topo.fig', coarsing, i)));
-        print(hs.topo{i}, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
-        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_cluster-%g_curve.fig', coarsing, i)));
-        print(hs.curve{i}, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_cluster-%g_curve.png', coarsing, i)),'-dpng','-r300');
-    end
-    close([hs.topo{:} hs.curve{:}]) % to close figures
-end
-
-%% RCMFE
-
-% scales = 1:scales(end);
-% num_scales = length(scales);
-RCMFE1(:,1,:) = [];
-RCMFE2(:,1,:) = [];
-% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(RCMFE1, RCMFE2, nPerm, ct, grp_type);
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(RCMFE1, RCMFE2, nPerm, ct, grp_type);
-mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
-if any(mask, 'all')
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
-        'nonlinear', grp_type, {size(RCMFE1,3) size(RCMFE2,3)}, [], [], [], 'g');
-    plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-    title("RCMFE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold');
-    saveas(gcf, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_main.fig', coarsing)));
-    print(gcf, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
-
-    writetable(summary_tbl, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_summary.csv', coarsing)));
-    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, scales, chanlocs, 'RCMFE', ...
-        'DataType', 'scalp', 'Domain', 'nonlinear');
-    for i = 1:numel(hs.curve)
-        saveas(hs.topo{i}, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_cluster-%g_topo.fig', coarsing, i)));
-        print(hs.topo{i}, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_cluster-%g_topo.png', coarsing, i)),'-dpng','-r300');
-        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_cluster-%g_curve.fig', coarsing, i)));
-        print(hs.curve{i}, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_cluster-%g_curve.png', coarsing, i)),'-dpng','-r300');
-    end
-    % close([hs.topo{:} hs.curve{:}]) % to close figures
-end
-
-
-
-%% PSD (raw)
-
-% PSD1 = log10(PSD1);
-% PSD2 = log10(PSD2);
-% fprintf('PSD1 negative/zero values: %d\n', sum(PSD1(:) <= 0));
-% fprintf('PSD2 negative/zero values: %d\n', sum(PSD2(:) <= 0));
-
-% figure('color','w'); hold on 
-% % plot(freqs, mean(mean(PSD1,3),1),'LineWidth',2)
-% % plot(freqs, mean(mean(PSD2,3),1),'LineWidth',2)
-% % title("Linear")
-% plot(freqs, mean(mean(10*log10(PSD1),3),1),'LineWidth',2)
-% plot(freqs, mean(mean(10*log10(PSD2),3),1),'LineWidth',2)
-% title("dB-norm")
-% legend('eyes-closed','eyes-open')
-
-% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(10*log10(PSD1), 10*log10(PSD2), nPerm, ct, grp_type);
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(PSD1, PSD2, nPerm, ct, grp_type);
-mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
-if any(mask, 'all')
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, freqs, chanlocs, ...
-        'frequency', grp_type, {size(PSD1,3) size(PSD2,3)}, 1, [], [], 'g');
-    plot_results('frequency', 'scalp', freqs, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-    title('Eyes closed vs. Eyes open (raw)'); 
-    set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
-    saveas(gcf, fullfile(outputs_path, 'PSD_raw_perm_tfce_main.fig'));
-    print(gcf, fullfile(outputs_path, 'PSD_raw_perm_tfce_main.png'), '-dpng', '-r300');
-
-    writetable(summary_tbl, fullfile(outputs_path, 'PSD_raw_perm_tfce_summary.csv'));
-    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, ...
-        chanlocs, 'Power (uV^2/Hz)', 'DataType', 'scalp','Domain','Frequency');
-    for i = 1:numel(hs.curve)
-        saveas(hs.topo{i},  fullfile(outputs_path, sprintf('PSD_raw_perm_tfce_cluster-%g_topo.fig', i)));
-        print(hs.topo{i},   fullfile(outputs_path, sprintf('PSD_raw_perm_tfce_cluster-%g_topo.png', i)), '-dpng', '-r300');
-        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('PSD_raw_perm_tfce_cluster-%g_curve.fig', i)));
-        print(hs.curve{i},  fullfile(outputs_path, sprintf('PSD_raw_perm_tfce_cluster-%g_curve.png', i)), '-dpng', '-r300');
-    end
-    % close([hs.topo{:} hs.curve{:}])
-end
-
-%% PSD (aperiodic-corrected)
-
-% figure('color','w'); hold on 
-% plot(freqs, mean(mean(PSD_corr1,3),1),'LineWidth',2)
-% plot(freqs, mean(mean(PSD_corr2,3),1),'LineWidth',2)
-% title("Linear")
-% % plot(freqs, mean(mean(10*log10(PSD_corr1),3),1),'LineWidth',2)
-% % plot(freqs, mean(mean(10*log10(PSD_corr2),3),1),'LineWidth',2)
-% % title("dB-norm")
-% legend('eyes-closed','eyes-open')
-
-% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(10*log10(PSD_corr1), 10*log10(PSD_corr2), nPerm, ct, grp_type);
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(PSD_corr1, PSD_corr2, nPerm, ct, grp_type);
-mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
-if any(mask, 'all')
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, freqs, chanlocs, ...
-        'frequency', grp_type, {size(PSD_corr1,3) size(PSD_corr2,3)}, 1, [], [], 'g');
-    plot_results('frequency', 'scalp', freqs, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-    title('Eyes closed vs. Eyes open (aperiodic-corrected)')
-    set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
-    saveas(gcf, fullfile(outputs_path, 'PSD_corrected_perm_tfce_main.fig'));
-    print(gcf, fullfile(outputs_path, 'PSD_corrected_perm_tfce_main.png'), '-dpng', '-r300');
-
-    writetable(summary_tbl, fullfile(outputs_path, 'PSD_corrected_perm_tfce_summary.csv'));
-    % hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, chanlocs, 'PSD (corrected)', 'DataType', 'scalp');
-    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, chanlocs, ...
-        'Power (uV^2/Hz)', 'DataType', 'scalp', 'Domain', 'frequency');
-    for i = 1:numel(hs.curve)
-        saveas(hs.topo{i},  fullfile(outputs_path, sprintf('PSD_corrected_perm_tfce_cluster-%g_topo.fig', i)));
-        print(hs.topo{i},   fullfile(outputs_path, sprintf('PSD_corrected_perm_tfce_cluster-%g_topo.png', i)), '-dpng', '-r300');
-        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('PSD_corrected_perm_tfce_cluster-%g_curve.fig', i)));
-        print(hs.curve{i},  fullfile(outputs_path, sprintf('PSD_corrected_perm_tfce_cluster-%g_curve.png', i)), '-dpng', '-r300');
-    end
-    % close([hs.topo{:} hs.curve{:}])
-end
 
 
 %% Local helper
