@@ -6,8 +6,6 @@
 
 clear; close all; clc % clear every time to avoid potential memory bias
 eeglab; close;
-pluginPath = fileparts(which('eegplugin_ascent.m'));
-addpath(genpath(pluginPath))
 cd(pluginPath)
 EEG = pop_loadset('filename','ascent_sample_data.set','filepath',fullfile(pluginPath));
 data = EEG.data;
@@ -54,7 +52,6 @@ difference = out1 - out2
 clear % clear every time to avoid potential memory bias
 eeglab; close;
 pluginPath = fileparts(which('eegplugin_ascent.m'));
-addpath(genpath(pluginPath))
 cd(pluginPath)
 EEG = pop_loadset('filename','ascent_sample_data.set','filepath',fullfile(pluginPath));
 data = EEG.data;
@@ -98,7 +95,6 @@ difference = out1 - out2
 clear % clear every time to avoid potential memory bias
 eeglab; close;
 pluginPath = fileparts(which('eegplugin_ascent.m'));
-addpath(genpath(pluginPath))
 cd(pluginPath)
 EEG = pop_loadset('filename','ascent_sample_data.set','filepath',fullfile(pluginPath));
 data = EEG.data;
@@ -129,7 +125,6 @@ Mobj.tau  = tau;
 clear % clear every time to avoid potential memory bias
 eeglab; close;
 pluginPath = fileparts(which('eegplugin_ascent.m'));
-addpath(genpath(pluginPath))
 cd(pluginPath)
 EEG = pop_loadset('filename','ascent_sample_data.set','filepath',fullfile(pluginPath));
 data = EEG.data;
@@ -181,75 +176,76 @@ difference = out1 - out2
 clear % clear every time to avoid potential memory bias
 eeglab; close;
 pluginPath = fileparts(which('eegplugin_ascent.m'));
-addpath(genpath(pluginPath))
 cd(pluginPath)
 EEG = pop_loadset('filename','ascent_sample_data.set','filepath',fullfile(pluginPath));
-data = EEG.data;
+
 m           = 2;    % embedding dimension
 r           = .15;  % similarity bound
-n           = 2;    % fuzzy power
 tau         = 1;    % time lag
-paraComp    = true; % parallel computing
-trackProg   = true; % track progress
-num_scales = 50;
-coarsing = 'mean';
+paraComp    = false; % parallel computing
+trackProg   = true;  % track progress
+num_scales  = 30;
+coarsing    = 'mean';
 
 
-% Mobj = MSobject('SampEn', 'm', m, 'r', r);
-Mobj.Func = @SampEn;
-Mobj.m    = m;
-Mobj.r    = r;
-Mobj.Vcp  = false;
+% % Mobj = MSobject('SampEn', 'm', m, 'r', r);
+% Mobj.Func = @SampEn;
+% Mobj.m    = m;
+% Mobj.r    = r;
+% Mobj.Vcp  = false;
 
 % original
 tic
 out1 = [];
 for iChan = 1:EEG.nbchan
-    % for tau = 1:num_scales
-        % out1(iChan,tau) = compute_mse_costa(zscore(data(iChan,:)), m, r, tau, coarsing);
-    % end
-    [out1(iChan,:), CI] = compute_MSE_ori(EEG.data(iChan,:), Mobj, ...
-        'Scales',  num_scales, 'Methodx', 'coarse', ...
-        'RadNew',  1, ...       % rescale r by std at each scale
-        'Plotx',   false);
+    % Original Costa algrithm
+    for iScale = 1:num_scales
+        out1(iChan,iScale) = compute_mse_costa(EEG.data(iChan,:), m, r, iScale, coarsing);
+    end
+    
+    % % From EntropyHub
+    % [out1(iChan,:), CI] = compute_MSE_ori(EEG.data(iChan,:), Mobj, ...
+    %     'Scales',  num_scales, 'Methodx', 'coarse', ...
+    %     'RadNew',  1, ...       % rescale r by std at each scale
+    %     'Plotx',   false);
     
     fprintf('  ch %g/%g\n', iChan, EEG.nbchan);
 end
+out1(:,1) = [];
 disp('')
 toc
-ascent_plot(out1, EEG.chanlocs, 'mse', 1:num_scales);
+ascent_plot(out1, EEG.chanlocs, 'mse', 2:num_scales);
 
 
 % Ascent
 tic
-[out2, scales] = compute_MSE(EEG.data, 'm', m, 'tau', tau, ...
-    'coarsing', coarsing, 'num_scales', num_scales, ...
-    'Parallel', paraComp, 'Progress', trackProg);
+[out2, scales] = compute_MSE(EEG.data, 'm', m, 'r', r, 'tau', tau, ...
+                              'coarsing',coarsing, 'num_scales', num_scales,  ...
+                              'ZScore', false, ...  % false to compare against Costa original (true to compare against entropyHub RadNew = 1)
+                              'Parallel', paraComp, 'Progress', true);
+
+[out2, scales] = compute_MSE(EEG.data, 'm', m, 'r', r, 'tau', tau, ...
+    'coarsing',coarsing, 'num_scales', num_scales,  ...
+    'RadNew', 0, 'IncludeScale1', false, ...  
+    'Parallel', paraComp, 'Progress', true);
+
+% [MSE, scales, CI] = compute_MSE(data, 'm', 2, 'r', 0.15, 'tau', 1, ...
+%                               'coarsing','mean', 'num_scales', 20, ...
+%                               'RadNew', 0, 'IncludeScale1', false, ...
+%                               'MinSamplesPerBin', 4, 'StableMinBins', 100, ...
+%                               'Parallel', true, 'Progress', true)
+
 toc
-ascent_plot(out2, EEG.chanlocs, 'mse', 1:num_scales);
+ascent_plot(out2, EEG.chanlocs, 'MSE', scales);
 
-out1(:,1) = [];
-out2(:,1) = [];
-
-% Plot
-nexttile; hold on
-% plot(out1, 'xr', 'LineWidth',2); 
-% plot(out2, 'ob', 'LineWidth',2, 'MarkerSize', 8); 
-% legend("original", "Ascent")
-% xlabel("EEG channels"); ylabel("Entropy")
-% title("MSE")
+% Compare differences
 diff = out1 - out2;
-imagesc(diff)
-colorbar
-colormap(parula)  % or parula, redblue, etc.
-xticks(1:4)
-xticklabels(arrayfun(@(s) sprintf('Scale %d', s), 1:4, 'UniformOutput', false))
-xlabel('Scale')
-ylabel('Channel')
-title('MSE difference (out1 - out2)')
+figure('color','w','ToolBar','none');
+imagesc(diff); colorbar; colormap(parula);
+xlabel('Scale'); ylabel('Channel');
+title('MSE difference: Costa reference minus ASCENT');
 
-% Check outputs
-difference = out1 - out2
+
 
 
 %% Modified Multiscale Entropy (mMSE; from Kloosterman and Kosciessa, implemented in Fieldtrip)

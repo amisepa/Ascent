@@ -16,7 +16,14 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %                          'SampEn', 'FuzzEn', 'ExSEnt', 'FracDim',
 %                          'HigFracDim', 'Aperiodic', 'MSE', 'mMSE',
 %                          'MFE', 'CMFE', 'RCMFE', 'mvFuzzEn', 'RCmvMFE'
+%     'domain'           - Data to run the measure on (default: 'channel'):
+%                            'channel' - scalp channel signals (EEG.data)
+%                            'ica'     - independent components (EEG.icaact).
+%                          ICA mode requires an existing decomposition; IC
+%                          results are back-projected to the scalp for topos
+%                          using EEG.icawinv. 'chanlist' is ignored (all ICs).
 %     'chanlist'         - Channel labels, e.g. {'Fz','Cz', 'POz'} or 'all' (default: all)
+%                          Channel domain only.
 %     'tau'              - Time lag for embedding (default: 1)
 %     'm'                - Embedding dimension (default: 2)
 %     'r'                - Similarity bound as fraction of SD (default: 0.15)
@@ -27,6 +34,7 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %   Multiscale measures (MSE, mMSE, MFE, RCMFE, RCmvMFE):
 %     'coarsing'         - Coarse-graining method: 'mean', 'median', 'std', 'var' (default: 'mean')
 %     'num_scales'       - Number of scale factors (default: 30)
+%     'zNorm'            - z-normalize per channel
 %     'filter_mode'      - Scale filtering: 'none' or 'narrowband' (mMSE only)
 %     'TimeOnly'         - compute time-resolved mMSE only
 %     'TimeWin'          - Window length for time-resolved mMSE (default: [])
@@ -47,20 +55,31 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %     'peakwidthlimits'  - [min max] peak width in Hz (default: [1 12])
 %     'correctaperiodic' - Subtract aperiodic model from PSD, logical (default: true)
 %                          Important: only valid with aperiodicmode = fixed.
+%     'alphaband'        - [fMin fMax] Hz for the saved alpha power (default: [8 13])
 %     'timeresolved'     - Compute sliding-window aperiodic fit, logical (default: false)
 %                          slidWinSec (2 s) and slidOverlap (.5 for 50%).
 %                          expose via GUI or name-value pairs in a future version.
 %
 % OUTPUTS:
-%   EEG.ascent.(measure).data               - computed measure [channels x scales]
-%   EEG.ascent.(measure).electrode_labels   - channel labels used
-%   EEG.ascent.(measure).electrode_locations- channel locations used
+%   Below, "signals" are scalp channels, or ICs when domain = 'ica'.
+%
+%   EEG.ascent.(measure).data               - computed measure [signals x scales]
+%   EEG.ascent.(measure).domain             - 'channel' or 'ica'
+%   EEG.ascent.(measure).electrode_labels   - signal labels ('IC1'.. in ICA mode)
+%   EEG.ascent.(measure).electrode_locations- scalp channels (the ones ICs project onto)
+%   EEG.ascent.(measure).icawinv            - mixing matrix        (ICA mode only)
+%   EEG.ascent.(measure).icachansind        - channels ICA ran on  (ICA mode only)
 %   EEG.ascent.(measure).scales             - scale vector (multiscale only)
-%   EEG.ascent.aperiodic.data.exponent      - aperiodic exponent [channels x 1]
-%   EEG.ascent.aperiodic.data.offset        - aperiodic offset [channels x 1]
-%   EEG.ascent.aperiodic.data.psd           - raw PSD [channels x freqs]
+%   EEG.ascent.aperiodic.data.exponent      - aperiodic exponent [signals x 1]
+%   EEG.ascent.aperiodic.data.offset        - aperiodic offset [signals x 1]
+%   EEG.ascent.aperiodic.data.psd           - raw PSD [signals x freqs]
 %   EEG.ascent.aperiodic.data.freqs         - frequency vector
-%   EEG.ascent.aperiodic.data.psd_corrected - aperiodic-corrected PSD (if requested)
+%   EEG.ascent.aperiodic.data.psd_corrected - aperiodic-corrected PSD (if requested).
+%                                             RATIO to the 1/f fit (dimensionless).
+%   EEG.ascent.aperiodic.data.alpha_raw     - total alpha power [signals x 1], µV²/Hz
+%                                             (includes the aperiodic background)
+%   EEG.ascent.aperiodic.data.alpha_osc     - alpha power above the 1/f fit
+%                                             [signals x 1], µV²/Hz. NaN in knee mode.
 %   EEG.ascent.aperiodic.data.exp_slid      - time-resolved exponent [channels x times]
 %   EEG.ascent.aperiodic.data.off_slid      - time-resolved offset   [channels x times]
 %   EEG.ascent.aperiodic.data.times_slid    - window centre times (s) [1 x times]
@@ -93,7 +112,7 @@ tstart = tic;
 
 % Add path to subfolders
 plugin_path = fileparts(which('eegplugin_ascent.m'));
-addpath(genpath(plugin_path));
+addpath(fullfile(plugin_path, 'functions'));
 
 % ----------------------------
 % Input checks
@@ -128,6 +147,7 @@ parallel         = p.parallel;
 progress         = p.progress;
 coarsing         = p.coarsing;
 num_scales       = p.num_scales;
+zNorm            = p.zNorm;
 filter_mode      = p.filter_mode;
 TimeWin          = p.TimeWin;
 TimeStep         = p.TimeStep;
@@ -146,11 +166,55 @@ minPeakHeight    = p.minPeakHeight;
 peakThreshold    = p.peakThreshold;
 peakWidthLimits  = p.peakWidthLimits;
 correctAperiodic = p.correctAperiodic;
+alphaBand        = p.alphaBand;
 timeResolved     = p.timeResolved;
+domain           = p.domain;
 slidWinSec       = p.slidWinSec;
 slidOverlap      = p.slidOverlap;
 slidNAvg         = p.slidNAvg;
 slidPeakWidthLimits = p.slidPeakWidthLimits;
+
+% ----------------------------
+% Data domain validation (ICA)
+% ----------------------------
+% Done before any heavy lifting so a missing/inconsistent decomposition fails
+% immediately with an actionable message rather than deep inside a measure.
+isICA       = strcmpi(domain, 'ica');
+icawinv     = [];
+icachansind = [];
+if isICA
+    if isempty(EEG.icaweights) || isempty(EEG.icasphere)
+        error(['ascent_compute: domain = ''ica'' requires an ICA decomposition, but ' ...
+               'EEG.icaweights/EEG.icasphere are empty. Run ICA first ' ...
+               '(e.g. EEG = pop_runica(EEG, ''icatype'', ''picard'')).']);
+    end
+    if isempty(EEG.icawinv)
+        error('ascent_compute: EEG.icawinv is empty; cannot back-project ICs to the scalp.');
+    end
+
+    % Channels the decomposition was actually run on. EEGLAB allows ICA on a
+    % subset, in which case icawinv rows map to these channels only -- never to
+    % the full EEG.chanlocs.
+    icachansind = EEG.icachansind;
+    if isempty(icachansind), icachansind = 1:EEG.nbchan; end
+
+    if size(EEG.icawinv,1) ~= numel(icachansind)
+        error(['ascent_compute: EEG.icawinv has %d rows but ICA was run on %d channels. ' ...
+               'The decomposition looks inconsistent with EEG.icachansind.'], ...
+              size(EEG.icawinv,1), numel(icachansind));
+    end
+
+    % icaact is often not saved to disk to keep .set files small
+    if isempty(EEG.icaact)
+        disp('EEG.icaact is empty: reconstructing IC activations.');
+        try
+            EEG.icaact = eeg_getica(EEG);
+        catch
+            EEG.icaact = EEG.icaweights * EEG.icasphere * EEG.data(icachansind,:);
+        end
+    end
+    icawinv = EEG.icawinv;
+end
 
 % ----------------------------
 % Parpool management
@@ -169,21 +233,34 @@ else
 end
 
 % ----------------------------
-% Channel indexing
+% Signal selection
 % ----------------------------
-nChan = length(chanlist);
-if nChan > 1 && nChan < EEG.nbchan
-    [~, chanIdx] = intersect({EEG.chanlocs.labels}, split(chanlist));
+% Extract data up front — avoids struct broadcast overhead in parfor.
+% Note: from here on nChan counts *signals*, i.e. ICs when domain = 'ica'.
+% chanlocs always describes scalp channels: in ICA mode it is the set the
+% decomposition was run on, and is what icawinv back-projects onto.
+fs = EEG.srate;
+if isICA
+    if numel(chanlist) < EEG.nbchan
+        warning(['ascent_compute: channel selection is ignored when domain = ''ica''; ' ...
+                 'using all %d ICs.'], size(EEG.icaact,1));
+    end
+    data       = EEG.icaact(:,:);          % flatten epochs, as in channel mode
+    nChan      = size(data, 1);
+    chanLabels = arrayfun(@(k) sprintf('IC%d',k), 1:nChan, 'UniformOutput', false);
+    chanlocs   = EEG.chanlocs(icachansind);
 else
-    chanIdx = 1:EEG.nbchan;
+    nChan = length(chanlist);
+    if nChan > 1 && nChan < EEG.nbchan
+        [~, chanIdx] = intersect({EEG.chanlocs.labels}, split(chanlist));
+    else
+        chanIdx = 1:EEG.nbchan;
+    end
+    data       = EEG.data(chanIdx, :);
+    nChan      = size(data, 1);
+    chanLabels = {EEG.chanlocs(chanIdx).labels};
+    chanlocs   = EEG.chanlocs(chanIdx);
 end
-
-% Extract data — avoids struct broadcast overhead in parfor
-data       = EEG.data(chanIdx, :);
-fs         = EEG.srate;
-nChan      = size(data, 1);
-chanLabels = {EEG.chanlocs(chanIdx).labels};
-chanlocs   = EEG.chanlocs(chanIdx);
 
 % Preallocate
 if contains(lower(measure), {'mse','mmse','mfe','cmfe','rcmfe','rcmvmfe'})
@@ -238,7 +315,7 @@ switch lower(measure)
         % Aperiodic (1/f) exponent and offset — Donoghue et al. (2020)
 
         % Step 1: Welch PSD (linear, µV²/Hz)
-        [psd, freqs] = compute_psd(EEG.data, EEG.srate, ...
+        [psd, freqs] = compute_psd(data, fs, ...
             'freqRange', freqRange,   ...
             'winSec',    winSec,      ...
             'overlap',   psdOverlap,  ...
@@ -258,25 +335,35 @@ switch lower(measure)
             'Parallel',        parallel,        ...
             'Progress',        progress);
 
-        % Step 3: subtract aperiodic model from static PSD (ONLY VALID FOR FIXED MODE)
-        % Model: L(f) = offset - exponent * log10(f)
-        % Correction: log10(psd_corrected) = log10(psd) - L(f)
-        if correctAperiodic && strcmpi(aperiodicMode, 'fixed')
-            log_freqs = log10(freqs);
-            psd_corrected = nan(size(psd));
-            for iChan = 1:nChan
-                ap_model = offset(iChan) - exponent(iChan) .* log_freqs;
-                psd_corrected(iChan,:) = 10.^(log10(psd(iChan,:)) - ap_model);
+        % Step 3: aperiodic model, band power, and corrected PSD (FIXED MODE ONLY)
+        % Two different quantities, deliberately kept apart:
+        %   psd_corrected — RATIO to the fit (dimensionless, ~1 where the fit is good)
+        %   alpha_osc     — absolute oscillatory power in uV^2/Hz (alpha_raw minus fit)
+        % They are not on a common scale; do not plot them against each other.
+        [alpha_raw, alpha_osc, ap_model] = ...
+            compute_AperiodicBandPower(freqs, psd, exponent, offset, alphaBand);
+
+        psd_corrected = [];   % stays empty when correction is off or not applicable
+        if strcmpi(aperiodicMode, 'fixed')
+            if correctAperiodic
+                psd_corrected = psd ./ ap_model;   % = 10.^(log10(psd) - (offset - exp*log10(f)))
+                disp('Aperiodic component subtracted from PSD.');
             end
-            disp('Aperiodic component subtracted from PSD.');
         else
-            warning('Aperiodic correction is only valid for fixed mode. Skipping correction.');
+            % The knee model is not a straight line in log-log space, so the
+            % linear reconstruction the helper uses does not describe it.
+            % alpha_raw is still valid (plain band-averaged PSD); the
+            % oscillatory split is not.
+            alpha_osc = nan(size(alpha_osc));
+            if correctAperiodic
+                warning('Aperiodic correction is only valid for fixed mode. Skipping correction.');
+            end
         end
 
         % Step 4 (optional): sliding-window (time-resolved) aperiodic fit.
         if timeResolved
                 [exp_slid, off_slid, times_slid, freqs_slid, psd_slid, psd_corr_slid, fiterr_slid, peaks_slid] = ...
-                    compute_AperiodicFit_sliding(EEG.data, EEG.srate, ...
+                    compute_AperiodicFit_sliding(data, fs, ...
                     'freqRange',        freqRange,        ...
                     'aperiodicMode',    aperiodicMode,    ...
                     'maxPeaks',         maxPeaks,         ...
@@ -292,7 +379,16 @@ switch lower(measure)
         end
 
     case 'mse'
-        % Multiscale Entropy — Costa et al. (2002)
+        % % Multiscale Entropy — Costa et al. (2002)
+        % entropy = nan(nChan, num_scales);
+        % for iChan = 1:EEG.nbchan
+        %     for iScale = 1:num_scales
+        %         entropy(iChan,iScale) = compute_mse_costa(zscore(EEG.data(iChan,:)), m, r, tau, coarsing);
+        %     end
+        % end
+        % scales = 1:num_scales;
+
+        % Ascent improved MSE (BUG???)
         [entropy, scales] = compute_MSE(data, 'm', m, 'tau', tau, ...
             'coarsing', coarsing, 'num_scales', num_scales, ...
             'Parallel', parallel, 'Progress', progress);
@@ -343,10 +439,16 @@ switch lower(measure)
         EEG.ascent.(measure).data.HA  = HA;
         EEG.ascent.(measure).data.HDA = HDA;
     case 'aperiodic'
-        EEG.ascent.(measure).data.exponent = exponent;
-        EEG.ascent.(measure).data.offset   = offset;
-        EEG.ascent.(measure).data.psd      = psd;
-        EEG.ascent.(measure).data.freqs    = freqs;
+        EEG.ascent.(measure).data.exponent  = exponent;
+        EEG.ascent.(measure).data.offset    = offset;
+        EEG.ascent.(measure).data.psd       = psd;
+        EEG.ascent.(measure).data.freqs     = freqs;
+        % Band power saved so the figures plot what was computed, not their own
+        % re-derivation. alpha_raw is total power (uV^2/Hz, includes the 1/f);
+        % alpha_osc is the part above the fit (same unit). NaN in knee mode.
+        EEG.ascent.(measure).data.alpha_raw = alpha_raw;
+        EEG.ascent.(measure).data.alpha_osc = alpha_osc;
+        EEG.ascent.(measure).params.alphaBand = alphaBand;
         EEG.ascent.(measure).params.freqRange       = freqRange;
         EEG.ascent.(measure).params.winSec          = winSec;
         EEG.ascent.(measure).params.overlap         = psdOverlap;
@@ -358,7 +460,7 @@ switch lower(measure)
         EEG.ascent.(measure).params.peakThreshold   = peakThreshold;
         EEG.ascent.(measure).params.peakWidthLimits = peakWidthLimits;
         EEG.ascent.(measure).params.timeResolved    = timeResolved;
-        if correctAperiodic
+        if ~isempty(psd_corrected)
             EEG.ascent.(measure).data.psd_corrected = psd_corrected;
         end
         if timeResolved
@@ -374,8 +476,14 @@ switch lower(measure)
     otherwise
         EEG.ascent.(measure).data = entropy;
 end
-EEG.ascent.(measure).electrode_labels    = chanLabels;
-EEG.ascent.(measure).electrode_locations = chanlocs;
+EEG.ascent.(measure).domain              = domain;
+EEG.ascent.(measure).electrode_labels    = chanLabels;   % IC1..ICn when domain = 'ica'
+EEG.ascent.(measure).electrode_locations = chanlocs;     % scalp channels ICs project onto
+if isICA
+    % Saved so the back-projected figures can be reproduced from the .set alone
+    EEG.ascent.(measure).icawinv     = icawinv;
+    EEG.ascent.(measure).icachansind = icachansind;
+end
 if contains(lower(measure), {'mse','mmse','mfe','rcmfe','rcmvmfe'})
     EEG.ascent.(measure).scales = scales;
 end
@@ -394,21 +502,28 @@ if vis
             scales(1) = [];
         end
 
+        % Domain-specific arguments, appended to every ascent_plot call.
+        % In channel mode this is empty and the calls are unchanged.
+        icaArgs = {};
+        if isICA
+            icaArgs = {'ICA', true, 'icawinv', icawinv};
+            if isfield(EEG,'dipfit') && ~isempty(EEG.dipfit)
+                icaArgs = [icaArgs, {'dipfit', EEG.dipfit}];
+            end
+        end
+
         switch lower(measure)
             case 'exsent'
-                ascent_plot(HD,  chanlocs, 'SampEn of durations',                    []);
-                ascent_plot(HA,  chanlocs, 'SampEn of amplitudes',                   []);
-                ascent_plot(HDA, chanlocs, 'Joint SampEn of durations & amplitudes', []);
+                ascent_plot(HD,  chanlocs, 'SampEn of durations',                    [], icaArgs{:});
+                ascent_plot(HA,  chanlocs, 'SampEn of amplitudes',                   [], icaArgs{:});
+                ascent_plot(HDA, chanlocs, 'Joint SampEn of durations & amplitudes', [], icaArgs{:});
 
             case 'aperiodic'
-                if correctAperiodic
-                    ascent_plot(exponent, chanlocs, 'Aperiodic', [], offset, freqs, psd, psd_corrected);
-                else
-                    ascent_plot(exponent, chanlocs, 'Aperiodic', [], offset, freqs, psd);
-                end
+                ascent_plot(exponent, chanlocs, 'Aperiodic', [], offset, freqs, psd, psd_corrected, ...
+                    icaArgs{:}, 'alphaPower', struct('raw',alpha_raw,'osc',alpha_osc,'band',alphaBand));
                 if timeResolved
                     ascent_plot(exp_slid, chanlocs, 'Aperiodic', [], off_slid, ...
-                        freqs_slid, psd_slid, psd_corr_slid, times_slid);
+                        freqs_slid, psd_slid, psd_corr_slid, times_slid, icaArgs{:});
                 end
 
             case 'mmse'
@@ -418,13 +533,13 @@ if vis
                     plot_mMSE_timecourse(info.mse_time, info.time_sec, scales);
                 end
                 if ~TimeOnly && ~all(isnan(entropy(:)))
-                    ascent_plot(entropy, chanlocs, measure, scales);
+                    ascent_plot(entropy, chanlocs, measure, scales, icaArgs{:});
                 end
             otherwise
-                ascent_plot(entropy, chanlocs, measure, scales);
+                ascent_plot(entropy, chanlocs, measure, scales, icaArgs{:});
         end
     else
-        disp("Ascent's visualizations require more than 1 channel.");
+        disp("Ascent's visualizations require more than 1 signal.");
     end
 end
 
@@ -439,25 +554,27 @@ chanlist_str = ['{' strjoin(cellfun(@(c) sprintf('''%s''', c), cellstr(chanlist)
 
 if strcmpi(measure, 'aperiodic')
     com = sprintf( ...
-        ['EEG = ascent_compute(EEG, ''measure'', ''%s'', ''chanlist'', %s, '       ...
+        ['EEG = ascent_compute(EEG, ''measure'', ''%s'', ''domain'', ''%s'', '     ...
+         '''chanlist'', %s, '                                                      ...
          '''vis'', %d, ''parallel'', %d, ''progress'', %d, '                       ...
          '''freqrange'', [%g %g], ''slidWinSec'', %g, ''slidOverlap'', %g, '               ...
          '''aperiodicmode'', ''%s'', ''fitfreqrange'', [%g %g], '                   ...
          '''maxpeaks'', %d, ''minpeakheight'', %g, ''peakthreshold'', %g, '        ...
          '''peakwidthlimits'', [%g %g], ''correctaperiodic'', %d, '                ...
-         '''timeresolved'', %d;'],                                                   ...
-        measure, chanlist_str, vis, parallel, progress,                             ...
+         '''alphaband'', [%g %g], ''timeresolved'', %d;'],                          ...
+        measure, domain, chanlist_str, vis, parallel, progress,                     ...
         freqRange(1), freqRange(2), slidWinSec, slidOverlap,                            ...
         aperiodicMode, fitFreqRange(1), fitFreqRange(2),                            ...
         maxPeaks, minPeakHeight, peakThreshold,                                     ...
         peakWidthLimits(1), peakWidthLimits(2),                                     ...
-        correctAperiodic, timeResolved);
+        correctAperiodic, alphaBand(1), alphaBand(2), timeResolved);
 else
     com = sprintf( ...
-        ['EEG = ascent_compute(EEG, ''measure'', ''%s'', ''chanlist'', %s, ' ...
-         '''tau'', %d, ''m'', %d, ''r'', %.3f, '                             ...
-         '''vis'', %d, ''parallel'', %d, ''progress'', %d);'],               ...
-        measure, chanlist_str, tau, m, r, vis, parallel, progress);
+        ['EEG = ascent_compute(EEG, ''measure'', ''%s'', ''domain'', ''%s'', ' ...
+         '''chanlist'', %s, '                                                  ...
+         '''tau'', %d, ''m'', %d, ''r'', %.3f, '                               ...
+         '''vis'', %d, ''parallel'', %d, ''progress'', %d);'],                 ...
+        measure, domain, chanlist_str, tau, m, r, vis, parallel, progress);
 end
 
 % Save dataset with new outputs

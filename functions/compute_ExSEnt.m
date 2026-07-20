@@ -2,14 +2,14 @@ function [HD, HA, HDA, info] = compute_ExSEnt(data, varargin)
 % compute_ExSEnt  Extrema-Segmented Entropy (ExSEnt) for multichannel data.
 %
 %   [HD, HA, HDA, info] = compute_ExSEnt(data, 'm', 2, ...
-%                                        'r', 0.20, 'lambda', 0.01, ...
+%                                        'r', 0.15, 'lambda', 0.01, ...
 %                                        'Parallel', true, 'Progress', true, ...
 %                                        'Plot', false)
 %
 % Inputs:
 %   data        : matrix [n_channels x n_samples]
 %   'm'         : embedding dimension (default = 2)
-%   'r'         : r scaling (r = r * std), default = 0.20
+%   'r'         : r scaling (r = r * std), default = 0.15
 %   'lambda'    : threshold factor for extrema detection (θ = λ * IQR(diff(x))), default = 0.01
 %   'Parallel'  : logical true/false to enable parfor over channels (default = true)
 %   'Progress'  : logical true/false to show progress (default = true)
@@ -30,7 +30,9 @@ function [HD, HA, HDA, info] = compute_ExSEnt(data, varargin)
 % Notes:
 %   • Durations (D) are in samples; amplitudes (A) are net differences.
 %   • Joint SampEn uses interleaved z-scored [D A] (embedding = 2*m).
-%   • Uses the SAME SampEn backend as compute_SampEn (embed_tau + Chebyshev).
+%   • SampEn estimation is delegated to the shared compute_SampEn engine with
+%     'ZScore', false, so rD/rA/r are applied as absolute Chebyshev tolerances
+%     on the sequences ExSEnt has already prepared (single source of truth).
 %
 % Example:
 %   [HD,HA,HDA,info] = compute_ExSEnt(EEG.data, 'm', 2, 'r', 0.2, ...
@@ -52,7 +54,7 @@ function [HD, HA, HDA, info] = compute_ExSEnt(data, varargin)
 p = inputParser;
 p.addRequired('data', @(x) isnumeric(x) && ndims(x) == 2);
 p.addParameter('m', 2, @(x) isnumeric(x) && isscalar(x) && x > 0);
-p.addParameter('r', 0.20, @(x) isnumeric(x) && isscalar(x) && x > 0);
+p.addParameter('r', 0.15, @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('lambda', 0.01, @(x) isnumeric(x) && isscalar(x) && x >= 0);
 p.addParameter('Parallel', true, @(x) islogical(x) && isscalar(x));
 p.addParameter('Progress', true, @(x) islogical(x) && isscalar(x));
@@ -231,17 +233,21 @@ end
 rD = r * std(D_vals);
 rA = r * std(A_vals);
 
-% Use the SAME SampEn backend as compute_SampEn (embed_tau + Chebyshev)
-HD = compute_SampEn_single(D_vals, m, rD, 1);
-HA = compute_SampEn_single(A_vals, m, rA, 1);
+% Delegate to the shared SampEn engine. ZScore=false so rD/rA are applied as
+% absolute Chebyshev tolerances on the raw duration/amplitude sequences.
+HD = compute_SampEn(D_vals, 'm', m, 'r', rD, 'tau', 1, ...
+    'ZScore', false, 'Parallel', false, 'Progress', false);
+HA = compute_SampEn(A_vals, 'm', m, 'r', rA, 'tau', 1, ...
+    'ZScore', false, 'Parallel', false, 'Progress', false);
 
 % Normalize then interleave [D_norm, A_norm] → 1D series, embed with 2*m
 D_norm = normalize(D_vals);
 A_norm = normalize(A_vals);
 joint_data = reshape([D_norm(:) A_norm(:)]', [], 1);
 
-% Joint r after z-scoring (std≈1): use r directly
-HDA = compute_SampEn_single(joint_data, 2*m, r, 1);
+% Joint r after z-scoring (std≈1): use r directly (ZScore=false, absolute r)
+HDA = compute_SampEn(joint_data, 'm', 2*m, 'r', r, 'tau', 1, ...
+    'ZScore', false, 'Parallel', false, 'Progress', false);
 
 % Diagnostics
 info = struct('M',M,'rD',rD,'rA',rA,'rDA',r, ...
@@ -275,101 +281,6 @@ for i = 2:length(dx)
         start_idx = i;
     end
 end
-end
-
-% ========================= SampEn backend (same as compute_SampEn) ====== %
-function SampEn = compute_SampEn_single(signal, m, r, tau)
-% Fast SampEn using embed_tau + Chebyshev distance; NaN-robust.
-signal = signal(isfinite(signal));
-N = numel(signal);
-if N <= m + 1
-    SampEn = NaN; return;
-end
-
-try
-    Xm  = embed_tau(signal, m,   tau);   % [L_m  x m]
-    Xm1 = embed_tau(signal, m+1, tau);   % [L_m1 x (m+1)]
-    Lm  = size(Xm,  1);
-    Lm1 = size(Xm1, 1);
-    if Lm < 2 || Lm1 < 2
-        SampEn = NaN; return;
-    end
-
-    Dm  = pdist(Xm,  'chebychev');
-    Dm1 = pdist(Xm1, 'chebychev');
-
-    Bm  = mean(Dm  <= r);   % matches at length m
-    Am1 = mean(Dm1 <= r);   % matches at length m+1
-
-    if Bm > 0 && Am1 > 0
-        SampEn = -log(Am1 / Bm);
-    else
-        SampEn = NaN;
-    end
-catch
-    SampEn = fallback_SampEn(signal, m, r, tau);
-end
-end
-
-function SampEn = fallback_SampEn(signal, m, r, tau)
-% Robust fallback with blockwise counting (Chebyshev).
-signal = signal(isfinite(signal));
-N = numel(signal);
-if N <= m + 1
-    SampEn = NaN; return;
-end
-
-Xm  = embed_tau(signal, m,   tau);
-Xm1 = embed_tau(signal, m+1, tau);
-Lm  = size(Xm,  1);
-Lm1 = size(Xm1, 1);
-if Lm < 2 || Lm1 < 2
-    SampEn = NaN; return;
-end
-
-    function p = match_prob(X)
-        n  = size(X,1);
-        tp = n*(n-1)/2;
-        if tp == 0, p = 0; return; end
-        blk = 1024;
-        hits = 0;
-        for i1 = 1:blk:n-1
-            j1 = min(i1+blk-1, n-1);
-            Xi = X(i1:j1,:);                 
-            for j = (i1+1):blk:n
-                j2 = min(j+blk-1, n);
-                Xj = X(j:j2,:);              
-                bi = size(Xi,1); bj = size(Xj,1); mm = size(X,2);
-                maxd = zeros(bi,bj);
-                for d = 1:mm
-                    Dij = abs(Xi(:,d) - Xj(:,d).');
-                    if d == 1, maxd = Dij; else, maxd = max(maxd, Dij); end
-                end
-                hits = hits + nnz(maxd <= r);
-            end
-        end
-        p = hits / tp;
-    end
-
-Bm  = match_prob(Xm);
-Am1 = match_prob(Xm1);
-
-if Bm > 0 && Am1 > 0
-    SampEn = -log(Am1 / Bm);
-else
-    SampEn = NaN;
-end
-end
-
-function X = embed_tau(signal, m, tau)
-% Delay-embedded vectors with step = tau; returns [n_vec x m] (rows=templates)
-signal = signal(:).';                       
-N = numel(signal);
-L = N - (m-1)*tau;                          
-if L <= 0, X = zeros(0,m); return; end
-idx  = (0:(m-1)) * tau;
-rows = (1:L).';
-X = signal(rows + idx);
 end
 
 % ========================= misc ========================= %

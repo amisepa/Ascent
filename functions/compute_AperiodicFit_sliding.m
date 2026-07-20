@@ -175,8 +175,6 @@ else
     psd_corrected_t = [];
 end
 
-log_freqs = log10(freqs);   % pre-compute for correction step
-
 %% --- Steps 2-4: average windows, fit specparam, optional correction ---
 if opt.Progress
     fprintf('  Step 2: fitting aperiodic model to %d time bins...\n', nTimes);
@@ -210,16 +208,15 @@ for iTime = 1:nTimes
     if isfield(info_win, 'peaks'),  peaks_t(:, iTime)     = info_win.peaks;  end
     end
 
-    % Optional: subtract aperiodic model (fixed mode only)
-    % Model: log10(P_corr) = log10(P) - (offset - exponent * log10(f))
+    % Optional: subtract aperiodic model (fixed mode only).
+    % Ratio to the fit; the model itself comes from compute_AperiodicBandPower
+    % so this stays identical to the static path in ascent_compute. Only
+    % ap_model is wanted here, so the band spans freqs to keep the helper's
+    % coverage warning from firing once per time bin.
     if opt.correctAperiodic
-        psd_corr = nan(nChan, nFreqs);
-        for iChan = 1:nChan
-            if isnan(exp_win(iChan)) || isnan(off_win(iChan)), continue; end
-            ap_model = off_win(iChan) - exp_win(iChan) .* log_freqs;
-            psd_corr(iChan, :) = 10.^(log10(psd_avg(iChan,:)) - ap_model);
-        end
-        psd_corrected_t(:, :, iTime) = psd_corr;
+        [~, ~, ap_model] = compute_AperiodicBandPower(freqs, psd_avg, ...
+                                exp_win, off_win, [freqs(1) freqs(end)]);
+        psd_corrected_t(:, :, iTime) = psd_avg ./ ap_model;
     end
 
     if opt.Progress

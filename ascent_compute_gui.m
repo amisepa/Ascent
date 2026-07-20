@@ -1,10 +1,10 @@
-function [measType, chanlist, tau, m, coarseType, nScales, extraParams, n, vis, parallelComp, progressTrack] = ascent_compute_gui(EEG)
+function [measType, chanlist, tau, m, coarseType, nScales, extraParams, n, vis, parallelComp, progressTrack, dataDomain] = ascent_compute_gui(EEG)
 % ascent_compute_gui - EEGLAB GUIs for ascent_compute parameter entry.
 %
 % Called internally by ascent_get_params. Not intended for direct use.
 %
 % Spawns 1 or 2 GUIs depending on the selected measure:
-%   GUI #1 (always)     : measure, channels, vis/progress/parallel
+%   GUI #1 (always)     : measure, data domain, channels, vis/progress/parallel
 %   GUI #2a (entropy)   : tau, m  (SampEn, ExSEnt, FracDim, HigFracDim)
 %   GUI #2b (MS/fuzzy)  : tau, m, coarse-graining, scale factors, fuzzy power
 %   GUI #2c (Aperiodic) : PSD settings, aperiodic fitting, correction toggle,
@@ -24,11 +24,13 @@ function [measType, chanlist, tau, m, coarseType, nScales, extraParams, n, vis, 
 %   vis           - logical, visualize outputs
 %   parallelComp  - logical, use parallel computing
 %   progressTrack - logical, track progress in console
+%   dataDomain    - 'channel' (scalp channels) or 'ica' (independent components)
 
 % Default outputs
 chanlist = []; tau = []; m = [];
 coarseType = []; nScales = []; extraParams = []; n = [];
 vis = true; parallelComp = true; progressTrack = true;
+dataDomain = 'channel';
 
 if nargin < 1 || isempty(EEG)
     error('EEG input is required.');
@@ -40,27 +42,43 @@ end
 meas = {'Aperiodic' 'SampEn' 'FuzzEn' 'ExSEnt' 'FracDim' 'HigFracDim' ...
         'MSE' 'mMSE' 'MFE' 'RCMFE' 'mvFuzzEn' 'RCmvMFE'};
 
+domains = {'Scalp channels' 'ICA components'};
+
 setappdata(0, 'ascent_gui1_cancel', 0);
 oldCloseFcn = get(0, 'DefaultFigureCloseRequestFcn');
 set(0, 'DefaultFigureCloseRequestFcn', "setappdata(0,'ascent_gui1_cancel',1); delete(gcbf);");
 
-uigeom = { [0.5 0.5] [0.5 0.35 0.15] [0.34 0.33 0.33] };
+% Channel selection is meaningless on ICs: grey out the edit box and its '...'
+% button when the ICA domain is picked (all ICs are used). The pushbutton
+% filter on '...' keeps inputgui's own OK/Cancel/Help buttons out of the set.
+domainCallback = [ ...
+    'dmVal = get(gcbo,''value''); ' ...
+    'hEd = findobj(gcbf,''style'',''edit''); ' ...
+    'hPb = findobj(gcbf,''style'',''pushbutton''); ' ...
+    'hPb = hPb(arrayfun(@(h) strcmp(get(h,''string''),''...''),hPb)); ' ...
+    'if dmVal == 2, set([hEd(:); hPb(:)],''enable'',''off''); ' ...
+    'else, set([hEd(:); hPb(:)],''enable'',''on''); end' ];
+
+uigeom = { [0.5 0.5] [0.5 0.5] [0.5 0.35 0.15] [0.34 0.33 0.33] };
 
 uilist = {
     {'style' 'text'      'string' 'Measure to compute:'        'fontweight' 'bold'}   % 1
     {'style' 'popupmenu' 'string' meas 'value' 10}                                    % 2 (default 10 = RCMFE)
 
-    {'style' 'text'      'string' 'M/EEG channels selection:'  'fontweight' 'bold'}   % 3
-    {'style' 'edit'      'string' ''}                                                  % 4
+    {'style' 'text'      'string' 'Data to use:'               'fontweight' 'bold'}   % 3
+    {'style' 'popupmenu' 'string' domains 'value' 1 'callback' domainCallback}        % 4
+
+    {'style' 'text'      'string' 'M/EEG channels selection:'  'fontweight' 'bold'}   % 5
+    {'style' 'edit'      'string' ''}                                                  % 6
     {'style' 'pushbutton' 'string' '...' 'enable' 'on' ...
      'callback' "tmpEEG=get(gcbf,'userdata'); tmpchanlocs=tmpEEG.chanlocs; " + ...
                 "[tmp,tmpval]=pop_chansel({tmpchanlocs.labels},'withindex','on'); " + ...
                 "set(findobj(gcbf,'style','edit'),'string',tmpval); " + ...
-                "clear tmp tmpEEG tmpchanlocs tmpval" }                                % 5
+                "clear tmp tmpEEG tmpchanlocs tmpval" }                                % 7
 
-    {'style' 'checkbox'  'string' 'Visualize outputs'  'value' 1 'fontweight' 'bold'} % 6
-    {'style' 'checkbox'  'string' 'Track progress'     'value' 1 'fontweight' 'bold'} % 7
-    {'style' 'checkbox'  'string' 'Parallel computing' 'value' 1 'fontweight' 'bold'} % 8
+    {'style' 'checkbox'  'string' 'Visualize outputs'  'value' 1 'fontweight' 'bold'} % 8
+    {'style' 'checkbox'  'string' 'Track progress'     'value' 1 'fontweight' 'bold'} % 9
+    {'style' 'checkbox'  'string' 'Parallel computing' 'value' 1 'fontweight' 'bold'} % 10
     };
 
 param = inputgui(uigeom, uilist, 'pophelp(''ascent_compute'')', 'Ascent EEGLAB plugin', EEG);
@@ -72,18 +90,25 @@ if isempty(param)
     return;
 end
 
-% Parse GUI #1
+% Parse GUI #1 — only interactive controls produce entries (text labels and the
+% '...' pushbutton do not), hence: 1=measure 2=domain 3=chanlist 4..6=checkboxes
 measType = meas{param{1}};
 
-if ~isempty(param{2})
-    chanlist = cellstr(split(string(param{2})));
+if param{2} == 2
+    dataDomain = 'ica';
+else
+    dataDomain = 'channel';
+end
+
+if ~isempty(param{3})
+    chanlist = cellstr(split(string(param{3})));
 else
     chanlist = {EEG.chanlocs.labels}';
 end
 
-vis           = logical(param{3});
-progressTrack = logical(param{4});
-parallelComp  = logical(param{5});
+vis           = logical(param{4});
+progressTrack = logical(param{5});
+parallelComp  = logical(param{6});
 
 % ---------------------------
 % GUI #2b — multiscale / fuzzy measures (includes tau and m)
@@ -96,7 +121,7 @@ if isMS || isFZ
     if isMS, enMS = 'on'; else, enMS = 'off'; end
     if isFZ, enFZ = 'on'; else, enFZ = 'off'; end
 
-    cTypes = {'Mean' 'Median' 'Trimmed mean' 'Std' 'Variance'};
+    cTypes = {'Mean' 'Median' 'Std' 'Variance'};
 
     uigeom2 = { [0.5 0.5] [1] [0.5 0.5] [1] [0.5 0.5] [1] [0.5 0.5] [1] [0.5 0.5] };
 
@@ -108,7 +133,7 @@ if isMS || isFZ
         {'style' 'edit' 'string' '2'}                                              % 5
         {}                                                                         % 6
         {'style' 'text'      'string' 'Coarse graining method:' 'fontweight' 'bold' 'enable' enMS}   % 7
-        {'style' 'popupmenu' 'string' cTypes 'value' 4                             'enable' enMS}    % 8
+        {'style' 'popupmenu' 'string' cTypes 'value' 1                             'enable' enMS}    % 8
         {}                                                                         % 9
         {'style' 'text'      'string' 'Number of scale factors:' 'fontweight' 'bold' 'enable' enMS}  % 10
         {'style' 'edit'      'string' '30'                                         'enable' enMS}    % 11
