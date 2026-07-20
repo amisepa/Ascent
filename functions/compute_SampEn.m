@@ -2,7 +2,7 @@ function SampEn = compute_SampEn(data, varargin)
 % compute_SampEn  Computes Sample Entropy (SampEn) across multichannel data.
 %
 %   SampEn = compute_SampEn(data, 'm', 2, 'tau', 1, 'r', .15, ...
-%       'BlockSize', 2000, 'pdistMaxGB', 2.0, ...
+%       'ZScore', true, 'BlockSize', 2000, 'pdistMaxGB', 2.0, ...
 %       'Parallel', true, 'Progress', true)
 %
 % Inputs:
@@ -10,6 +10,9 @@ function SampEn = compute_SampEn(data, varargin)
 %   'm'         : embedding dimension (default = 2)
 %   'tau'       : time lag (default = 1)
 %   'r'         : similarity bound (default = 0.15)
+%   'ZScore'    : z-score each channel before computing SampEn (default = true).
+%                 Set false when the caller has already normalised the data and
+%                 'r' is an absolute Chebyshev threshold (used by compute_MSE).
 %   'BlockSize' : block size for exact blocked fallback (default = 2000)
 %   'pdistMaxGB': max GB allowed for pdist temporary vector (default = 2.0)
 %   'Parallel'  : logical true/false to enable parfor over channels (default = true)
@@ -19,7 +22,9 @@ function SampEn = compute_SampEn(data, varargin)
 %   SampEn      : [n_channels x 1] Sample Entropy per channel
 %
 % Notes:
-%   • Data is z-scored per channel across time.
+%   • When ZScore is true, data is z-scored per channel across time and r is a
+%     fraction of the (unit) SD. When false, data is used as-is and r is the
+%     absolute Chebyshev tolerance.
 %   • Pairwise Chebyshev match fractions are computed exactly using pdist
 %     when memory allows, otherwise an exact blocked fallback is used.
 
@@ -28,7 +33,8 @@ p = inputParser;
 p.addRequired('data', @(x) isnumeric(x) && ndims(x) == 2);
 p.addParameter('m', 2,           @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('tau', 1,         @(x) isnumeric(x) && isscalar(x) && x > 0);
-p.addParameter('r', 0.15,        @(x) isnumeric(x) && isscalar(x) && x > 0 && x < 1);
+p.addParameter('r', 0.15,        @(x) isnumeric(x) && isscalar(x) && x > 0);
+p.addParameter('ZScore', true,   @(x) islogical(x) && isscalar(x));
 p.addParameter('BlockSize', 2000,@(x) isnumeric(x) && isscalar(x) && x >= 100);
 p.addParameter('pdistMaxGB', 2.0,@(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('Parallel', true, @(x) islogical(x) && isscalar(x));
@@ -38,6 +44,7 @@ p.parse(data, varargin{:});
 m            = p.Results.m;
 tau          = p.Results.tau;
 r            = p.Results.r;
+doZScore     = p.Results.ZScore;
 blockSize    = p.Results.BlockSize;
 pdistMaxGB   = p.Results.pdistMaxGB;
 parallelMode = p.Results.Parallel;
@@ -48,16 +55,18 @@ if size(data,1) > size(data,2)
 end
 [nchan, ~] = size(data);
 
-% ---------------- Z-score per channel ----------------
+% ---------------- Z-score per channel (optional) ----------------
 data_z = data;
-for c = 1:nchan
-    x  = data(c,:);
-    mu = mean(x, 'omitnan');
-    sd = std(x, 0, 'omitnan');
-    if ~isfinite(sd) || sd == 0
-        data_z(c,:) = 0;
-    else
-        data_z(c,:) = (x - mu) ./ sd;
+if doZScore
+    for c = 1:nchan
+        x  = data(c,:);
+        mu = mean(x, 'omitnan');
+        sd = std(x, 0, 'omitnan');
+        if ~isfinite(sd) || sd == 0
+            data_z(c,:) = 0;
+        else
+            data_z(c,:) = (x - mu) ./ sd;
+        end
     end
 end
 

@@ -90,21 +90,21 @@
 %     Addressing problems of smoothing, threshold dependence and localisation
 %     in cluster inference. NeuroImage, 44, 83-98.
 %
-% Author  : Cedric Cannard, 2025 - ASCENT EEGLAB Plugin
+% Author  : Cedric Cannard, 2021 - ASCENT EEGLAB Plugin
 % Contact : ccannard@pm.me
 % GitHub  : https://github.com/amisepa/ascent
 
 clear; close all; clc
-
 data_path = 'C:\Users\ccann\Documents\biosemi_data';
-pluginPath = fileparts(which('eegplugin_ascent.m'));
-addpath(genpath(pluginPath))
+pluginPath = 'C:\Users\ccann\Documents\MATLAB\Ascent';
+addpath(fullfile(pluginPath, 'functions'))
 cd(pluginPath)
 eeglab; close
 
-coarsing 	= 'sd'; 	% 'mean' and 'sd' were run for the paper
 
 %% Compute on whole group - Eyes closed (EC) condition
+
+coarsing 	= 'sd'; 	% 'mean' and 'sd' were run for the paper
 
 %------ PARAMETERS -------------------------
 num_scales 	= 30; 		% 30 scales were run for the paper
@@ -131,7 +131,7 @@ MFE = nan(num_chan, num_scales-1, num_files);
 RCMFE = nan(num_chan, num_scales, num_files);
 % RCmvMFE = nan(num_chan, num_scales, num_files);
 progressbar('Prosessing and computing measures for eyes-closed condition')
-for iFile = 2:num_files
+for iFile = 1:num_files
 
     disp('')
     fprintf('--------------------------------------------------------\n')
@@ -345,6 +345,8 @@ gong
 
 %% Load, separate the data by condition, & reorganize electrodes
 
+coarsing = 'sd';
+
 % Load chanlocs only
 load(fullfile(data_path, sprintf('ascent_outputs_EC_%s_new.mat', coarsing)), 'chanlocs')
 cd(data_path)
@@ -423,28 +425,29 @@ RCMFE2   = RCMFE(order_idx, :, :);
 
 %% --------- PARAMETERS ---------------------------------------
 
-nPerm = 1000;          % number of permutations for H0
-alpha = 0.05;           % NaN to show maps of p-values
-ct = 'mean';            % central tendency method ('mean' for normal t-test, 'trimmed mean' for Yuen t-test)
-grp_type = 'dpt';       % groupe is dependent ('dpt') or independent ('idpt')
-mcc_type = 2;   % 0 = uncorrected; 1 = t-max; 2 = cluster; 3 = TFCE
+nPerm       = 2000;       % number of permutations for H0
+alpha       = 0.05;       % NaN to show maps of p-values
+ct          = 'mean';        % central tendency method ('mean' for normal t-test, 'trimmed mean' for Yuen t-test)
+grp_type    = 'dpt';   % groupe is dependent ('dpt') or independent ('idpt')
+mcc_type    = 2;       % 0 = uncorrected; 1 = t-max; 2 = cluster; 3 = TFCE
 
-
-outputs_path = fullfile(pluginPath, 'figures_new2', 'group_results'); mkdir(outputs_path)
+outputs_path = fullfile(pluginPath, 'figures', 'group_results'); mkdir(outputs_path)
 
 % load(fullfile(data_path,'chanlocs_reorganized.mat'), 'chanlocs')
 % load colormap_bwr.mat; dmap(1,:) = [0.9 0.9 0.9]; % set NaNs to grey
-rdbu_cmap    = interp1([1;128;256],[0.698 0.094 0.168;1 1 1;0.129 0.400 0.675],(1:256)','linear');
-dmap    = flipud(max(0,min(1,rdbu_cmap)));
+rdbu_cmap   = interp1([1;128;256],[0.698 0.094 0.168;1 1 1;0.129 0.400 0.675],(1:256)','linear');
+dmap        = flipud(max(0,min(1,rdbu_cmap)));
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % num_scales = 1:scales(end);
 
 %% --------- UNISCALES ---------------------------------------
 
-figure('Color','w','ToolBar','none','MenuBar','none');
+figure('Name', 'Results: Uniscale measures', 'Color','w','ToolBar','none','MenuBar','none');
 
 % SampEn
+disp("------------------------------------------------------")
+disp("         MEASURE: SampEn")
 % nexttile
 subplot(2,4,1)
 % figure('color','w');
@@ -461,17 +464,21 @@ subplot(2,4,1)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...
+        'nonlinear', grp_type, {size(SampEn1,2) size(SampEn2,2)}, [], [], [], 'g');
     % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
     % title(sprintf("SampEn (coarse: %s)", coarsing));
     title("SampEn")
-else
-    close(gcf)
 end
+disp("")
+
 
 % FuzzEn
+disp("------------------------------------------------------")
+disp("         MEASURE: FuzzEn")
 % nexttile
 subplot(2,4,2)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(FuzzEn1, FuzzEn2, nPerm, ct, grp_type);
@@ -479,17 +486,20 @@ subplot(2,4,2)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...
+        'nonlinear', grp_type, {size(SampEn1,2) size(SampEn2,2)}, [], [], [], 'g');
     % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
     % title(sprintf("FuzzEn (coarse: %s)", coarsing));
     title("FuzzEn")
-else
-    close(gcf)
 end
+disp("")
 
 % ExSEnt1
+disp("------------------------------------------------------")
+disp("         MEASURE: ExSent (Duration)")
 % nexttile
 subplot(2,4,3)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(ExSEnt1_1, ExSEnt2_1, nPerm, ct, grp_type);
@@ -497,17 +507,20 @@ subplot(2,4,3)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...
+        'nonlinear', grp_type, {size(SampEn1,2) size(SampEn2,2)}, [], [], [], 'g');
     % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
     % title(sprintf("ExSEnt (coarse: %s)", coarsing));
     title("ExSEnt (duration)")
-else
-    close(gcf)
 end
+disp("")
 
 % ExSEnt2
+disp("------------------------------------------------------")
+disp("         MEASURE: ExSEnt (Amplitude)")
 % nexttile
 subplot(2,4,4)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(ExSEnt1_2, ExSEnt2_2, nPerm, ct, grp_type);
@@ -515,17 +528,20 @@ subplot(2,4,4)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...
+        'nonlinear', grp_type, {size(SampEn1,2) size(SampEn2,2)}, [], [], [], 'g');
     % tvals(~mask) = NaN;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
     % title(sprintf("ExSEnt (coarse: %s)", coarsing));
     title("ExSEnt (amplitude)")
-else
-    close(gcf)
 end
+disp("")
 
 % ExSEnt3
+disp("------------------------------------------------------")
+disp("         MEASURE: ExSEnt (Duration + Amplitude)")
 % nexttile
 subplot(2,4,5)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(ExSEnt1_3, ExSEnt2_3, nPerm, ct, grp_type);
@@ -533,24 +549,20 @@ subplot(2,4,5)
 % mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...
+        'nonlinear', grp_type, {size(SampEn1,2) size(SampEn2,2)}, [], [], [], 'g');
     % tvals(~mask) = NaN;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
     % title(sprintf("ExSEnt (coarse: %s)", coarsing));
     title("ExSEnt (amp + dur)")
-else
-    close(gcf)
-% mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, 0, 0.05, chanlocs);
-% % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
-% topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
-%     'verbose','off','whitebk','on');
-% c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
-% % title(sprintf("ExSEnt (coarse: %s)", coarsing));
-% title("ExSEnt (amp + dur; uncorrected)")
 end
+disp("")
 
-% FracDim
+% HigFracDim
+disp("------------------------------------------------------")
+disp("         MEASURE: Higuchi Fractal Dimension")
 % nexttile
 subplot(2,4,6)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(FracDim1, FracDim2, nPerm, ct, grp_type);
@@ -558,17 +570,20 @@ subplot(2,4,6)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
-    tvals(mask) = 0;
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...
+        'nonlinear', grp_type, {size(SampEn1,2) size(SampEn2,2)}, [], [], [], 'g');
+    % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
     % title(sprintf("FracDim (coarse: %s)", coarsing));
     title("HigFracDim")
-else
-    close(gcf)
 end
+disp("")
 
 % Aperiodic Exponent
+disp("------------------------------------------------------")
+disp("         MEASURE: Aperiodic Exponent")
 % nexttile
 subplot(2,4,7)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(Exponent1, Exponent2, nPerm, ct, grp_type);
@@ -576,17 +591,20 @@ subplot(2,4,7)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...
+        'nonlinear', grp_type, {size(SampEn1,2) size(SampEn2,2)}, [], [], [], 'g');
     % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
     % title(sprintf("FracDim (coarse: %s)", coarsing));
     title("Aperiodic Exponent")
-else
-    close(gcf)
 end
+disp("")
 
-% Aperiodic Ofset
+% Aperiodic Offset
+disp("------------------------------------------------------")
+disp("         MEASURE: Aperiodic Offset")
 % nexttile
 subplot(2,4,8)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(Offset1, Offset2, nPerm, ct, grp_type);
@@ -594,31 +612,241 @@ subplot(2,4,8)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
+    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...
+        'nonlinear', grp_type, {size(SampEn1,2) size(SampEn2,2)}, [], [], [], 'g');
     % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
     c = colorbar; ylabel(c,'t-values','FontWeight','bold','FontSize',12)
     % title(sprintf("FracDim (coarse: %s)", coarsing));
     title("Aperiodic Offset")
-else
-    close(gcf)
 end
+disp("")
 
-set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
 
+% set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
+set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold', 'CLim', [-10 10]);
 saveas(gcf, fullfile(outputs_path, 'fig_uniscales.fig'));
 print(gcf, fullfile(outputs_path, 'fig_uniscales.png'), '-dpng', '-r300');
+
+%% ---------- CORRELATION ANALYSIS ON EC-EO DIFFERENCES ----------
+% This section computes the difference (EC minus EO) for each single-scale
+% measure per subject, then calculates:
+%   1. A global correlation matrix (channel-averaged differences)
+%   2. A spatial correlation matrix of the t-maps (EC vs EO)
+% Both are plotted with the circle-based style (color + size + r-value),
+% including the diagonal (r=1).
+
+% Compute difference scores (EC - EO) for each measure
+% All matrices are [nChans x nSubj]
+SampEn_diff  = SampEn1  - SampEn2;
+FuzzEn_diff  = FuzzEn1  - FuzzEn2;
+ExSEnt1_diff = ExSEnt1_1 - ExSEnt2_1;
+ExSEnt2_diff = ExSEnt1_2 - ExSEnt2_2;
+ExSEnt3_diff = ExSEnt1_3 - ExSEnt2_3;
+FracDim_diff = FracDim1 - FracDim2;
+Exponent_diff= Exponent1 - Exponent2;
+Offset_diff  = Offset1  - Offset2;
+
+% List of measure names and corresponding difference matrices
+measureNames = {'SampEn','FuzzEn','ExSEnt (HD)','ExSEnt (HA)','ExSEnt (HDA)',...
+                'HigFracDim','Aperiodic Exponent','Aperiodic Offset'};
+measureData  = {SampEn_diff, FuzzEn_diff, ExSEnt1_diff, ExSEnt2_diff, ...
+                ExSEnt3_diff, FracDim_diff, Exponent_diff, Offset_diff};
+nMeasures = numel(measureNames);
+nChans = size(measureData{1}, 1);
+
+% Correlation type: 'Spearman' (robust) or 'Pearson'
+corrType = 'Spearman';
+
+% ----- Global correlation matrix (channel-averaged differences) -----
+% Average each difference measure across channels, then compute pairwise correlations
+avgMeasures = zeros(size(measureData{1}, 2), nMeasures);  % subjects x measures
+for m = 1:nMeasures
+    avgMeasures(:, m) = mean(measureData{m}, 1, 'omitnan')';
+end
+
+[R_global, P_global] = corr(avgMeasures, 'Type', corrType, 'Rows', 'pairwise');
+
+% BH-FDR correction across all unique pairs (lower triangle)
+pvals_global = P_global(tril(true(nMeasures), -1));
+pvals_global_fdr = bh_fdr(pvals_global);
+% Rebuild FDR-corrected p-value matrix (for reference, not displayed)
+P_global_fdr = ones(nMeasures);
+idx = 1;
+for i = 1:nMeasures
+    for j = 1:i-1
+        P_global_fdr(i,j) = pvals_global_fdr(idx);
+        P_global_fdr(j,i) = pvals_global_fdr(idx);
+        idx = idx + 1;
+    end
+end
+
+% Plot global correlation matrix (circle style, with diagonal)
+plot_corrmatrix_with_text(R_global, measureNames, ...
+    sprintf('Global %s correlations of EC-EO differences (channel-averaged)', corrType), ...
+    fullfile(outputs_path, sprintf('corr_diff_matrix_%s', corrType)));
+
+% ----- Spatial correlation of t-maps (group-level) -----
+% Recompute t-values for each measure (EC vs EO)
+EC_data = {SampEn1, FuzzEn1, ExSEnt1_1, ExSEnt1_2, ExSEnt1_3, FracDim1, Exponent1, Offset1};
+EO_data = {SampEn2, FuzzEn2, ExSEnt2_1, ExSEnt2_2, ExSEnt2_3, FracDim2, Exponent2, Offset2};
+
+tvals_all = zeros(nChans, nMeasures);
+for m = 1:nMeasures
+    [tvals_all(:,m), ~, ~, ~] = run_stats_permutation(EC_data{m}, EO_data{m}, nPerm, ct, grp_type);
+end
+
+% Compute spatial correlation (across channels) for each pair
+[R_spatial, P_spatial] = corr(tvals_all, 'Type', corrType, 'Rows', 'pairwise');
+
+% BH-FDR correction
+pvals_spatial = P_spatial(tril(true(nMeasures), -1));
+pvals_spatial_fdr = bh_fdr(pvals_spatial);
+P_spatial_fdr = ones(nMeasures);
+idx = 1;
+for i = 1:nMeasures
+    for j = 1:i-1
+        P_spatial_fdr(i,j) = pvals_spatial_fdr(idx);
+        P_spatial_fdr(j,i) = pvals_spatial_fdr(idx);
+        idx = idx + 1;
+    end
+end
+
+% Plot spatial correlation matrix (circle style, with diagonal)
+plot_corrmatrix_with_text(R_spatial, measureNames, ...
+    'Spatial correlation of t-maps (EC vs EO)', ...
+    fullfile(outputs_path, 'spatial_corr_tmaps'));
+
+disp('Correlation analysis complete.');
+
+%% ---------- Helper functions ----------
+
+function plot_corrmatrix_with_text(C, labels, title_str, save_path)
+% plot_corrmatrix_with_text  Visualize a correlation matrix with colored circles
+% and the correlation coefficient displayed inside each circle.
+% Includes the diagonal (r=1). Uses red-blue colormap, black text.
+%
+% Inputs
+%   C         Square correlation matrix [N x N], values in [-1, 1]
+%   labels    Cell array of variable names (length N)
+%   title_str Figure title
+%   save_path Base path for saving .fig and .png (without extension)
+
+if size(C,1) ~= length(labels)
+    error("Labels and correlation matrix must have the same number of variables: %g", size(C,1))
+end
+
+% Use the red-blue diverging colormap
+cmap = rdbu_colormap();
+
+% Keep lower triangle AND diagonal (set upper triangle to 0 to hide)
+C_full = C;
+C_full(triu(true(size(C)), 1)) = 0;
+
+% Compute center of each circle
+nVar = size(C_full, 1);
+x = 1 : nVar;
+y = 1 : nVar;
+[xAll, yAll] = meshgrid(x, y);
+hide = (C_full == 0) & ~eye(nVar);
+xAll(hide) = nan;
+
+% Scale colors from -1 to 1
+clrLim = [-1, 1];
+Cscaled = (C_full - clrLim(1)) / range(clrLim);
+colIdx = discretize(Cscaled, linspace(0, 1, size(cmap,1)));
+
+% Scale circle size
+diamLim = [0.3, 0.9];
+Cscaled_abs = abs(C_full);
+diamSize = Cscaled_abs * range(diamLim) + diamLim(1);
+
+% Create figure (wider to prevent cropping)
+fh = figure('Color','w', 'Position', [100 100 1000 700]);  % increased width
+ax = axes(fh);
+hold(ax, 'on');
+colormap(cmap);
+
+% Draw axis labels (left and bottom) – BOLD
+tickvalues = 1:nVar;
+% Left labels: place further left to avoid cropping long names
+x_left = -1 * ones(size(tickvalues));   % moved from -0.5 to -1
+text(x_left, tickvalues, labels, 'HorizontalAlignment','right', ...
+    'FontSize',12, 'FontWeight','bold', 'Color','k');
+% Bottom labels: place at y = nVar+1, rotated
+y_bottom = (nVar + 1) * ones(size(tickvalues));
+text(tickvalues, y_bottom, labels, 'HorizontalAlignment','right', ...
+    'Rotation',45, 'FontSize',12, 'FontWeight','bold', 'Color','k');
+
+% Draw circles
+theta = linspace(0, 2*pi, 100);
+for i = 1:numel(xAll)
+    if isnan(xAll(i)), continue; end
+    fill(diamSize(i)/2 * cos(theta) + xAll(i), ...
+         diamSize(i)/2 * sin(theta) + yAll(i), ...
+         cmap(colIdx(i),:), 'LineStyle','none');
+    r_val = C_full(i);
+    text(xAll(i), yAll(i), sprintf('%.2f', r_val), ...
+        'HorizontalAlignment','center', 'VerticalAlignment','middle', ...
+        'FontSize', 9, 'Color', 'k', 'FontWeight','bold');
+end
+
+% Figure formatting
+set(ax, 'YDir', 'reverse');
+% Expand limits to show labels fully
+xlim([-2, nVar+1]);   % left margin increased to -2
+ylim([0.5, nVar+2]);  % bottom margin for rotated labels
+cb = colorbar;
+ylabel(cb, 'Correlation coefficient', 'FontSize', 12, 'FontWeight', 'bold');
+clim(clrLim);
+axis off;
+set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
+title(title_str, 'FontSize', 13, 'FontWeight', 'bold');
+
+% Save
+saveas(gcf, [save_path '.fig']);
+print(gcf, [save_path '.png'], '-dpng', '-r300');
+end
+
+function cmap = rdbu_colormap()
+% Red-Blue diverging colormap (256 colors)
+n = 256;
+half = floor(n/2);
+r1 = linspace(0.019, 0.97, half)';
+g1 = linspace(0.188, 0.97, half)';
+b1 = linspace(0.380, 0.97, half)';
+r2 = linspace(0.97, 0.698, n-half)';
+g2 = linspace(0.97, 0.094, n-half)';
+b2 = linspace(0.97, 0.169, n-half)';
+cmap = [r1 g1 b1; r2 g2 b2];
+end
+
+
+
+function p_adj = bh_fdr(p)
+% Benjamini-Hochberg FDR correction
+p = p(:); n = numel(p);
+[ps, ord] = sort(p);
+p_adj_sorted = min(1, ps .* n ./ (1:n)');
+for k = n-1:-1:1
+    p_adj_sorted(k) = min(p_adj_sorted(k), p_adj_sorted(k+1));
+end
+p_adj = nan(n,1);
+p_adj(ord) = p_adj_sorted;
+end
+
 
 
 %% %%%%%%%%%%%%%%%%%%%% MULTISCALES %%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % coarsing = 'sd';
-nPerm = 1000;          % number of permutations for H0
+nPerm = 2000;          % number of permutations for H0
 alpha = 0.05;           % NaN to show maps of p-values
 % ct = 'mean';            % central tendency method ('mean' for normal t-test, 'trimmed mean' for Yuen t-test)
 % grp_type = 'dpt';       % groupe is dependent ('dpt') or independent ('idpt')
-mcc_type = 3;         % 0 = uncorrected; 1 = t-max; 2 = cluster; 3 = TFCE
+mcc_type = 2;         % 0 = uncorrected; 1 = t-max; 2 = cluster; 3 = TFCE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % scales = scales(2:end);  % avoid frequencies filtered out by lowpass filter
@@ -660,7 +888,7 @@ end
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 if any(mask, 'all')
     [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
-        'nonlinear', grp_type, {size(mMSE1,3) size(mMSE2,3)}, [], [], [], 'g');
+        'nonlinear', grp_type, {size(mMSE1,3) size(mMSE2,3)}, 2, [], [], 'g');
     plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
     title("mMSE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold'); 
     ax = findobj(hs.curve{i}, 'Type', 'axes');
@@ -703,7 +931,7 @@ if any(mask, 'all')
     [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
         'nonlinear', grp_type, {size(MFE1,3) size(MFE2,3)}, [], [], [], 'g');
     plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
-    title("MFE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold');
+    title("MFE"); %set(get(gca,'Title'), 'Color', 'k', 'FontSize', 14, 'FontWeight', 'bold');
     saveas(gcf, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_main.fig', coarsing)));
     print(gcf, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
 
@@ -717,7 +945,7 @@ if any(mask, 'all')
         saveas(hs.curve{i}, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_cluster-%g_curve.fig', coarsing, i)));
         print(hs.curve{i}, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_cluster-%g_curve.png', coarsing, i)),'-dpng','-r300');
     end
-    close([hs.topo{:} hs.curve{:}]) % to close figures
+    % close([hs.topo{:} hs.curve{:}]) % to close figures
 end
 
 %% RCMFE
@@ -773,31 +1001,36 @@ end
 % title("dB-norm")
 % legend('eyes-closed','eyes-open')
 
-% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(10*log10(PSD1), 10*log10(PSD2), nPerm, ct, grp_type);
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(PSD1, PSD2, nPerm, ct, grp_type);
+y_unit = 'dB';   % '\muV^2/Hz'  or 'dB'
+
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(10*log10(PSD1), 10*log10(PSD2), nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(10*log10(PSD1), 10*log10(PSD2), nPerm, ct, grp_type);
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(PSD1, PSD2, nPerm, ct, grp_type);
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(PSD1, PSD2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 if any(mask, 'all')
     [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, freqs, chanlocs, ...
-        'frequency', grp_type, {size(PSD1,3) size(PSD2,3)}, 1.5, [], [], 'g');
+        'frequency', grp_type, {size(PSD1,3) size(PSD2,3)}, 1, [], [], 'g');
+    writetable(summary_tbl, fullfile(outputs_path, 'PSD_raw_summary.csv'));
+
     plot_results('frequency', 'scalp', freqs, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
     title('Eyes closed vs. Eyes open - Classic PSD'); 
     set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
-    saveas(gcf, fullfile(outputs_path, 'PSD_raw_perm_tfce_main.fig'));
-    print(gcf, fullfile(outputs_path, 'PSD_raw_perm_tfce_main.png'), '-dpng', '-r300');
+    saveas(gcf, fullfile(outputs_path, 'PSD_raw_main.fig'));
+    print(gcf, fullfile(outputs_path, 'PSD_raw_main.png'), '-dpng', '-r300');
 
-    writetable(summary_tbl, fullfile(outputs_path, 'PSD_raw_perm_tfce_summary.csv'));
-    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, ...
-        chanlocs, 'Power (\muV^2/Hz)', 'DataType', 'scalp','Domain','Frequency');
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, chanlocs, ...
+        sprintf('Power (%s)', y_unit), 'DataType', 'scalp','Domain','Frequency');
     for i = 1:numel(hs.curve)
-        saveas(hs.topo{i},  fullfile(outputs_path, sprintf('PSD_raw_perm_tfce_cluster-%g_topo.fig', i)));
-        print(hs.topo{i},   fullfile(outputs_path, sprintf('PSD_raw_perm_tfce_cluster-%g_topo.png', i)), '-dpng', '-r300');
-        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('PSD_raw_perm_tfce_cluster-%g_curve.fig', i)));
-        print(hs.curve{i},  fullfile(outputs_path, sprintf('PSD_raw_perm_tfce_cluster-%g_curve.png', i)), '-dpng', '-r300');
+        saveas(hs.topo{i},  fullfile(outputs_path, sprintf('PSD_raw_cluster-%g_topo.fig', i)));
+        print(hs.topo{i},   fullfile(outputs_path, sprintf('PSD_raw_cluster-%g_topo.png', i)), '-dpng', '-r300');
+        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('PSD_raw_cluster-%g_curve.fig', i)));
+        print(hs.curve{i},  fullfile(outputs_path, sprintf('PSD_raw_cluster-%g_curve.png', i)), '-dpng', '-r300');
     end
     % close([hs.topo{:} hs.curve{:}])
 end
 
-%% PSD (aperiodic-corrected)
+%% PSD (Aperiodic-corrected)
 
 % figure('color','w'); hold on 
 % plot(freqs, mean(mean(PSD_corr1,3),1),'LineWidth',2)
@@ -808,33 +1041,35 @@ end
 % % title("dB-norm")
 % legend('eyes-closed','eyes-open')
 
-% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(10*log10(PSD_corr1), 10*log10(PSD_corr2), nPerm, ct, grp_type);
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(PSD_corr1, PSD_corr2, nPerm, ct, grp_type);
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(10*log10(PSD_corr1), 10*log10(PSD_corr2), nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(10*log10(PSD_corr1), 10*log10(PSD_corr2), nPerm, ct, grp_type);
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(PSD_corr1, PSD_corr2, nPerm, ct, grp_type);
+% [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(PSD_corr1, PSD_corr2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 if any(mask, 'all')
     [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, freqs, chanlocs, ...
-        'frequency', grp_type, {size(PSD_corr1,3) size(PSD_corr2,3)}, 1.5, [], [], 'g');
+        'frequency', grp_type, {size(PSD_corr1,3) size(PSD_corr2,3)}, 0.5, [], [], 'g');
+    writetable(summary_tbl, fullfile(outputs_path, 'PSD_corrected_summary.csv'));
+
     plot_results('frequency', 'scalp', freqs, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
     title('Eyes closed vs. Eyes open - Aperiodic-corrected PSD')
     set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
-    saveas(gcf, fullfile(outputs_path, 'PSD_corrected_perm_tfce_main.fig'));
-    print(gcf, fullfile(outputs_path, 'PSD_corrected_perm_tfce_main.png'), '-dpng', '-r300');
+    saveas(gcf, fullfile(outputs_path, 'PSD_corrected_main.fig'));
+    print(gcf, fullfile(outputs_path, 'PSD_corrected_main.png'), '-dpng', '-r300');
 
-    writetable(summary_tbl, fullfile(outputs_path, 'PSD_corrected_perm_tfce_summary.csv'));
-    % hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, chanlocs, 'PSD (corrected)', 'DataType', 'scalp');
     hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, chanlocs, ...
-        'Power (\muV^2/Hz)', 'DataType', 'scalp', 'Domain', 'frequency');
+        sprintf('Power (%s)', y_unit), 'DataType', 'scalp', 'Domain', 'frequency');
     for i = 1:numel(hs.curve)
-        saveas(hs.topo{i},  fullfile(outputs_path, sprintf('PSD_corrected_perm_tfce_cluster-%g_topo.fig', i)));
-        print(hs.topo{i},   fullfile(outputs_path, sprintf('PSD_corrected_perm_tfce_cluster-%g_topo.png', i)), '-dpng', '-r300');
-        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('PSD_corrected_perm_tfce_cluster-%g_curve.fig', i)));
-        print(hs.curve{i},  fullfile(outputs_path, sprintf('PSD_corrected_perm_tfce_cluster-%g_curve.png', i)), '-dpng', '-r300');
+        saveas(hs.topo{i},  fullfile(outputs_path, sprintf('PSD_corrected_cluster-%g_topo.fig', i)));
+        print(hs.topo{i},   fullfile(outputs_path, sprintf('PSD_corrected_cluster-%g_topo.png', i)), '-dpng', '-r300');
+        saveas(hs.curve{i}, fullfile(outputs_path, sprintf('PSD_corrected_cluster-%g_curve.fig', i)));
+        print(hs.curve{i},  fullfile(outputs_path, sprintf('PSD_corrected_cluster-%g_curve.png', i)), '-dpng', '-r300');
     end
-    % close([hs.topo{:} hs.curve{:}])
+    close([hs.topo{:} hs.curve{:}])
 end
 
 
-%% Same but with eeglab/fieldtrip
+%% try with eeglab/fieldtrip
 
 % % --- Build FieldTrip freq structures (one per subject per condition) ---
 % for s = 1:size(MSE1, 3)
@@ -892,9 +1127,9 @@ function lbl = format_scale_label(s)
     end
 end
 
-function elec = chanlocs2ft(chanlocs)
-    elec.label  = {chanlocs.labels}';
-    elec.elecpos = [[chanlocs.X]' [chanlocs.Y]' [chanlocs.Z]'];
-    elec.chanpos = elec.elecpos;
-    elec.unit    = 'mm';
-end
+% function elec = chanlocs2ft(chanlocs)
+%     elec.label  = {chanlocs.labels}';
+%     elec.elecpos = [[chanlocs.X]' [chanlocs.Y]' [chanlocs.Z]'];
+%     elec.chanpos = elec.elecpos;
+%     elec.unit    = 'mm';
+% end

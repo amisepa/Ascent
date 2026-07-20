@@ -19,6 +19,9 @@ function p = ascent_get_params(EEG, varargin)
 %     p.measure       'RCMFE' | 'SampEn' | 'FuzzEn' | 'ExSEnt' | 'FracDim' |
 %                     'HigFracDim' | 'Aperiodic' | 'MSE' | 'mMSE' |
 %                     'MFE' | 'RCMFE' | 'RCmvMFE'             (default: 'RCMFE')
+%     p.domain        'channel' (scalp channels) | 'ica'     (default: 'channel')
+%                     'ica' runs the measure on EEG.icaact; the channel
+%                     selection is ignored and all ICs are used.
 %     p.chanlist       cell array of channel labels           (default: all)
 %     p.tau            time lag for embedding                 (default: 1)
 %     p.m              embedding dimension                    (default: 2)
@@ -53,12 +56,14 @@ function p = ascent_get_params(EEG, varargin)
 %     p.peakThreshold  peak detection threshold (SDs)         (default: 2.0)
 %     p.peakWidthLimits [min max] peak width in Hz            (default: [1 12])
 %     p.correctAperiodic subtract aperiodic model from PSD    (default: true)
+%     p.alphaBand      [fMin fMax] Hz for saved alpha power   (default: [8 13])
 %     p.timeResolved   sliding-window aperiodic fit           (default: false)
 
 % ----------------------------
 % Initialize all fields to []
 % ----------------------------
 p.measure          = [];
+p.domain           = [];
 p.chanlist         = [];
 p.tau              = [];
 p.m                = [];
@@ -93,7 +98,8 @@ p.minPeakHeight    = [];
 p.peakThreshold    = [];
 p.peakWidthLimits  = [];
 p.correctAperiodic = [];
-p.timeResolved     = [];  
+p.alphaBand        = [];
+p.timeResolved     = [];
 p.slidWinSec       = [];
 p.slidOverlap      = [];
 p.slidNAvg         = [];
@@ -106,7 +112,7 @@ if isempty(varargin) || (numel(varargin) == 1 && isempty(varargin{1}))
 
     % --- GUI mode ---
     [p.measure, p.chanlist, p.tau, p.m, p.coarsing, p.num_scales, extraParams, ...
-     p.n, p.vis, p.parallel, p.progress] = ascent_compute_gui(EEG);
+     p.n, p.vis, p.parallel, p.progress, p.domain] = ascent_compute_gui(EEG);
 
     if isempty(p.measure)
         p = [];     % signal abort to caller
@@ -144,6 +150,14 @@ else
         val = varargin{k+1};
         switch key
             case 'measure',          p.measure          = val;
+            case 'domain'
+                dm = lower(char(val));
+                switch dm
+                    case {'channel','channels','chan','scalp'}, p.domain = 'channel';
+                    case {'ica','ic','comp','components'},      p.domain = 'ica';
+                    otherwise
+                        error('domain must be ''channel'' or ''ica'' (got ''%s'').', dm);
+                end
             case 'chanlist'
                 if ischar(val) || isstring(val)
                     if strcmpi(string(val), 'all')
@@ -181,6 +195,7 @@ else
             case 'peakthreshold',    p.peakThreshold    = double(val);
             case 'peakwidthlimits',  p.peakWidthLimits  = double(val);
             case 'correctaperiodic', p.correctAperiodic = logical(val);
+            case 'alphaband',        p.alphaBand        = double(val);
             case 'timeresolved',     p.timeResolved     = logical(val);
             case 'slidwinsec',       p.slidWinSec       = double(val);
             case 'slidoverlap',      p.slidOverlap      = double(val);
@@ -197,8 +212,13 @@ end
 % Apply defaults
 % ----------------------------
 
+if isempty(p.domain)
+    p.domain = 'channel';
+end
 if isempty(p.chanlist)
-    disp('No channels selected: using all channels (default).');
+    if strcmpi(p.domain,'channel')
+        disp('No channels selected: using all channels (default).');
+    end
     p.chanlist = {EEG.chanlocs.labels}';
 end
 if isempty(p.measure)
@@ -231,7 +251,7 @@ end
 if contains(lower(p.measure), {'mse','mmse','mfe','cmfe','rcmfe','rcmvmfe'})
     if isempty(p.coarsing)
         disp('No coarse-graining method selected: using Standard Deviation (default).');
-        p.coarsing = 'sd';
+        p.coarsing = 'mean';
     end
     if isempty(p.num_scales)
         disp('Number of scales not set: using 30 (default).');
@@ -283,6 +303,7 @@ if strcmpi(p.measure, 'aperiodic')
     if isempty(p.peakThreshold),    p.peakThreshold    = 2.0;          end
     if isempty(p.peakWidthLimits),  p.peakWidthLimits  = [1 12];       end
     if isempty(p.correctAperiodic), p.correctAperiodic = true;         end
+    if isempty(p.alphaBand),        p.alphaBand        = [8 13];       end
     if isempty(p.timeResolved),     p.timeResolved     = false;        end
     if isempty(p.slidWinSec),       p.slidWinSec       = 2;            end
     if isempty(p.slidOverlap),      p.slidOverlap      = 0.5;          end

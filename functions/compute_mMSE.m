@@ -11,11 +11,17 @@ function [mse, scales, info] = compute_mMSE(data, varargin)
 % z-normalized once at the start, then each scale's signal (filtered or
 % coarse-grained) is further normalized to unit variance before SampEn,
 % so r is always relative to the scale-specific SD rather than the
-% original broadband variance.
+% original broadband variance. This scale-wise normalization is the
+% defining feature of the method and is applied once, explicitly, per
+% scale. compute_SampEn is therefore called with 'ZScore', false so it
+% does NOT re-normalize each segment on top of it. This matters most for
+% the time-resolved output: without it, every time window would be
+% renormalized to its own variance and windows would no longer be
+% comparable to one another or to the whole-epoch value.
 %
 % Note that the different coarse-graining methods only apply to filter_mode = 'none'.
-% the filt-skip method filters to isolate the frequency band and then decimates 
-% by selecting every s-th sample, so applying mean/std/variance operators to 
+% the filt-skip method filters to isolate the frequency band and then decimates
+% by selecting every s-th sample, so applying mean/std/variance operators to
 % bins would change the measure's meaning and defeat the purpose of the spectral isolation.
 %
 % Author: Cedric Cannard, 2025
@@ -27,8 +33,8 @@ p.addParameter('Fs',               [], @(x) isempty(x) || (isnumeric(x) && issca
 p.addParameter('m',                2,  @(x) isnumeric(x) && isscalar(x) && x>=1);
 p.addParameter('tau',              1,  @(x) isnumeric(x) && isscalar(x) && x>=1);
 p.addParameter('r',               .15, @(x) isnumeric(x) && isscalar(x) && x>0 && x<1);
-p.addParameter('num_scales',      20,  @(x) isnumeric(x) && isscalar(x) && x>=1);
-p.addParameter('coarsing',       'std', @(s) any(strcmpi(s,{'median','mean','trimmed mean','trimmed','trimmean','std','sd','standard deviation','var','variance'})));
+p.addParameter('num_scales',      30,  @(x) isnumeric(x) && isscalar(x) && x>=1);
+p.addParameter('coarsing',      'mean', @(s) any(strcmpi(s,{'median','mean','std','sd','standard deviation','var','variance'})));
 p.addParameter('filter_mode', 'narrowband', @(s) any(strcmpi(s,{'none','narrowband'})));
 p.addParameter('BlockSize',     2000, @(x) isnumeric(x) && isscalar(x) && x>=100);
 p.addParameter('pdistMaxGB',     2.0, @(x) isnumeric(x) && isscalar(x) && x>0);
@@ -217,7 +223,7 @@ if useParScales
                 if ~o.TimeOnly
                     for ch = 1:nChan
                         mse_s(ch) = compute_SampEn(CG(ch,:), 'm', o.m, 'tau', o.tau, ...
-                            'r', o.r, 'BlockSize', o.BlockSize, 'pdistMaxGB', o.pdistMaxGB, ...
+                            'r', o.r, 'ZScore', false, 'BlockSize', o.BlockSize, 'pdistMaxGB', o.pdistMaxGB, ...
                             'Parallel', false, 'Progress', false);
                     end
                 end
@@ -266,7 +272,7 @@ if useParScales
                     tmp = nan(nChan,1);
                     for ch = 1:nChan
                         tmp(ch) = compute_SampEn(CG(ch,:), 'm', o.m, 'tau', o.tau, ...
-                            'r', o.r, 'BlockSize', o.BlockSize, 'pdistMaxGB', o.pdistMaxGB, ...
+                            'r', o.r, 'ZScore', false, 'BlockSize', o.BlockSize, 'pdistMaxGB', o.pdistMaxGB, ...
                             'Parallel', false, 'Progress', false);
                     end
                     vals(:,is) = tmp;
@@ -318,7 +324,7 @@ else
                 if ~o.TimeOnly
                     for ch = 1:nChan
                         mse(ch,s) = compute_SampEn(CG(ch,:), 'm', o.m, 'tau', o.tau, ...
-                            'r', o.r, 'BlockSize', o.BlockSize, 'pdistMaxGB', o.pdistMaxGB, ...
+                            'r', o.r, 'ZScore', false, 'BlockSize', o.BlockSize, 'pdistMaxGB', o.pdistMaxGB, ...
                             'Parallel', false, 'Progress', false);
                     end
                 end
@@ -371,7 +377,7 @@ else
                 tmp = nan(nChan,1);
                 for ch = 1:nChan
                     tmp(ch) = compute_SampEn(CG(ch,:), 'm', o.m, 'tau', o.tau, ...
-                        'r', o.r, 'BlockSize', o.BlockSize, 'pdistMaxGB', o.pdistMaxGB, ...
+                        'r', o.r, 'ZScore', false, 'BlockSize', o.BlockSize, 'pdistMaxGB', o.pdistMaxGB, ...
                         'Parallel', false, 'Progress', false);
                 end
                 vals(:,is) = tmp;
@@ -437,14 +443,14 @@ end
 end
 
 function ct = parse_coarse_type(token)
-ct = 'std';
+ct = 'mean';
 if isempty(token), return; end
 if isnumeric(token)
     switch round(token)
         case 0,    ct = 'mean';
         case 1,    ct = 'std';
         case 2,    ct = 'variance';
-        otherwise, ct = 'std';
+        otherwise, ct = 'mean';
     end
 else
     t = lower(regexprep(strtrim(char(token)),'[^a-z]',''));
@@ -472,6 +478,22 @@ for ch = 1:nChan
 end
 end
 
+function cg = coarsegrain(Y, ct)
+% Coarse-grain down dim 1 (over the s samples of each window) -> 1 x nBins.
+switch lower(strtrim(ct))
+    case {'mean'}
+        cg = mean(Y, 1);
+    case {'median'}
+        cg = median(Y, 1);
+    case {'std','sd','standard deviation'}
+        cg = std(Y, 0, 1);
+    case {'var','variance'}
+        cg = var(Y, 0, 1);
+    otherwise
+        cg = mean(Y, 1);
+end
+end
+
 function M = time_windows_one_scale(CG, feff, o, nTOI, tCenters)
 nChan = size(CG,1);
 M     = nan(nChan, nTOI);
@@ -486,7 +508,7 @@ for ii = 1:numel(ki)
     seg = CG(:, starts(ki(ii)):stops(ki(ii)));
     for ch = 1:nChan
         M(ch,ki(ii)) = compute_SampEn(seg(ch,:), 'm', o.m, 'tau', o.tau, ...
-            'r', o.r, 'BlockSize', o.BlockSize, 'pdistMaxGB', o.pdistMaxGB, ...
+            'r', o.r, 'ZScore', false, 'BlockSize', o.BlockSize, 'pdistMaxGB', o.pdistMaxGB, ...
             'Parallel', false, 'Progress', false);
     end
 end
@@ -518,7 +540,7 @@ for ii = 1:numel(ki)
         seg = Y(:,idxv);
         for ch = 1:nChan
             acc(ch) = acc(ch) + compute_SampEn(seg(ch,:), 'm', o.m, 'tau', o.tau, ...
-                'r', o.r, 'BlockSize', o.BlockSize, 'pdistMaxGB', o.pdistMaxGB, ...
+                'r', o.r, 'ZScore', false, 'BlockSize', o.BlockSize, 'pdistMaxGB', o.pdistMaxGB, ...
                 'Parallel', false, 'Progress', false);
         end
     end

@@ -2,35 +2,46 @@ function [CMFE, scales] = compute_CMFE(data, varargin)
 % compute_CMFE  Composite Multiscale Fuzzy Entropy (CMFE).
 %
 %   [CMFE, scales] = compute_CMFE(data, 'm', 2, 'r', 0.15, 'tau', 1, ...
-%                                 'n', 2, 'coarsing', 'std', ...
-%                                 'Mode', 'local', 'num_scales', 15)
+%                                 'n', 2, 'coarsing', 'mean', ...
+%                                 'Mode', 'local', 'num_scales', 30, 'zNorm', 0)
 %
 % Inputs
 %   data : EEGLAB EEG struct with .data OR numeric [n_ch x n_samp]
 %
 % Name-value parameters
 %   'm'               : embedding dimension (default = 2)
-%   'r'               : similarity bound (default = 0.15)
+%   'r'               : similarity bound, fraction of SD (default = 0.15)
 %   'tau'             : embedding delay for FuzEn (default = 1)
 %   'n'               : fuzzy exponent (default = 2)
-%   'coarsing'        : 'mean' | 'median' | 'trimmed mean' | 'std' | 'var'
-%                       (default = 'std')
+%   'coarsing'        : 'mean' | 'median' | 'std' | 'var' (default = 'mean')
 %   'Mode'            : 'local' | 'global' (default = 'local')
-%   'num_scales'      : requested number of scales (default = 15)
-%   'MinSamplesPerBin': minimum number of coarse-grained bins required for a valid FE estimate (default = 4)
+%   'num_scales'      : requested number of scales (default = 30)
+%   'zNorm'           : varying-tolerance rescaling, integer 0-4 (default 0 = OFF)
+%                       0  fixed tolerance across scales (classic)
+%                       1  r*std / 2  r*var / 3  r*mad(mean) / 4  r*mad(median)
+%                       A SINGLE tolerance is computed per scale (from the
+%                       unshifted coarse-grained series) and shared across all
+%                       offsets, so the composite average stays coherent.
+%   'IncludeScale1'   : include scale 1 (= plain FuzzEn) (default = false).
+%                       Ignored for 'std'/'var' (single-point spread is undefined).
+%   'MinSamplesPerBin': minimum coarse-grained bins for a valid FE estimate (default = 4)
 %   'Parallel'        : true/false (default = true)
 %   'Progress'        : true/false (default = true)
 %
 % Outputs
 %   CMFE   : [n_channels x numel(scales)] composite multiscale fuzzy entropy
-%   scales : scales retained by the selected coarse-graining
+%   scales : scales retained
 %
 % Notes
 %   • CMFE averages Fuzzy Entropy values across shifted coarse-grained series.
 %   • This differs from RCMFE, which averages phi_m and phi_m+1 first, then
 %     computes the log-ratio.
-%   • For 'std' and 'var', scale 1 is omitted because spread of a single-point
-%     segment is not meaningful in the multiscale formulation.
+%   • The signal is z-scored once per channel; the coarse-grained series is
+%     NOT re-normalized. With zNorm=0 the tolerance r is fixed across scales;
+%     with zNorm>0 it is rescaled per scale (shared across offsets).
+%   • Scale 1 is skipped by default so the scale range matches the other
+%     multiscale measures (MSE, MFE, mMSE). Set IncludeScale1=true to add it
+%     for mean/median coarse-graining.
 %   • For best agreement with the original FuzEn-style literature, use
 %     'Mode','local'. Use 'global' for a SampEn-like variant.
 
@@ -40,9 +51,11 @@ p.addParameter('m', 2,                 @(x) isnumeric(x) && isscalar(x) && x>0);
 p.addParameter('r', 0.15,              @(x) isnumeric(x) && isscalar(x) && x>0 && x<2);
 p.addParameter('tau', 1,               @(x) isnumeric(x) && isscalar(x) && x>=1);
 p.addParameter('n', 2,                 @(x) isnumeric(x) && isscalar(x) && x>0);
-p.addParameter('coarsing','std',       @(s) any(strcmpi(s,{'median','mean','trimmed mean','trimmed','tmean','trim20','std','sd','standard deviation','var','variance'})));
+p.addParameter('coarsing','mean',      @(s) any(strcmpi(s,{'median','mean','std','sd','standard deviation','var','variance'})));
 p.addParameter('Mode','local',         @(s) any(strcmpi(s,{'local','global'})));
-p.addParameter('num_scales', 15,       @(x) isnumeric(x) && isscalar(x) && x>=1);
+p.addParameter('num_scales', 30,       @(x) isnumeric(x) && isscalar(x) && x>=1);
+p.addParameter('zNorm', 0,             @(x) isnumeric(x) && isscalar(x) && ismember(x,0:4));
+p.addParameter('IncludeScale1', false, @(x) islogical(x) && isscalar(x));
 p.addParameter('MinSamplesPerBin', 4,  @(x) isnumeric(x) && isscalar(x) && x>=1);
 p.addParameter('Parallel', true,       @(x) islogical(x) && isscalar(x));
 p.addParameter('Progress', true,       @(x) islogical(x) && isscalar(x));
@@ -55,6 +68,8 @@ n_exp        = p.Results.n;
 coarseType   = p.Results.coarsing;
 modeType     = lower(p.Results.Mode);
 nScales_req  = p.Results.num_scales;
+zNorm        = p.Results.zNorm;
+incScale1    = p.Results.IncludeScale1;
 minBinsHard  = p.Results.MinSamplesPerBin;
 parallelMode = p.Results.Parallel;
 showProg     = p.Results.Progress;
@@ -73,11 +88,19 @@ if S > maxS
 end
 if S < 1, S = 1; end
 
+% Scale range: skip scale 1 by default (matches MSE/MFE/mMSE). Include it only
+% when explicitly requested and only for mean/median coarse-graining.
 isSpread = ismember(lower(strtrim(coarseType)), {'sd','std','standard deviation','var','variance'});
-if isSpread
-    scales = 2:S;
-else
+if incScale1 && ~isSpread
     scales = 1:S;
+else
+    if incScale1 && isSpread
+        warning('compute_CMFE: IncludeScale1 ignored for spread coarse-graining (single-point spread is undefined).');
+    end
+    scales = 2:S;
+end
+if isempty(scales)
+    error('compute_CMFE: not enough samples/scales to compute even scale 2. Provide longer data or increase num_scales.');
 end
 
 Xz = zscore_channels_local(X);
@@ -85,8 +108,8 @@ CMFE = nan(nch, numel(scales));
 
 if showProg
     state = ternary(parallelMode && ~isempty(ver('parallel')), 'on', 'off');
-    fprintf('CMFE: %d ch | m=%g, tau=%g, r=%g, n=%g | coarse=%s | mode=%s | scales=%d:%d | parallel=%s\n', ...
-        nch, m, tau, r, n_exp, upperLabel(coarseType), upper(modeType), scales(1), scales(end), state);
+    fprintf('CMFE: %d ch | m=%g, tau=%g, r=%g, n=%g | coarse=%s | mode=%s | zNorm=%d | scales=%d:%d | parallel=%s\n', ...
+        nch, m, tau, r, n_exp, upperLabel(coarseType), upper(modeType), zNorm, scales(1), scales(end), state);
 end
 
 useWB = ~parallelMode && usejava('desktop') && showProg;
@@ -108,7 +131,8 @@ if parallelMode && ~isempty(ver('parallel'))
         v = nan(1, numel(scales));
 
         for ii = 1:numel(scales)
-            s = scales(ii);
+            s   = scales(ii);
+            r_s = scale_tolerance(sig, s, coarseType, r, zNorm, minBinsHard, m);
 
             fe_vals = nan(1, s);
             for off = 1:s
@@ -120,7 +144,7 @@ if parallelMode && ~isempty(ver('parallel'))
                 Y  = reshape(xoff(1:Loff), s, []);
                 cg = coarsegrain(Y, coarseType);
 
-                [fe, ~, ~] = fuzz_engine_raw(cg, m, r, n_exp, tau, ...
+                [fe, ~, ~] = fuzz_engine_raw(cg, m, r_s, n_exp, tau, ...
                     'exponential', false, 2000, 2.0, modeType);
                 fe_vals(off) = double(fe);
             end
@@ -138,7 +162,8 @@ else
         v = nan(1, numel(scales));
 
         for ii = 1:numel(scales)
-            s = scales(ii);
+            s   = scales(ii);
+            r_s = scale_tolerance(sig, s, coarseType, r, zNorm, minBinsHard, m);
 
             fe_vals = nan(1, s);
             for off = 1:s
@@ -150,7 +175,7 @@ else
                 Y  = reshape(xoff(1:Loff), s, []);
                 cg = coarsegrain(Y, coarseType);
 
-                [fe, ~, ~] = fuzz_engine_raw(cg, m, r, n_exp, tau, ...
+                [fe, ~, ~] = fuzz_engine_raw(cg, m, r_s, n_exp, tau, ...
                     'exponential', false, 2000, 2.0, modeType);
                 fe_vals(off) = double(fe);
             end
@@ -176,7 +201,8 @@ end
     end
 end
 
-% -------------------------------------------------------------------------
+%% Local helpers
+
 function Xz = zscore_channels_local(X)
 Xz = X;
 for c = 1:size(X,1)
@@ -191,61 +217,7 @@ for c = 1:size(X,1)
 end
 end
 
-% -------------------------------------------------------------------------
-function cg = coarsegrain(Y, ct)
-switch lower(strtrim(ct))
-    case 'mean'
-        cg = mean(Y, 1, 'omitnan');
-    case 'median'
-        cg = median(Y, 1, 'omitnan');
-    case {'trimmed mean','trimmed','tmean','trim20'}
-        pct = 20;
-        if exist('trimmean','file') == 2 && all(isfinite(Y(:)))
-            cg = trimmean(Y, pct, 1);
-        else
-            nSeg = size(Y,2); cg = nan(1,nSeg);
-            kfrac = pct/200;
-            for j = 1:nSeg
-                col = Y(:,j); col = col(isfinite(col));
-                if isempty(col), cg(j)=NaN; continue; end
-                k = floor(kfrac*numel(col));
-                if 2*k >= numel(col)
-                    cg(j) = NaN;
-                else
-                    col = sort(col);
-                    cg(j) = mean(col(k+1:end-k));
-                end
-            end
-        end
-    case {'sd','std','standard deviation'}
-        cg = std(Y, 0, 1, 'omitnan');
-    case {'variance','var'}
-        cg = var(Y, 0, 1, 'omitnan');
-    otherwise
-        error('compute_CMFE:BadCoarsing', 'Unknown coarsing "%s".', ct);
-end
-cg = cg(:).';
-end
 
-% -------------------------------------------------------------------------
-function s = upperLabel(coarseType)
-cl = lower(strtrim(coarseType));
-if any(strcmp(cl,{'sd','std','standard deviation'}))
-    s = 'STD';
-elseif any(strcmp(cl,{'var','variance'}))
-    s = 'VAR';
-elseif strcmp(cl,'mean')
-    s = 'MEAN';
-elseif strcmp(cl,'median')
-    s = 'MEDIAN';
-elseif any(strcmp(cl,{'trimmed mean','trimmed','tmean','trim20'}))
-    s = 'TRIM20';
-else
-    s = upper(coarseType);
-end
-end
-
-% -------------------------------------------------------------------------
 function out = ternary(cond, a, b)
 if cond, out = a; else, out = b; end
 end
