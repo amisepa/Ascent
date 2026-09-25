@@ -1,8 +1,10 @@
-function [bp_raw, bp_osc, ap_model] = compute_AperiodicBandPower(freqs, psd, exponent, offset, band)
+function [bp_raw, bp_osc, ap_model] = compute_AperiodicBandPower(freqs, psd, exponent, offset, band, knee)
 % Band power split into its total and oscillatory (aperiodic-removed) parts.
 %
 %   [bp_raw, bp_osc, ap_model] = compute_AperiodicBandPower(freqs, psd, ...
-%       exponent, offset, [8 13])
+%       exponent, offset, [8 13])            % fixed mode (default)
+%   [bp_raw, bp_osc, ap_model] = compute_AperiodicBandPower(freqs, psd, ...
+%       exponent, offset, [8 13], knee)      % knee mode (Lorentzian)
 %
 % Single source of truth for the aperiodic ("1/f") model in Ascent. Anything
 % that needs the model, a corrected spectrum, or a band power should call this
@@ -17,6 +19,12 @@ function [bp_raw, bp_osc, ap_model] = compute_AperiodicBandPower(freqs, psd, exp
 %   exponent : aperiodic exponent per signal [nSig x 1], from compute_AperiodicFit
 %   offset   : aperiodic offset per signal   [nSig x 1], log10 units
 %   band     : [fmin fmax] Hz to average over (default [8 13], alpha)
+%   knee     : (optional) knee parameter per signal [nSig x 1]. When supplied,
+%              the full Lorentzian model is used:
+%                  log10(P_ap) = offset - log10(knee + f^exponent)
+%              This matches the specparam/FOOOF knee definition (Donoghue et
+%              al., 2020) and upstream's internal "flattened spectrum", which
+%              is computed on every fit regardless of aperiodic mode.
 %
 % Outputs
 %   bp_raw   : total band power per signal [nSig x 1], µV²/Hz.
@@ -30,14 +38,12 @@ function [bp_raw, bp_osc, ap_model] = compute_AperiodicBandPower(freqs, psd, exp
 %              the band (returned as-is; callers decide how to handle it).
 %   ap_model : aperiodic model [nSig x nFreqs], linear µV²/Hz.
 %              A corrected spectrum in the ratio sense is psd ./ ap_model.
-%
-% NOTE
-%   Only valid for AperiodicMode = 'fixed'. The knee model is not a straight
-%   line in log-log space and is not reconstructed here.
+%              Valid in BOTH fixed and knee mode.
 %
 % Copyright (C) - ASCENT EEGLAB PLUGIN - Cedric Cannard, 2021-2025
 
 if nargin < 5 || isempty(band), band = [8 13]; end
+if nargin < 6, knee = []; end
 
 freqs    = freqs(:)';
 exponent = exponent(:);
@@ -52,8 +58,19 @@ if numel(exponent) ~= size(psd,1) || numel(offset) ~= size(psd,1)
           size(psd,1));
 end
 
-% Aperiodic model in linear units: log10(P_ap) = offset - exponent*log10(f)
-ap_model = 10.^(offset - exponent .* log10(freqs));   % implicit expansion -> [nSig x nFreqs]
+% Aperiodic model in linear units.
+if isempty(knee)
+    % Fixed mode: log10(P_ap) = offset - exponent*log10(f)
+    ap_model = 10.^(offset - exponent .* log10(freqs));   % implicit expansion -> [nSig x nFreqs]
+else
+    % Knee mode (full Lorentzian): log10(P_ap) = offset - log10(knee + f^exponent)
+    knee = knee(:);
+    if numel(knee) ~= size(psd,1)
+        error('compute_AperiodicBandPower: knee must have one entry per psd row (%d).', ...
+              size(psd,1));
+    end
+    ap_model = 10.^(offset - log10(knee + freqs.^exponent));   % [nSig x nFreqs]
+end
 
 mask = freqs >= band(1) & freqs <= band(2);
 if ~any(mask)

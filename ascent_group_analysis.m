@@ -62,9 +62,8 @@
 %     RCMFE(:,1,:) is additionally removed before statistics to align scales.
 %   - mMSE scale labels reflect bandpass frequency bounds (Hz) derived from
 %     the filt-skip scheme (Kosciessa et al., 2020).
-%   - Statistics are run on linear PSD values; dB-normalized alternatives
-%     are available as commented-out lines.
-%   - The aperiodic correction is applied in fixed mode only (no knee).
+%   - PSD statistics are run on dB values (10*log10).
+%   - The aperiodic fit is run in fixed mode.
 %
 % REFERENCES:
 %   Cannard, C., & Delorme, A. (2025). Introducing the ASCENT EEGLAB plugin:
@@ -546,7 +545,7 @@ disp("         MEASURE: ExSEnt (Duration + Amplitude)")
 subplot(2,4,5)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(ExSEnt1_3, ExSEnt2_3, nPerm, ct, grp_type);
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(ExSEnt1_3, ExSEnt2_3, nPerm, ct, grp_type);
-% mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
+mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
     [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...

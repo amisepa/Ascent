@@ -200,14 +200,14 @@ if strcmpi(measType, 'Aperiodic')
 
     apModes  = {'Fixed (default)' 'Knee'};
 
-    % Callback on the mode popupmenu: disable correction checkbox when Knee
-    % is selected (correction is not valid for the knee model).
+    % Callback on the mode popupmenu: the aperiodic correction is available
+    % in both modes (knee mode uses the full Lorentzian model), so the
+    % checkbox stays enabled regardless of mode selection.
     apModeCallback = [ ...
         'apVal = get(gcbo,''value''); ' ...
         'hCB = findobj(gcbf,''style'',''checkbox''); ' ...
         'correctCB = hCB(arrayfun(@(h) ~isempty(strfind(get(h,''string''),''Subtract'')),hCB)); ' ...
-        'if apVal == 2, set(correctCB,''value'',0,''enable'',''off''); ' ...
-        'else, set(correctCB,''enable'',''on''); end' ];
+        'set(correctCB,''enable'',''on''); ' ];
 
     uigeomAP = { [1] ...
                  [0.55 0.45] [0.55 0.45] ...
@@ -237,7 +237,7 @@ if strcmpi(measType, 'Aperiodic')
         {'style' 'edit' 'string' '1 40'}
 
         {'style' 'text' 'string' 'Max peaks:'}
-        {'style' 'edit' 'string' '6'}
+        {'style' 'edit' 'string' '3'}
 
         {'style' 'text' 'string' 'Min peak height:'}
         {'style' 'edit' 'string' '0.05'}

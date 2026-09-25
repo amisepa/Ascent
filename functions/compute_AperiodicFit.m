@@ -17,7 +17,7 @@ function [exponent, offset, info] = compute_AperiodicFit(freqs, psd, varargin)
 %     'AperiodicMode'   : 'fixed' (default) | 'knee'
 %                         'fixed'  — log P = offset - exponent * log F
 %                         'knee'   — log P = offset - log(knee + F^exponent)
-%     'MaxPeaks'        : maximum number of Gaussian peaks to fit (default 6)
+%     'MaxPeaks'        : maximum number of Gaussian peaks to fit (default 3)
 %     'MinPeakHeight'   : minimum peak height above aperiodic, in log10 power
 %                         units (default 0.05)
 %     'PeakThreshold'   : peak detection threshold in units of SD of the
@@ -38,19 +38,26 @@ function [exponent, offset, info] = compute_AperiodicFit(freqs, psd, varargin)
 %                .peak_params – [nPeaks x 3]: [CF, power, BW] per peak
 %                               CF = center freq (Hz), power = height above
 %                               aperiodic (log10), BW = 2*sigma (Hz)
-%                .gauss_params– [nPeaks x 3]: underlying Gaussian [mu, amp, sigma]
+%                .gauss_params– [nPeaks x 3]: underlying Gaussian [CF (Hz),
+%                               height (log10), sigma (Hz)], linear-frequency
+%                               Gaussians as in specparam
 %                .r_squared   – R² of full model vs. log10 PSD
 %                .error       – MAE of full model vs. log10 PSD
 %                .freqs_used  – frequency vector used for fitting
 %                .flags       – struct: fitFailed, highError, noConverge
 %              plus .params   – copy of options used
 %
-% Algorithm (Donoghue et al., 2020, Nat Neurosci)
-%   1. Trim spectrum to FreqRange; convert to log10 power vs log10 frequency.
-%   2. Initial aperiodic fit (robustfit on log-log, ignoring peaks).
+% Algorithm (Donoghue et al., 2020, Nat Neurosci; mirrors specparam 2.0
+% SpectralFitAlgorithm._fit step by step)
+%   1. Trim spectrum to FreqRange; log10 power.
+%   2. Robust initial aperiodic fit: simple fit, flatten, clip negatives to
+%      0, refit on points <= 0.025th percentile of the clipped residual
+%      (i.e. points at/below the first fit), as specparam _robust_ap_fit.
 %   3. Subtract initial aperiodic → flattened spectrum.
-%   4. Iteratively detect and fit Gaussian peaks on flattened spectrum.
-%   5. Robust aperiodic re-fit after removing peak regions.
+%   4. Greedy peak search on the flattened spectrum (Gaussians in LINEAR Hz,
+%      guess width from FWHM, guess subtracted), drop edge / overlapping
+%      guesses, then one joint bounded fit of all Gaussians.
+%   5. Simple (non-robust) aperiodic re-fit on the peak-removed spectrum.
 %   6. Final full model = aperiodic + sum of Gaussians; compute R² and MAE.
 %
 % The aperiodic model in log10 space:
@@ -82,7 +89,7 @@ p.addRequired('freqs', @(x) isnumeric(x) && isvector(x));
 p.addRequired('psd',   @(x) isnumeric(x) && ismatrix(x));
 p.addParameter('FreqRange',       [1 40],      @(x) isnumeric(x) && numel(x)==2);
 p.addParameter('AperiodicMode',   'fixed',     @(s) ischar(s) || isstring(s));
-p.addParameter('MaxPeaks',        6,           @(x) isnumeric(x) && isscalar(x) && x >= 0);
+p.addParameter('MaxPeaks',        3,           @(x) isnumeric(x) && isscalar(x) && x >= 0);
 p.addParameter('MinPeakHeight',   0.05,        @(x) isnumeric(x) && isscalar(x) && x >= 0);
 p.addParameter('PeakThreshold',   2.0,         @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('PeakWidthLimits', [1 12],     @(x) isnumeric(x) && numel(x)==2);
@@ -164,7 +171,7 @@ if opts.Parallel && ~isempty(ver('parallel'))
 
     parfor ch = 1:nchan
         logp = log10(max(psd(ch, fmask), eps));  % [1 x nFit], guard zero
-        [exp_ch, off_ch, chInfo] = fooof_single(logf, logp(:), opts);
+        [exp_ch, off_ch, chInfo] = fooof_single(f_use(:), logf, logp(:), opts);
         exponent(ch) = exp_ch;
         offset(ch)   = off_ch;
         knee_all{ch}  = chInfo.knee;
@@ -200,7 +207,7 @@ else
 
     for ch = 1:nchan
         logp = log10(max(psd(ch, fmask), eps));
-        [exponent(ch), offset(ch), chInfo] = fooof_single(logf, logp(:), opts);
+        [exponent(ch), offset(ch), chInfo] = fooof_single(f_use(:), logf, logp(:), opts);
         info.knee{ch}         = chInfo.knee;
         info.ap_fit{ch}       = chInfo.ap_fit;
         info.flat_spec{ch}    = chInfo.flat_spec;
@@ -226,15 +233,17 @@ end
 %% Helpers
 
 % Single-spectrum worker
-function [exp_out, off_out, out] = fooof_single(logf, logp, opts)
-% logf, logp: [nFit x 1] column vectors (log10 scale)
+function [exp_out, off_out, out] = fooof_single(f_lin, logf, logp, opts)
+% f_lin: [nFit x 1] frequencies (Hz); logf, logp: [nFit x 1] log10 values.
+% Step order and rules follow specparam 2.0 SpectralFitAlgorithm._fit.
 
 out = init_out();
 
-% Initial aperiodic fit (robust, ignores peaks)
-ap0 = fit_aperiodic(logf, logp, opts.AperiodicMode);
+% Initial aperiodic fit, robust to peaks (specparam _robust_ap_fit)
+ap0 = fit_aperiodic_robust(logf, logp, opts.AperiodicMode);
 if any(~isfinite(ap0))
     out.flags.fitFailed = true;
+    out.knee = ap0;   % param-vector shape ([NaN NaN] or [NaN NaN NaN])
     exp_out = NaN; off_out = NaN;
     return
 end
@@ -243,51 +252,30 @@ end
 ap_spec0  = aperiodic_model(logf, ap0, opts.AperiodicMode);
 flat_spec = logp - ap_spec0;
 
-% Iterative Gaussian peak detection on flattened spectrum
-gauss_params = find_peaks(logf, flat_spec, opts);  % [nPeaks x 3]: [mu amp sigma]
+% Peak search + joint Gaussian fit, Gaussians in LINEAR frequency (Hz)
+gauss_params = find_peaks(f_lin, flat_spec, opts);  % [nPeaks x 3]: [cf_Hz height std_Hz]
+gauss_fit    = eval_gaussians(reshape(gauss_params.', 1, []), f_lin, size(gauss_params,1));
 
-% Create peak-removed spectrum; re-fit aperiodic (Donoghue et al. 2020)
-% Subtract the full joint-refit peak model from the original log PSD.
-if ~isempty(gauss_params)
-    peak_model = zeros(size(logf));
-    for pk = 1:size(gauss_params,1)
-        peak_model = peak_model + gauss_params(pk,2) .* ...
-            exp(-0.5 .* ((logf - gauss_params(pk,1)) ./ gauss_params(pk,3)).^2);
-    end
-    logp_rm_peaks = logp - peak_model;   % peak-removed spectrum
-    ap_params = fit_aperiodic(logf, logp_rm_peaks, opts.AperiodicMode);
-    if any(~isfinite(ap_params)), ap_params = ap0; end
-else
-    ap_params = ap0;
-end
+% Final aperiodic fit: simple (non-robust) fit on the peak-removed spectrum,
+% also when no peak was found (specparam _simple_ap_fit on _spectrum_peak_rm)
+ap_params = fit_aperiodic(logf, logp - gauss_fit, opts.AperiodicMode);
+if any(~isfinite(ap_params)), ap_params = ap0; end
 
 % Compute final full model and goodness of fit
 ap_fit   = aperiodic_model(logf, ap_params, opts.AperiodicMode);
-gauss_fit = zeros(size(logf));
-for pk = 1:size(gauss_params,1)
-    gauss_fit = gauss_fit + gauss_params(pk,2) .* ...
-        exp(-0.5 * ((logf - gauss_params(pk,1)) ./ gauss_params(pk,3)).^2);
-end
 full_fit = ap_fit + gauss_fit;
 ss_res = sum((logp - full_fit).^2);
 ss_tot = sum((logp - mean(logp)).^2);
 r2  = 1 - ss_res / max(ss_tot, eps);
 mae = mean(abs(logp - full_fit));
 
-% Convert Gaussian params to peak params (CF, power, BW)
-% CF    = mu  (Hz, convert from log10)
-% power = height of model above aperiodic at CF (log10 power units)
-% BW    = 2 * sigma in log10 freq → convert back to Hz approximation
+% Peak params (specparam 'log_sub' / 'full_width' converters):
+% CF = Gaussian centre (Hz); power = full model minus aperiodic at the bin
+% nearest CF (= periodic model there, log10); BW = 2*std (Hz)
 peak_params = zeros(size(gauss_params));
 for pk = 1:size(gauss_params,1)
-    cf_log = gauss_params(pk,1);         % log10(CF)
-    cf_hz  = 10^cf_log;
-    % Height above aperiodic at CF
-    ap_at_cf = aperiodic_model(cf_log, ap_params, opts.AperiodicMode);
-    pw = gauss_fit(find(logf >= cf_log, 1));  % model height at CF bin
-    if isempty(pw), pw = gauss_params(pk,2); end
-    bw_hz = 2 * gauss_params(pk,3) * cf_hz * log(10);   % first-order approx
-    peak_params(pk,:) = [cf_hz, pw - ap_at_cf, bw_hz]; %#ok<FNDSB>
+    [~, ind] = min(abs(f_lin - gauss_params(pk,1)));
+    peak_params(pk,:) = [gauss_params(pk,1), gauss_fit(ind), 2 * gauss_params(pk,3)];
 end
 
 % Pack outputs
@@ -320,15 +308,37 @@ end
 end
 
 
+% Robust aperiodic fitting (specparam _robust_ap_fit)
+function params = fit_aperiodic_robust(logf, logp, mode)
+% 1) simple fit; 2) flatten, clip negative residuals to 0; 3) keep points at
+% or below the 0.025th percentile of the clipped residual (numpy 'linear'
+% percentile) - in practice every point on/below the first fit, so peaks
+% cannot pull the line up; 4) refit on those points, warm-started.
+logf = logf(:); logp = logp(:);
+p0 = fit_aperiodic(logf, logp, mode);
+if any(~isfinite(p0)), params = p0; return; end
+flat = logp - aperiodic_model(logf, p0, mode);
+flat(flat < 0) = 0;
+s    = sort(flat);
+pos  = 0.025/100 * (numel(s) - 1);          % numpy.percentile, linear interp
+lo   = floor(pos);
+thr  = s(lo+1) + (pos - lo) * (s(min(lo+2, numel(s))) - s(lo+1));
+mask = flat <= thr;
+if nnz(mask) < numel(p0) + 1, params = p0; return; end
+params = fit_aperiodic(logf(mask), logp(mask), mode, p0);
+if any(~isfinite(params)), params = p0; end
+end
+
+
 % Aperiodic fitting
-function params = fit_aperiodic(logf, logp, mode)
-% Least-squares fit of the aperiodic model in log10 space.
-% Uses MATLAB's lsqcurvefit if available, otherwise OLS (fixed mode only).
+function params = fit_aperiodic(logf, logp, mode, x0)
+% Least-squares fit of the aperiodic model in log10 space (specparam
+% _simple_ap_fit). Fixed mode is linear in log-log -> exact OLS. Knee mode
+% uses lsqcurvefit if available, otherwise fminsearch; x0 optional guess.
 
 logf = logf(:); logp = logp(:);
 
 if strcmp(mode, 'fixed')
-    % Linear in log-log: logp = b0 - b1*logf  →  OLS
     X      = [ones(size(logf)) -logf];
     beta   = X \ logp;
     params = [beta(1); beta(2)];
@@ -338,10 +348,14 @@ else
     % Initial guess: run fixed first for offset/exponent, knee = median power
     X       = [ones(size(logf)) -logf];
     beta0   = X \ logp;
-    off0    = beta0(1);
-    exp0    = max(0, beta0(2));
-    knee0   = 10^median(logf) / 2;
-    x0      = [off0, knee0, exp0];
+    if nargin < 4 || isempty(x0)
+        off0    = beta0(1);
+        exp0    = max(0, beta0(2));
+        knee0   = 10^median(logf) / 2;
+        x0      = [off0, knee0, exp0];
+    else
+        x0      = [x0(1), max(0, x0(2)), max(0, x0(3))];
+    end
     lb      = [-inf, 0,   0   ];
     ub      = [ inf, inf, inf ];
     model_fn = @(b, lf) b(1) - log10(abs(b(2)) + 10.^(b(3) .* lf));
@@ -362,95 +376,105 @@ end
 end
 
 
-% Peak detection
-function gauss_params = find_peaks(logf, flat_spec, opts)
-% Iteratively find and fit Gaussians on the flattened spectrum.
-% Returns [nPeaks x 3]: [log10(CF), amplitude, sigma_log10]
+% Peak detection (specparam _fit_peaks, Gaussians in linear Hz)
+function gauss_params = find_peaks(f, flat_spec, opts)
+% Returns [nPeaks x 3]: [CF (Hz), height (log10 power), std (Hz)], by CF.
 
-logf      = logf(:);
+f         = f(:);
 flat_spec = flat_spec(:);
-nF        = numel(logf);
-freq_res  = mean(diff(logf));                  % log10 Hz resolution
+freq_res  = f(2) - f(1);
+std_lim   = opts.PeakWidthLimits / 2;           % 2-sided BW -> 1-sided std
+f_range   = [f(1) f(end)];
 
-% Convert Hz width limits to log10-space sigma limits
-% BW = 2*sigma (Hz) ≈ 2*sigma_log * CF * ln(10);  sigma_log ≈ BW/(2*CF*ln(10))
-% Use approximate: sigma_log_min = log10-space half-width
-% Simpler conservative approach: convert limits at geometric mean frequency
-f_mid     = 10^mean(logf);
-sigma_min = (opts.PeakWidthLimits(1)/2) / (f_mid * log(10));
-sigma_max = (opts.PeakWidthLimits(2)/2) / (f_mid * log(10));
-sigma_min = max(sigma_min, freq_res);          % cannot be < freq resolution
+% 1) Greedy search: take the max, stop on relative/absolute height, guess
+%    the width from the FWHM, subtract the GUESS Gaussian, repeat.
+guess     = zeros(0,3);
+flat_iter = flat_spec;
+while size(guess,1) < opts.MaxPeaks
+    [max_height, max_ind] = max(flat_iter);
+    if max_height <= opts.PeakThreshold * std(flat_iter, 1), break; end  % numpy std (ddof=0)
+    if ~(max_height > opts.MinPeakHeight), break; end
 
-gauss_params = zeros(0,3);
-flat_iter    = flat_spec;
-
-for pk = 1:opts.MaxPeaks
-    % Find candidate peak: maximum of flattened spectrum
-    [peak_val, peak_idx] = max(flat_iter);
-
-    % Stop if peak is below absolute or relative threshold
-    if peak_val < opts.MinPeakHeight, break; end
-    if peak_val < opts.PeakThreshold * std(flat_iter), break; end
-
-    % Initial Gaussian guess at peak
-    cf_guess    = logf(peak_idx);
-    amp_guess   = peak_val;
-    sigma_guess = max(sigma_min, freq_res * 2);
-
-    % Fit Gaussian to neighborhood around peak (±3 sigma)
-    win   = abs(logf - cf_guess) <= 3 * sigma_guess * 3;
-    if sum(win) < 3
-        win = abs(logf - cf_guess) <= 5 * freq_res;
+    fwhm = estimate_fwhm(flat_iter, max_ind, freq_res);
+    if isnan(fwhm)
+        g_std = mean(opts.PeakWidthLimits);      % specparam fallback
+    else
+        g_std = fwhm / (2 * sqrt(2 * log(2)));
     end
-    xfit  = logf(win);
-    yfit  = flat_iter(win);
+    if g_std < std_lim(1), g_std = std_lim(1); end
+    if g_std > std_lim(2), g_std = std_lim(1); end   % sic: specparam resets to lower limit
 
-    gauss_fn = @(b, x) b(2) .* exp(-0.5 .* ((x - b(1)) ./ b(3)).^2);
-    x0_g     = [cf_guess, amp_guess, sigma_guess];
-    lb_g     = [logf(1),   0,         sigma_min ];
-    ub_g     = [logf(end), Inf,       sigma_max ];
-    opts_ls  = optimset('Display','off','TolX',1e-8,'TolFun',1e-8,'MaxIter',1000);
-
-    try
-        if ~isempty(which('lsqcurvefit'))
-            gfit = lsqcurvefit(gauss_fn, x0_g, xfit, yfit, lb_g, ub_g, opts_ls);
-        else
-            cost = @(b) sum((yfit - gauss_fn(b,xfit)).^2);
-            gfit = fminsearch(cost, x0_g, opts_ls);
-            gfit(3) = max(sigma_min, min(sigma_max, abs(gfit(3))));
-        end
-    catch
-        gfit = x0_g;
-    end
-
-    % Validate fitted peak
-    if gfit(2) < opts.MinPeakHeight, break; end
-    if gfit(3) < sigma_min || gfit(3) > sigma_max, break; end
-
-    gauss_params(end+1,:) = gfit; %#ok<AGROW>
-
-    % Subtract this Gaussian from flattened spectrum before next iteration
-    flat_iter = flat_iter - gauss_fn(gfit, logf);
+    cur = [f(max_ind), max_height, g_std];
+    guess(end+1,:) = cur; %#ok<AGROW>
+    flat_iter = flat_iter - eval_gaussians(cur, f, 1);
 end
 
-% Final joint re-fit of all Gaussians simultaneously if > 1 peak found
-if size(gauss_params,1) > 1
-    all_gauss = @(b, x) eval_gaussians(b, x, size(gauss_params,1));
-    x0_all    = gauss_params(:).';
-    lb_all    = repmat([logf(1),   0,         sigma_min], 1, size(gauss_params,1));
-    ub_all    = repmat([logf(end), Inf,       sigma_max], 1, size(gauss_params,1));
-    opts_ls   = optimset('Display','off','TolX',1e-8,'TolFun',1e-8,'MaxIter',3000);
-    try
-        if ~isempty(which('lsqcurvefit'))
-            x_fit = lsqcurvefit(all_gauss, x0_all, logf, flat_spec, lb_all, ub_all, opts_ls);
-        else
-            cost  = @(b) sum((flat_spec - all_gauss(b, logf)).^2);
-            x_fit = fminsearch(cost, x0_all, opts_ls);
+% 2) Drop guesses too close to the edges (|CF - edge| <= 1 std) ...
+if ~isempty(guess)
+    keep  = abs(guess(:,1) - f_range(1)) > guess(:,3) & ...
+            abs(guess(:,1) - f_range(2)) > guess(:,3);
+    guess = guess(keep,:);
+end
+% ... and the lower of any adjacent pair overlapping at +/-0.75 std
+if size(guess,1) > 1
+    guess = sortrows(guess, 1);
+    bnds  = [guess(:,1) - 0.75*guess(:,3), guess(:,1) + 0.75*guess(:,3)];
+    drop  = false(size(guess,1),1);
+    for k = 1:size(guess,1)-1
+        if bnds(k,2) > bnds(k+1,1)
+            if guess(k,2) <= guess(k+1,2), drop(k) = true; else, drop(k+1) = true; end
         end
-        gauss_params = reshape(x_fit, 3, []).';
-    catch
-        % keep greedy fit
     end
+    guess = guess(~drop,:);
+end
+
+if isempty(guess)
+    gauss_params = zeros(0,3);
+    return
+end
+
+% 3) Joint bounded fit of all guesses on the whole flattened spectrum:
+%    CF within +/- 2*1.5*std of guess (clipped to range), height >= 0,
+%    std within PeakWidthLimits/2.
+nP = size(guess,1);
+x0 = reshape(guess.', 1, []);                  % [cf1 h1 s1 cf2 h2 s2 ...]
+lb = zeros(1, 3*nP); ub = zeros(1, 3*nP);
+for k = 1:nP
+    lcf = guess(k,1) - 2*1.5*guess(k,3);
+    hcf = guess(k,1) + 2*1.5*guess(k,3);
+    lb(3*k-2:3*k) = [max(lcf, f_range(1)), 0,   std_lim(1)];
+    ub(3*k-2:3*k) = [min(hcf, f_range(2)), Inf, std_lim(2)];
+end
+fun     = @(b, x) eval_gaussians(b, x, nP);
+opts_ls = optimset('Display','off','TolX',1e-8,'TolFun',1e-8,'MaxIter',3000, ...
+                   'MaxFunEvals',5000);
+try
+    if ~isempty(which('lsqcurvefit'))
+        x_fit = lsqcurvefit(fun, x0, f, flat_spec, lb, ub, opts_ls);
+    else
+        cost  = @(b) sum((flat_spec - fun(b, f)).^2);
+        x_fit = min(max(fminsearch(cost, x0, opts_ls), lb), ub);
+    end
+catch
+    x_fit = x0;                                % keep guesses
+end
+gauss_params = sortrows(reshape(x_fit, 3, []).', 1);
+end
+
+
+function fwhm = estimate_fwhm(flat, peak_ind, freq_res)
+% specparam estimate_fwhm: half-max crossing on each side, keep the shorter
+% side (robust to overlapping neighbours); NaN if neither side crosses.
+half = 0.5 * flat(peak_ind);
+le = find(flat(2:peak_ind-1) <= half, 1, 'last');       % numpy range stops at index 1
+if ~isempty(le), le = le + 1; end
+ri = find(flat(peak_ind+1:end) <= half, 1, 'first');
+if ~isempty(ri), ri = ri + peak_ind; end
+sides = [abs(le - peak_ind), abs(ri - peak_ind)];
+if isempty(sides)
+    fwhm = NaN;
+else
+    fwhm = min(sides) * 2 * freq_res;
 end
 end
 

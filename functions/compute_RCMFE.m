@@ -146,6 +146,10 @@ if useDQ
     dq = parallel.pool.DataQueue;
     nDone = 0;
     afterEach(dq, @notifyProgress);
+else
+    % parfor body references dq only when showProg is true; define a
+    % placeholder so the broadcast variable always exists.
+    dq = [];
 end
 
 if parallelMode && ~isempty(ver('parallel'))

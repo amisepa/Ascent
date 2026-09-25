@@ -98,7 +98,7 @@ EEG = ascent_compute(EEG, 'measure', 'Aperiodic', 'timeResolved', true,...
 EEG = ascent_compute(EEG, 'measure', 'MSE', ...
     'coarsing', 'mean', ...     % 'median' 'mean' 'trimmed mean' 'std' 'var'
     'num_scales', 20, ...       % number of scale factors to compute (default = 20; range = 5-100 depending on sample rate)
-    'zNorm', 1, ...          % per-channel z-normalization
+    'zNorm', 1, ...             % varying tolerance across scales: 0 = OFF (default), 1 = std, 2 = var, 3 = mad(mean), 4 = mad(median)
     'parallel', false, 'progress', true);
 
 
