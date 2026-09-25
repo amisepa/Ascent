@@ -9,8 +9,27 @@
   are obsolete.
 - DONE: ascent_group_analysis.m ExSEnt HDA now gets its own compute_mcc (was
   reusing the HA mask).
-- OPEN: figures that need the MATLAB desktop (graphics hang under -batch):
-  run make_revision_figures.m (Figs 4, 5, 6).
+- NEXT (session after 2026-09-25): the user ran make_revision_figures.m in the
+  MATLAB desktop -> manuscript/figures/regen (DONE.txt when finished). Then:
+  1. python manuscript/tools/compose_insert.py manuscript/figures/regen
+     "manuscript/Cannard and Delorme 2026 v13 Entropy - clean for Google Docs.docx"
+     "manuscript/Cannard and Delorme 2026 v14 Entropy.docx"
+     (composes Figs 4, 5, 6, 7, 10, 11 and swaps them in; Fig 6 becomes one image).
+  2. Check text against the new figures: Fig 4/5 topography wording
+     (3.2.2, 4.3, 4.4: "posterior-dominant", "right-lateralized", IC14 alpha map);
+     Fig 7 values vs regen/fig7*_values.csv (text already uses the recomputed
+     values); Figs 10/11 cluster numbers vs regen/PSD_*_summary.csv (text uses
+     the headless rerun; rng(1) in both, should match); Fig 6 HDA panel, then
+     delete the Word comment on the Fig 6 caption.
+  3. Render to PDF via Word COM (guarded: abort if New-Object attached to an
+     existing WINWORD) and look at every figure page.
+- TODO (user request): check the revised paper and response letter cannot be
+  flagged as AI-generated anywhere (run detectors; review phrasing, uniform
+  sentence rhythm, stock words such as "notably", "underscores",
+  "comprehensive", em-dash density; keep the authors' voice).
+- DECIDE: the old top-level figures/ folder is deleted in the working tree
+  (moved to manuscript/figures, untracked) but still tracked in git; check
+  README image links before committing that deletion.
 - OPEN: knee mode still differs from specparam (offset MAE ~0.5) — starting
   guesses/bounds of the knee fit.
 - OPEN: ascent_compute passes no tau to compute_SampEn (tau always 1);

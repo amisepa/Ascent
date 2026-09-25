@@ -1,0 +1,5 @@
+_archive/
+scratch_aperiodic/
+manuscript/
+*.log
+.claude/settings.local.json

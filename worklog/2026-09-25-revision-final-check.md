@@ -102,3 +102,19 @@ abstract, and intro if needed. Keep the journal template formatting."
   Psychophysiology 2026.
 - Figures 4, 5, 6, 7, 10, 11 need the MATLAB desktop: make_revision_figures.m ->
   manuscript/figures/regen; scratchpad compose_insert.py composes and swaps them.
+
+## Hand-off (end of session)
+- Deliverables in manuscript/: v13 clean docx (Google-Docs-safe) + PDF;
+  Revision 1 - Reviewer comments v4 (tracked). v12 tracked files are superseded.
+- Revision tooling copied from the session scratchpad to manuscript/tools/
+  (compose_insert.py, docx_xml.py helpers, final_xml.py round-2 edits,
+  group_aperiodic_rerun.m, ap_full.m, stats_recheck.m + serial stubs,
+  word_ops.ps1). manuscript/ is git-ignored (private drafts).
+- Root cleanup: downloaded specparam source copies (_sp_*.py, some were 404
+  pages), one-off scripts and logs moved to _archive/dev_2026-09/ (ignored).
+  scratch_aperiodic/ left in place (used by make_revision_figures.m).
+- Open items: see TODO.md "NEXT" (insert regenerated figures, verify text)
+  and the AI-detection check the user asked for.
+- Citations: the new EO/EC caveats cite published work (Gerster 2022,
+  Kałamała 2026), not the unpublished GLM aperiodic paper, so no preprint is
+  needed for this submission.
