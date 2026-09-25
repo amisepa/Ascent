@@ -34,7 +34,11 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %   Multiscale measures (MSE, mMSE, MFE, RCMFE, RCmvMFE):
 %     'coarsing'         - Coarse-graining method: 'mean', 'median', 'std', 'var' (default: 'mean')
 %     'num_scales'       - Number of scale factors (default: 30)
-%     'zNorm'            - z-normalize per channel
+%     'zNorm'            - Varying-tolerance rescaling across scales, integer 0-4
+%                          (default: 0 = OFF, i.e. fixed tolerance / classic Costa)
+%                            1 = std, 2 = var, 3 = mad(mean), 4 = mad(median)
+%                          of each coarse-grained series. MSE, MFE, CMFE and
+%                          RCMFE only; ignored by mMSE and RCmvMFE.
 %     'filter_mode'      - Scale filtering: 'none' or 'narrowband' (mMSE only)
 %     'TimeOnly'         - compute time-resolved mMSE only
 %     'TimeWin'          - Window length for time-resolved mMSE (default: [])
@@ -49,12 +53,12 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %
 %   Aperiodic (passed automatically from GUI, or set individually):
 %     'aperiodicmode'    - Aperiodic fit mode: 'fixed' (default) or 'knee'
-%     'maxpeaks'         - Max number of spectral peaks to fit (default: 6)
+%     'maxpeaks'         - Max number of spectral peaks to fit (default: 3)
 %     'minpeakheight'    - Min peak height above aperiodic (default: 0.05)
 %     'peakthreshold'    - Peak detection threshold in SDs (default: 2.0)
 %     'peakwidthlimits'  - [min max] peak width in Hz (default: [1 12])
 %     'correctaperiodic' - Subtract aperiodic model from PSD, logical (default: true)
-%                          Important: only valid with aperiodicmode = fixed.
+%                          In knee mode the full Lorentzian model is removed.
 %     'alphaband'        - [fMin fMax] Hz for the saved alpha power (default: [8 13])
 %     'timeresolved'     - Compute sliding-window aperiodic fit, logical (default: false)
 %                          slidWinSec (2 s) and slidOverlap (.5 for 50%).
@@ -79,7 +83,8 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %   EEG.ascent.aperiodic.data.alpha_raw     - total alpha power [signals x 1], µV²/Hz
 %                                             (includes the aperiodic background)
 %   EEG.ascent.aperiodic.data.alpha_osc     - alpha power above the 1/f fit
-%                                             [signals x 1], µV²/Hz. NaN in knee mode.
+%                                             [signals x 1], µV²/Hz (both modes;
+%                                             knee mode uses the Lorentzian model)
 %   EEG.ascent.aperiodic.data.exp_slid      - time-resolved exponent [channels x times]
 %   EEG.ascent.aperiodic.data.off_slid      - time-resolved offset   [channels x times]
 %   EEG.ascent.aperiodic.data.times_slid    - window centre times (s) [1 x times]
@@ -335,29 +340,27 @@ switch lower(measure)
             'Parallel',        parallel,        ...
             'Progress',        progress);
 
-        % Step 3: aperiodic model, band power, and corrected PSD (FIXED MODE ONLY)
+        % Step 3: aperiodic model, band power, and corrected PSD (all modes)
         % Two different quantities, deliberately kept apart:
         %   psd_corrected — RATIO to the fit (dimensionless, ~1 where the fit is good)
         %   alpha_osc     — absolute oscillatory power in uV^2/Hz (alpha_raw minus fit)
         % They are not on a common scale; do not plot them against each other.
-        [alpha_raw, alpha_osc, ap_model] = ...
-            compute_AperiodicBandPower(freqs, psd, exponent, offset, alphaBand);
-
-        psd_corrected = [];   % stays empty when correction is off or not applicable
-        if strcmpi(aperiodicMode, 'fixed')
-            if correctAperiodic
-                psd_corrected = psd ./ ap_model;   % = 10.^(log10(psd) - (offset - exp*log10(f)))
-                disp('Aperiodic component subtracted from PSD.');
-            end
+        % Knee mode uses the full Lorentzian model (offset - log10(knee+f^exp)),
+        % matching upstream specparam/FOOOF, whose flattened spectrum is
+        % computed on every fit regardless of aperiodic mode.
+        if strcmpi(aperiodicMode, 'knee')
+            knee_vec = cellfun(@(k) k(2), info.knee);   % knee is param 2 in knee mode
+            [alpha_raw, alpha_osc, ap_model] = ...
+                compute_AperiodicBandPower(freqs, psd, exponent, offset, alphaBand, knee_vec);
         else
-            % The knee model is not a straight line in log-log space, so the
-            % linear reconstruction the helper uses does not describe it.
-            % alpha_raw is still valid (plain band-averaged PSD); the
-            % oscillatory split is not.
-            alpha_osc = nan(size(alpha_osc));
-            if correctAperiodic
-                warning('Aperiodic correction is only valid for fixed mode. Skipping correction.');
-            end
+            [alpha_raw, alpha_osc, ap_model] = ...
+                compute_AperiodicBandPower(freqs, psd, exponent, offset, alphaBand);
+        end
+
+        psd_corrected = [];   % stays empty when correction is off
+        if correctAperiodic
+            psd_corrected = psd ./ ap_model;   % ratio to the fitted model
+            disp('Aperiodic component subtracted from PSD.');
         end
 
         % Step 4 (optional): sliding-window (time-resolved) aperiodic fit.
@@ -389,8 +392,8 @@ switch lower(measure)
         % scales = 1:num_scales;
 
         % Ascent improved MSE (BUG???)
-        [entropy, scales] = compute_MSE(data, 'm', m, 'tau', tau, ...
-            'coarsing', coarsing, 'num_scales', num_scales, ...
+        [entropy, scales] = compute_MSE(data, 'm', m, 'tau', tau, 'r', r, ...
+            'coarsing', coarsing, 'num_scales', num_scales, 'zNorm', zNorm, ...
             'Parallel', parallel, 'Progress', progress);
 
     case 'mmse'
@@ -405,19 +408,19 @@ switch lower(measure)
         % Multiscale Fuzzy Entropy — Azami & Escudero (2016)
         [entropy, scales] = compute_MFE(data, 'm', m, ...
             'tau', tau, 'r', r, 'coarsing', coarsing, 'num_scales', num_scales, ...
-            'Parallel', parallel, 'Progress', progress);
+            'zNorm', zNorm, 'Parallel', parallel, 'Progress', progress);
 
     case 'cmfe'
         % Composite Multiscale Fuzzy Entropy (CMFE) — Azami & Escudero (2016)
         [entropy, scales] = compute_CMFE(data, 'm', m, 'tau', tau, ...
             'r', r, 'n', n, 'coarsing', coarsing, 'num_scales', num_scales, ...
-            'Parallel', parallel, 'Progress', progress);
+            'zNorm', zNorm, 'Parallel', parallel, 'Progress', progress);
 
     case 'rcmfe'
         % Refined Composite Multiscale Fuzzy Entropy (RCMFE) — Azami & Escudero (2016)
         [entropy, scales] = compute_RCMFE(data, 'm', m, 'tau', tau, ...
             'r', r, 'n', n, 'coarsing', coarsing, 'num_scales', num_scales, ...
-            'Parallel', parallel, 'Progress', progress);
+            'zNorm', zNorm, 'Parallel', parallel, 'Progress', progress);
 
     case 'rcmvmfe'
         % Refined Composite Multivariate Multiscale Fuzzy Entropy
@@ -445,7 +448,7 @@ switch lower(measure)
         EEG.ascent.(measure).data.freqs     = freqs;
         % Band power saved so the figures plot what was computed, not their own
         % re-derivation. alpha_raw is total power (uV^2/Hz, includes the 1/f);
-        % alpha_osc is the part above the fit (same unit). NaN in knee mode.
+        % alpha_osc is the part above the fit (same unit, both modes).
         EEG.ascent.(measure).data.alpha_raw = alpha_raw;
         EEG.ascent.(measure).data.alpha_osc = alpha_osc;
         EEG.ascent.(measure).params.alphaBand = alphaBand;

@@ -33,6 +33,8 @@ function p = ascent_get_params(EEG, varargin)
 %   Multiscale (MSE, mMSE, MFE, RCMFE, RCmvMFE):
 %     p.coarsing         coarse-graining: 'mean'|'median'|'std'|'var'   (default: 'mean')
 %     p.num_scales       number of scale factors                        (default: 30)
+%     p.zNorm            varying-tolerance rescaling, integer 0-4       (default: 0 = OFF)
+%                        Ignored by mMSE and RCmvMFE (not supported).
 %     p.filter_mode      'none' | 'narrowband' (mMSE only)             (default: 'narrowband' if mMSE)
 %     p.TimeWin          window length for time-resolved mMSE          (default: [])
 %     p.TimeStep         step size for time-resolved mMSE              (default: [])
@@ -51,7 +53,7 @@ function p = ascent_get_params(EEG, varargin)
 %     p.windowType     taper window type                      (default: 'hann')
 %     p.aperiodicMode  'fixed' | 'knee'                       (default: 'fixed')
 %     p.fitFreqRange   specparam fitting range [fMin fMax] Hz (default: p.freqRange)
-%     p.maxPeaks       max number of spectral peaks to fit    (default: 6)
+%     p.maxPeaks       max number of spectral peaks to fit    (default: 3)
 %     p.minPeakHeight  min peak height above aperiodic (log)  (default: 0.05)
 %     p.peakThreshold  peak detection threshold (SDs)         (default: 2.0)
 %     p.peakWidthLimits [min max] peak width in Hz            (default: [1 12])
@@ -75,6 +77,7 @@ p.progress         = [];
 % Multiscale
 p.coarsing         = [];
 p.num_scales       = [];
+p.zNorm            = [];
 p.filter_mode      = [];
 p.TimeWin          = [];
 p.TimeStep         = [];
@@ -176,6 +179,7 @@ else
             case 'progress',         p.progress         = logical(val);
             case 'coarsing',         p.coarsing         = val;
             case 'num_scales',       p.num_scales       = double(val);
+            case 'znorm',            p.zNorm            = double(val);
             case 'filter_mode',      p.filter_mode      = val;
             case 'timewin',          p.TimeWin          = double(val);
             case 'timestep',         p.TimeStep         = double(val);
@@ -246,16 +250,31 @@ if isempty(p.parallel)
     disp('Parallel computing not set: ON (default).');
     p.parallel = true;
 end
+% Always numeric: ascent_compute unpacks p.zNorm for every measure, not just
+% the multiscale ones that actually use it.
+if isempty(p.zNorm)
+    p.zNorm = 0;    % fixed tolerance across scales (classic Costa)
+end
+if ~isscalar(p.zNorm) || ~ismember(p.zNorm, 0:4)
+    error(['zNorm must be an integer 0-4 (0 = fixed tolerance across scales, ' ...
+           '1 = std, 2 = var, 3 = mad(mean), 4 = mad(median)).']);
+end
 
 % Multiscale defaults
 if contains(lower(p.measure), {'mse','mmse','mfe','cmfe','rcmfe','rcmvmfe'})
     if isempty(p.coarsing)
-        disp('No coarse-graining method selected: using Standard Deviation (default).');
+        disp('No coarse-graining method selected: using Mean (default).');
         p.coarsing = 'mean';
     end
     if isempty(p.num_scales)
         disp('Number of scales not set: using 30 (default).');
         p.num_scales = 30;
+    end
+    % mMSE and RCmvMFE have no varying-tolerance option; say so rather than
+    % silently dropping the request.
+    if p.zNorm ~= 0 && any(strcmpi(p.measure, {'mMSE','RCmvMFE'}))
+        warning('zNorm is not supported by %s: using a fixed tolerance across scales (zNorm = 0).', p.measure);
+        p.zNorm = 0;
     end
     if isempty(p.filter_mode)
         if strcmpi(p.measure, 'mmse')
@@ -298,7 +317,7 @@ if strcmpi(p.measure, 'aperiodic')
     if isempty(p.windowType),       p.windowType       = 'hann';       end
     if isempty(p.aperiodicMode),    p.aperiodicMode    = 'fixed';      end
     if isempty(p.fitFreqRange),     p.fitFreqRange     = p.freqRange;  end
-    if isempty(p.maxPeaks),         p.maxPeaks         = 6;            end
+    if isempty(p.maxPeaks),         p.maxPeaks         = 3;            end
     if isempty(p.minPeakHeight),    p.minPeakHeight    = 0.05;         end
     if isempty(p.peakThreshold),    p.peakThreshold    = 2.0;          end
     if isempty(p.peakWidthLimits),  p.peakWidthLimits  = [1 12];       end

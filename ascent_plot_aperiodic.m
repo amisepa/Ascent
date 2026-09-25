@@ -393,20 +393,20 @@ hold(ax4, 'on');
 bandNames  = {'Theta', 'Alpha', 'Beta'};
 bandEdges  = [4 8; 8 13; 13 30];
 clrBands   = {[0.47 0.67 0.19], [0.85 0.33 0.10], [0.49 0.18 0.56]};
-src        = psd_t;
-srcLabel   = 'Raw';
-if hasCorrected
-    src      = psd_corr_t;
-    srcLabel = 'Corrected';
-end
 
 hLinesRaw  = gobjects(1, 3);
 hLines     = gobjects(1, 3);
+% Raw and corrected traces are different quantities: raw band averages are
+% absolute power (uV^2/Hz), while the aperiodic-corrected PSD is a RATIO to
+% the fit (dimensionless, ~1 where the fit is good -> log10 ~ 0). Plotting
+% them on shared axes would mix units, so corrected traces get their own
+% right-hand axis with its own label.
+yyaxis(ax4, 'left');
 for ib = 1:3
     fMask = freqs >= bandEdges(ib, 1) & freqs <= bandEdges(ib, 2);
     if ~any(fMask), continue; end
 
-    % --- Raw (plotted first, underneath) ---
+    % --- Raw (left axis, absolute power) ---
     band_raw_avg = squeeze(mean(log10(psd_t(:, fMask, :) + eps), 2, 'omitnan'));
     if nChan == 1, band_raw_avg = band_raw_avg(:)'; end
     raw_mean = mean(band_raw_avg, 1, 'omitnan');
@@ -417,11 +417,18 @@ for ib = 1:3
          'EdgeColor', 'none', 'HandleVisibility', 'off');
     hLinesRaw(ib) = plot(ax4, times, raw_mean, '--', ...
         'Color', clrBands{ib} * 0.55 + 0.45, ...
-        'LineWidth', 1.2, 'DisplayName', bandNames{ib});
+        'LineWidth', 1.2, 'DisplayName', [bandNames{ib} ' (raw)']);
+end
+ylabel(ax4, 'Raw (log_{10} \muV^2/Hz)');
+ax4.YColor = [0.35 0.35 0.35];
 
-    % --- Corrected (plotted on top) ---
-    if hasCorrected
-        band_freq_avg = squeeze(mean(log10(src(:, fMask, :) + eps), 2, 'omitnan'));
+if hasCorrected
+    yyaxis(ax4, 'right');
+    for ib = 1:3
+        fMask = freqs >= bandEdges(ib, 1) & freqs <= bandEdges(ib, 2);
+        if ~any(fMask), continue; end
+        % --- Corrected (right axis, ratio to the aperiodic fit) ---
+        band_freq_avg = squeeze(mean(log10(psd_corr_t(:, fMask, :) + eps), 2, 'omitnan'));
         if nChan == 1, band_freq_avg = band_freq_avg(:)'; end
         band_mean = mean(band_freq_avg, 1, 'omitnan');
         band_sd   = std(band_freq_avg,  0, 1, 'omitnan');
@@ -431,19 +438,27 @@ for ib = 1:3
         hLines(ib) = plot(ax4, times, band_mean, '-', 'Color', clrBands{ib}, ...
             'LineWidth', 1.8, 'DisplayName', [bandNames{ib} ' (corrected)']);
     end
+    ylabel(ax4, 'Corrected (log_{10} ratio)');
+    ax4.YColor = [0.35 0.35 0.35];
 end
 
-% Legend: raw first, then corrected - placed outside to the right
+% Legend: raw first, then corrected - placed outside to the right.
+% With yyaxis, one legend per side is the robust approach: left legend for
+% raw traces (eastoutside), right legend for corrected traces (below it).
 validRaw  = isgraphics(hLinesRaw);
 validCorr = isgraphics(hLines);
-allH = [hLinesRaw(validRaw) hLines(validCorr)];
-if ~isempty(allH)
-    legend(ax4, allH, 'Location', 'eastoutside', 'Box', 'off', 'FontSize', 10);
+% One legend listing raw (dashed) and corrected (solid) traces; a second
+% legend() call on a yyaxis axes replaces the first, so both sets go in one.
+hLeg = [hLinesRaw(validRaw) hLines(validCorr)];
+if ~isempty(hLeg)
+    legend(ax4, hLeg, 'Location', 'eastoutside', 'Box', 'off', 'FontSize', 9);
 end
+yyaxis(ax4, 'left');
 
 xlabel(ax4, xLabel);
-ylabel(ax4, 'log_{10} \muV^2/Hz');
-title(ax4, sprintf('%s PSD band averages  (mean \\pm SD)', srcLabel), 'FontWeight', 'bold');
+% Per-axis y-labels were set above (raw left, corrected right); no shared
+% ylabel here, as the two traces are different quantities.
+title(ax4, 'PSD band averages: raw vs corrected  (mean \pm SD)', 'FontWeight', 'bold');
 xlim(ax4, [times(1) times(end)]);
 set(ax4, 'TickDir', 'out'); box(ax4, 'on');
 
@@ -452,7 +467,8 @@ set(findall(hFig, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
 colormap(hFig, 'parula');
 try
     sgtitle(hFig, 'Aperiodic time course', 'FontSize', 14, 'FontWeight', 'bold');
-catch; end
+catch
+end
 
 % Align all plot axes to the same left edge and width so every row lines up.
 % Strategy: take the tightest common bounds across all axes (max left edge,
@@ -471,10 +487,21 @@ leftEdges  = arrayfun(@(a) a.Position(1),              plotAxes);
 rightEdges = arrayfun(@(a) a.Position(1)+a.Position(3), plotAxes);
 refLeft  = max(leftEdges);
 refWidth = min(rightEdges) - refLeft;
-for ax = plotAxes
+% The band-averages panel (ax4) has a right-hand yyaxis with a rotated label;
+% exclude it from the width alignment and give it its own narrower width so
+% its right-side label fits inside the figure. All other rows stay aligned.
+plotAxesNo4 = plotAxes(plotAxes ~= ax4);
+leftEdges  = arrayfun(@(a) a.Position(1),              plotAxesNo4);
+rightEdges = arrayfun(@(a) a.Position(1)+a.Position(3), plotAxesNo4);
+refLeft  = max(leftEdges);
+refWidth = min(rightEdges) - refLeft;
+for ax = plotAxesNo4
     pp = ax.Position;
     ax.Position = [refLeft, pp(2), refWidth, pp(4)];
 end
+drawnow;
+pp4 = ax4.Position;
+ax4.Position = [refLeft, pp4(2), refWidth - 0.085, pp4(4)];  % room for right ylabel
 cbW   = 0.025;
 cbGap = 0.008;
 for ii = 1:numel(cbAxes)

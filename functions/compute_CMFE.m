@@ -123,6 +123,8 @@ if useDQ
     dq = parallel.pool.DataQueue;
     nDone = 0;
     afterEach(dq, @notifyProgress);
+else
+    dq = [];   % placeholder: referenced in parfor but only sent to when useDQ
 end
 
 if parallelMode && ~isempty(ver('parallel'))
