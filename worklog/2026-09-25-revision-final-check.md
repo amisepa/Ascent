@@ -77,3 +77,28 @@ abstract, and intro if needed. Keep the journal template formatting."
 - Abstract ~230 words (MDPI guideline ~200).
 - Plugin code changes described in the paper (P_max 3, robust fit, pruning,
   knee correction, zNorm) are uncommitted in the working tree.
+
+## Round 2 (afternoon)
+- Google Docs import: tracked edits inside equations and Word "#(n)" numbering
+  don't survive -> deliver a clean copy (v13) with equations followed by a
+  tab + "(n)" in plain text, math style normalized (Word had stored bold-italic).
+- specparam port fixed by agent (compute_AperiodicFit.m): robust initial fit
+  now specparam's; ASCENT vs Python r > 0.999 (was offset r 0.45 synthetic);
+  ground-truth offset recovery 0.52 -> 0.97. Committed + pushed 5002f81.
+- Subject-level rerun (fixed code): channel r(exp,off) 0.901 -> 0.812, offset
+  1.055±0.327, alpha 22% aperiodic; ICA IC14, r 0.884 -> 0.844, 47%; sliding
+  unchanged to 2 dp.
+- Group aperiodic recomputed with current code/defaults (scratchpad
+  group_aperiodic_rerun.m; written into the cached biosemi_data .mat files,
+  originals kept as *_backup_20260925.mat): exponent 52 ch (AF7 t 5.63),
+  offset 61 ch (P8 t 5.89); raw PSD 1-30 Hz +, 20.75-40 Hz − (AF7), 17.5-18 −;
+  corrected PSD now 2 clusters: 4.5-24 Hz + (PO3 9 Hz), 34.75-40 Hz − (POz).
+  Fig 7 values recomputed (old recomputation reproduces published values).
+- Filtering: data show a 50 Hz low-pass in both conditions -> Methods updated.
+- GLM aperiodic project (~/Documents/MATLAB/eeg_glm_aperiodic_covariate)
+  cross-check: EO/EC fitted-aperiodic changes are leakage/artefact-prone;
+  spatial r ~ 0 is not evidence of dissociation; ratio correction = multiplicative.
+  Discussion 4.1/4.3/4.5/4.6 and Methods 2.4 caveats added. Kałamała now
+  Psychophysiology 2026.
+- Figures 4, 5, 6, 7, 10, 11 need the MATLAB desktop: make_revision_figures.m ->
+  manuscript/figures/regen; scratchpad compose_insert.py composes and swaps them.
