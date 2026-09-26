@@ -9,24 +9,19 @@
   are obsolete.
 - DONE: ascent_group_analysis.m ExSEnt HDA now gets its own compute_mcc (was
   reusing the HA mask).
-- NEXT (session after 2026-09-25): the user ran make_revision_figures.m in the
-  MATLAB desktop -> manuscript/figures/regen (DONE.txt when finished). Then:
-  1. python manuscript/tools/compose_insert.py manuscript/figures/regen
-     "manuscript/Cannard and Delorme 2026 v13 Entropy - clean for Google Docs.docx"
-     "manuscript/Cannard and Delorme 2026 v14 Entropy.docx"
-     (composes Figs 4, 5, 6, 7, 10, 11 and swaps them in; Fig 6 becomes one image).
-  2. Check text against the new figures: Fig 4/5 topography wording
-     (3.2.2, 4.3, 4.4: "posterior-dominant", "right-lateralized", IC14 alpha map);
-     Fig 7 values vs regen/fig7*_values.csv (text already uses the recomputed
-     values); Figs 10/11 cluster numbers vs regen/PSD_*_summary.csv (text uses
-     the headless rerun; rng(1) in both, should match); Fig 6 HDA panel, then
-     delete the Word comment on the Fig 6 caption.
-  3. Render to PDF via Word COM (guarded: abort if New-Object attached to an
-     existing WINWORD) and look at every figure page.
-- TODO (user request): check the revised paper and response letter cannot be
-  flagged as AI-generated anywhere (run detectors; review phrasing, uniform
-  sentence rhythm, stock words such as "notably", "underscores",
-  "comprehensive", em-dash density; keep the authors' voice).
+- DONE 2026-09-25: v14 docx + PDF (manuscript/) with the regenerated Figs 4–7,
+  10, 11, text checked against them, Fig 6 comment removed, Figs 1/6 no longer
+  overflow the page. Details: worklog/2026-09-25-insert-regenerated-figures.md.
+- DONE 2026-09-25 evening: v15 (manuscript/): clean, changes since v6 SUBMITTED
+  in red, edits since v14 (tracked), PDFs; letter v5 clean + tracked. Figures
+  4–11 regenerated, phrasing review, Discussion restructured, references checked
+  against Crossref. Rebuild: `bash manuscript/tools/build_v15.sh <scratch>`.
+  Details: worklog/2026-09-25-insert-regenerated-figures.md.
+- NEXT (user): import v15 clean into Google Docs as the new master; submit the
+  red version + letter v5; delete the old blue-tracked Google Doc copy.
+- OPEN (eeg_robust_statistics repo): pull_clusters' 2D path labels clusters on
+  the unsigned mask, so adjacent positive/negative regions merge; ASCENT scripts
+  now use a local pull_clusters_by_sign. Consider a sign-split option there.
 - DECIDE: the old top-level figures/ folder is deleted in the working tree
   (moved to manuscript/figures, untracked) but still tracked in git; check
   README image links before committing that deletion.
