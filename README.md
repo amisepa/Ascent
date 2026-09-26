@@ -1,6 +1,6 @@
 
 <p align="center" width="100%">
-  <img width="50%" alt="BrainBeats logo"
+  <img width="50%" alt="ASCENT logo"
        src="https://raw.githubusercontent.com/amisepa/Ascent/main/ascent_ai_img2.png">
 </p>
 
@@ -37,21 +37,24 @@ https://psyarxiv.com/xwmyk/
 ## Illustration 
 
 We computed all of ASCENT's measures for two conditions of 64-channel Biosemi data: eyes-open vs eyes-closed resting state (N = 40).
-We then performed (5,000 iterations) bootstrap statistics to identify the significant differences under the null hypothesis (H0; α = 0.05), and applied threshold-free cluster enhancement (TFCE) correction to control for the family-wise-error (FWE; Type 1 error), highlighting the significant spatiotemporal clusters. 
+We then compared conditions with paired permutation t-tests (2,000 permutations; α = 0.05) and cluster-based correction for the family-wise error (FWE; Type 1 error), highlighting the significant spatial or spatiotemporal clusters (script: ascent_group_analysis.m).
 
-For the multiscale measures, group analysis was performed using the mean as the coarse-graining method. 
+For the multiscale measures, group analysis was performed with both the standard deviation and the mean as the coarse-graining method.
 
 Time to compute everything with 32 GB of RAM and 10 cores with parallel computing: ~11 hours. 
 
 ### Uniscale measures
 
-<img alt="uniscales" src="https://github.com/amisepa/Ascent/blob/main/figures/figure2.png" width="50%" />
-
-<img alt="multiscale_std" src="https://github.com/amisepa/Ascent/blob/main/figures/fig3.png"  width="50%" />
-
+<img alt="uniscales" src="img/fig_uniscales.png" width="70%" />
 
 ### Multiscale measures
 
-<img alt="multiscale_median" src="https://github.com/amisepa/Ascent/blob/main/figures/figure4.png"  width="50%" />
+Standard deviation coarse-graining:
+
+<img alt="multiscale_sd" src="img/fig_multiscale_sd.png" width="70%" />
+
+Mean coarse-graining:
+
+<img alt="multiscale_mean" src="img/fig_multiscale_mean.png" width="70%" />
 
 

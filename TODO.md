@@ -22,9 +22,6 @@
 - OPEN (eeg_robust_statistics repo): pull_clusters' 2D path labels clusters on
   the unsigned mask, so adjacent positive/negative regions merge; ASCENT scripts
   now use a local pull_clusters_by_sign. Consider a sign-split option there.
-- DECIDE: the old top-level figures/ folder is deleted in the working tree
-  (moved to manuscript/figures, untracked) but still tracked in git; check
-  README image links before committing that deletion.
 - OPEN: knee mode still differs from specparam (offset MAE ~0.5) — starting
   guesses/bounds of the knee fit.
 - OPEN: ascent_compute passes no tau to compute_SampEn (tau always 1);
