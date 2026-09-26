@@ -459,6 +459,7 @@ subplot(2,4,1)
 % legend('EC','','EO',''); xlabel('SampEn') % title('SampEn')
 % set(findall(gcf,'type','axes'),'fontSize',10,'fontweight','bold');
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(SampEn1, SampEn2, nPerm, ct, grp_type);
+rng(1);  % fixed seed per test (same as make_revision_figures.m)
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(SampEn1, SampEn2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
@@ -481,6 +482,7 @@ disp("         MEASURE: FuzzEn")
 % nexttile
 subplot(2,4,2)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(FuzzEn1, FuzzEn2, nPerm, ct, grp_type);
+rng(1);  % fixed seed per test (same as make_revision_figures.m)
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(FuzzEn1, FuzzEn2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
@@ -502,6 +504,7 @@ disp("         MEASURE: ExSent (Duration)")
 % nexttile
 subplot(2,4,3)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(ExSEnt1_1, ExSEnt2_1, nPerm, ct, grp_type);
+rng(1);  % fixed seed per test (same as make_revision_figures.m)
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(ExSEnt1_1, ExSEnt2_1, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
@@ -523,6 +526,7 @@ disp("         MEASURE: ExSEnt (Amplitude)")
 % nexttile
 subplot(2,4,4)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(ExSEnt1_2, ExSEnt2_2, nPerm, ct, grp_type);
+rng(1);  % fixed seed per test (same as make_revision_figures.m)
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(ExSEnt1_2, ExSEnt2_2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
@@ -544,6 +548,7 @@ disp("         MEASURE: ExSEnt (Duration + Amplitude)")
 % nexttile
 subplot(2,4,5)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(ExSEnt1_3, ExSEnt2_3, nPerm, ct, grp_type);
+rng(1);  % fixed seed per test (same as make_revision_figures.m)
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(ExSEnt1_3, ExSEnt2_3, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
@@ -565,6 +570,7 @@ disp("         MEASURE: Higuchi Fractal Dimension")
 % nexttile
 subplot(2,4,6)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(FracDim1, FracDim2, nPerm, ct, grp_type);
+rng(1);  % fixed seed per test (same as make_revision_figures.m)
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(FracDim1, FracDim2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
@@ -586,6 +592,7 @@ disp("         MEASURE: Aperiodic Exponent")
 % nexttile
 subplot(2,4,7)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(Exponent1, Exponent2, nPerm, ct, grp_type);
+rng(1);  % fixed seed per test (same as make_revision_figures.m)
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(Exponent1, Exponent2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
@@ -607,6 +614,7 @@ disp("         MEASURE: Aperiodic Offset")
 % nexttile
 subplot(2,4,8)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(Offset1, Offset2, nPerm, ct, grp_type);
+rng(1);  % fixed seed per test (same as make_revision_figures.m)
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(Offset1, Offset2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
@@ -854,10 +862,11 @@ num_scales = length(scales);
 %% MSE
 
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(MSE1, MSE2, nPerm, ct, grp_type);
+rng(1);  % fixed seed per test (same as make_revision_figures.m)
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(MSE1, MSE2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
-[mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
-    'nonlinear', grp_type, {size(MSE1,3) size(MSE2,3)},  [], [], [], 'g');
+[mask_clusters, summary_tbl] = pull_clusters_by_sign(mask, tvals, scales, chanlocs, ...
+    'nonlinear', grp_type, {size(MSE1,3) size(MSE2,3)}, []);
 plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
 title("MSE")
 set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold');
@@ -865,7 +874,7 @@ saveas(gcf, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_main.fig', coarsing
 print(gcf, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
 if ~isempty(mask_clusters)
     writetable(summary_tbl, fullfile(outputs_path, sprintf('MSE_%s_perm_tfce_summary.csv', coarsing)));
-    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, scales, chanlocs, 'MSE', ...
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, MSE1 - MSE2, scales, chanlocs, 'EC - EO MSE', ...
         'DataType', 'scalp', 'Domain', 'nonlinear');
     for i = 1:numel(hs.curve)
         xlim(findobj(hs.curve{i}, 'Type', 'axes'), [2 scales(end)]);
@@ -883,11 +892,12 @@ end
 % scales_bounds(1) = []; 
 
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(mMSE1, mMSE2, nPerm, ct, grp_type);
+rng(1);  % fixed seed per test (same as make_revision_figures.m)
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(mMSE1, mMSE2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 if any(mask, 'all')
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
-        'nonlinear', grp_type, {size(mMSE1,3) size(mMSE2,3)}, 2, [], [], 'g');
+    [mask_clusters, summary_tbl] = pull_clusters_by_sign(mask, tvals, scales, chanlocs, ...
+        'nonlinear', grp_type, {size(mMSE1,3) size(mMSE2,3)}, 2);
     plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
     title("mMSE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold'); 
     ax = findobj(hs.curve{i}, 'Type', 'axes');
@@ -902,7 +912,7 @@ if any(mask, 'all')
     print(gcf, fullfile(outputs_path, sprintf('mMSE_%s_perm_main_uncorrected.png', coarsing)), '-dpng', '-r300');
 
     writetable(summary_tbl, fullfile(outputs_path, sprintf('mMSE_%s_perm_summary_uncorrected.csv', coarsing)));
-    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, scales, chanlocs, 'mMSE', ...
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, mMSE1 - mMSE2, scales, chanlocs, 'EC - EO mMSE', ...
         'DataType', 'scalp', 'Domain', 'nonlinear');
     for i = 1:numel(hs.curve)
         saveas(hs.topo{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_cluster-%g_topo_uncorrected.fig', coarsing, i)));
@@ -924,18 +934,19 @@ end
 %% MFE
 
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(MFE1, MFE2, nPerm, ct, grp_type);
+rng(1);  % fixed seed per test (same as make_revision_figures.m)
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(MFE1, MFE2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 if any(mask, 'all')
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
-        'nonlinear', grp_type, {size(MFE1,3) size(MFE2,3)}, [], [], [], 'g');
+    [mask_clusters, summary_tbl] = pull_clusters_by_sign(mask, tvals, scales, chanlocs, ...
+        'nonlinear', grp_type, {size(MFE1,3) size(MFE2,3)}, []);
     plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
     title("MFE"); %set(get(gca,'Title'), 'Color', 'k', 'FontSize', 14, 'FontWeight', 'bold');
     saveas(gcf, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_main.fig', coarsing)));
     print(gcf, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
 
     writetable(summary_tbl, fullfile(outputs_path, sprintf('MFE_%s_perm_tfce_summary.csv', coarsing)));
-    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, scales, chanlocs, 'MFE', ...
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, MFE1 - MFE2, scales, chanlocs, 'EC - EO MFE', ...
         'DataType', 'scalp', 'Domain', 'nonlinear');
     for i = 1:numel(hs.curve)
         xlim(findobj(hs.curve{i}, 'Type', 'axes'), [2 scales(end)]);
@@ -960,18 +971,19 @@ else
 end
 
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(RCMFE1, RCMFE2, nPerm, ct, grp_type);
+rng(1);  % fixed seed per test (same as make_revision_figures.m)
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(RCMFE1, RCMFE2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 if any(mask, 'all')
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, scales, chanlocs, ...
-        'nonlinear', grp_type, {size(RCMFE1,3) size(RCMFE2,3)}, [], [], [], 'g');
+    [mask_clusters, summary_tbl] = pull_clusters_by_sign(mask, tvals, scales, chanlocs, ...
+        'nonlinear', grp_type, {size(RCMFE1,3) size(RCMFE2,3)}, []);
     plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
     title("RCMFE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold');
     saveas(gcf, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_main.fig', coarsing)));
     print(gcf, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_main.png', coarsing)), '-dpng', '-r300');
 
     writetable(summary_tbl, fullfile(outputs_path, sprintf('RCMFE_%s_perm_tfce_summary.csv', coarsing)));
-    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, scales, chanlocs, 'RCMFE', ...
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, RCMFE1 - RCMFE2, scales, chanlocs, 'EC - EO RCMFE', ...
         'DataType', 'scalp', 'Domain', 'nonlinear');
     for i = 1:numel(hs.curve)
         xlim(findobj(hs.curve{i}, 'Type', 'axes'), xlims_curve_plot);
@@ -1003,13 +1015,14 @@ end
 y_unit = 'dB';   % '\muV^2/Hz'  or 'dB'
 
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(10*log10(PSD1), 10*log10(PSD2), nPerm, ct, grp_type);
+rng(1);  % fixed seed per test (same as make_revision_figures.m)
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(10*log10(PSD1), 10*log10(PSD2), nPerm, ct, grp_type);
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(PSD1, PSD2, nPerm, ct, grp_type);
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(PSD1, PSD2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 if any(mask, 'all')
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, freqs, chanlocs, ...
-        'frequency', grp_type, {size(PSD1,3) size(PSD2,3)}, 1, [], [], 'g');
+    [mask_clusters, summary_tbl] = pull_clusters_by_sign(mask, tvals, freqs, chanlocs, ...
+        'frequency', grp_type, {size(PSD1,3) size(PSD2,3)}, 1);
     writetable(summary_tbl, fullfile(outputs_path, 'PSD_raw_summary.csv'));
 
     plot_results('frequency', 'scalp', freqs, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
@@ -1018,8 +1031,8 @@ if any(mask, 'all')
     saveas(gcf, fullfile(outputs_path, 'PSD_raw_main.fig'));
     print(gcf, fullfile(outputs_path, 'PSD_raw_main.png'), '-dpng', '-r300');
 
-    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, chanlocs, ...
-        sprintf('Power (%s)', y_unit), 'DataType', 'scalp','Domain','Frequency');
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, 10*log10(PSD1) - 10*log10(PSD2), freqs, chanlocs, ...
+        'EC - EO power (dB)', 'DataType', 'scalp','Domain','Frequency');
     for i = 1:numel(hs.curve)
         saveas(hs.topo{i},  fullfile(outputs_path, sprintf('PSD_raw_cluster-%g_topo.fig', i)));
         print(hs.topo{i},   fullfile(outputs_path, sprintf('PSD_raw_cluster-%g_topo.png', i)), '-dpng', '-r300');
@@ -1041,13 +1054,14 @@ end
 % legend('eyes-closed','eyes-open')
 
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(10*log10(PSD_corr1), 10*log10(PSD_corr2), nPerm, ct, grp_type);
+rng(1);  % fixed seed per test (same as make_revision_figures.m)
 [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(10*log10(PSD_corr1), 10*log10(PSD_corr2), nPerm, ct, grp_type);
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(PSD_corr1, PSD_corr2, nPerm, ct, grp_type);
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(PSD_corr1, PSD_corr2, nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 if any(mask, 'all')
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, freqs, chanlocs, ...
-        'frequency', grp_type, {size(PSD_corr1,3) size(PSD_corr2,3)}, 0.5, [], [], 'g');
+    [mask_clusters, summary_tbl] = pull_clusters_by_sign(mask, tvals, freqs, chanlocs, ...
+        'frequency', grp_type, {size(PSD_corr1,3) size(PSD_corr2,3)}, 0.5);
     writetable(summary_tbl, fullfile(outputs_path, 'PSD_corrected_summary.csv'));
 
     plot_results('frequency', 'scalp', freqs, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
@@ -1056,8 +1070,8 @@ if any(mask, 'all')
     saveas(gcf, fullfile(outputs_path, 'PSD_corrected_main.fig'));
     print(gcf, fullfile(outputs_path, 'PSD_corrected_main.png'), '-dpng', '-r300');
 
-    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, chanlocs, ...
-        sprintf('Power (%s)', y_unit), 'DataType', 'scalp', 'Domain', 'frequency');
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, 10*log10(PSD_corr1) - 10*log10(PSD_corr2), freqs, chanlocs, ...
+        'EC - EO power (dB)', 'DataType', 'scalp', 'Domain', 'frequency');
     for i = 1:numel(hs.curve)
         saveas(hs.topo{i},  fullfile(outputs_path, sprintf('PSD_corrected_cluster-%g_topo.fig', i)));
         print(hs.topo{i},   fullfile(outputs_path, sprintf('PSD_corrected_cluster-%g_topo.png', i)), '-dpng', '-r300');
@@ -1115,6 +1129,24 @@ end
 
 
 %% Local helper
+
+function [masks, tbl] = pull_clusters_by_sign(mask, tvals, xaxis, chanlocs, datatype, grp_type, n, merge_thresh)
+% compute_mcc forms clusters on |t|, so a significant region can hold adjacent
+% positive and negative effects; pull_clusters then reports it under the sign of
+% its peak. For reporting, extract positive and negative clusters separately.
+% (Cluster curves in this script show the paired EC - EO difference, mean +/- 95% CI.)
+masks = {}; parts = {};
+for sg = [1 -1]
+    ms = mask & sign(tvals) == sg;
+    if ~any(ms(:)), continue, end
+    [mk, tb] = pull_clusters(ms, tvals, xaxis, chanlocs, datatype, grp_type, n, merge_thresh, [], [], 'g');
+    masks = [masks, mk]; parts{end+1} = tb; %#ok<AGROW>
+end
+if isempty(parts), tbl = table; return, end
+tbl = vertcat(parts{:});
+[~, ord] = sortrows([tbl.Start tbl.End]); tbl = tbl(ord, :); masks = masks(ord);
+tbl.Cluster = (1:height(tbl))';
+end
 
 
 function lbl = format_scale_label(s)

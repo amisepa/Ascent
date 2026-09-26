@@ -13,19 +13,33 @@
 %
 % Output: manuscript/figures/regen/*.png (300 dpi). Panels are composed into
 % the final multi-panel figures outside MATLAB.
+%
+% To redo only some figures, set `sections` in the command window first, e.g.
+%   sections = {'psd'}; make_revision_figures
+% ('aperiodic' = Figs 4-5, 'uniscale' = Figs 6-7, 'multiscale' = Figs 8-9,
+%  'psd' = Figs 10-11)
 
+if ~exist('sections', 'var'), sections = {'aperiodic', 'uniscale', 'multiscale', 'psd'}; end
 root    = fileparts(mfilename('fullpath'));
 eegRoot = fullfile(fileparts(root), 'eeglab');
 statRoot = fullfile(fileparts(root), 'eeg_robust_statistics');
 outdir  = fullfile(root, 'manuscript', 'figures', 'regen');
 if ~exist(outdir, 'dir'), mkdir(outdir); end
 
+% EEGLAB plugin compat/legacy folders shadow MATLAB built-ins (pwelch, mean, randi, ...):
+% add everything quietly, then drop them
+warning('off', 'MATLAB:dispatcher:nameConflict');
 addpath(genpath(eegRoot)); addpath(root); addpath(fullfile(root, 'functions'));
-% EEGLAB plugin compat stubs shadow MATLAB built-ins (pwelch, mean, ...)
 bad = {fullfile(eegRoot,'plugins','Biosig3.8.5'), fullfile(eegRoot,'plugins','Fieldtrip-lite250523')};
 for k = 1:numel(bad), if exist(bad{k},'dir'), rmpath(genpath(bad{k})); end, end
+pp = strsplit(path, pathsep);
+pp = pp(startsWith(pp, fullfile(eegRoot, 'plugins')) & ~cellfun(@isempty, regexp(pp, '[\\/](compat|legacy)([\\/]|$)', 'once')));
+if ~isempty(pp), rmpath(pp{:}); end
+warning('on', 'MATLAB:dispatcher:nameConflict');
+say('Sections: %s', strjoin(sections, ', '));
 
 %% ---- Figs. 4-5: aperiodic, sample dataset ----
+if ismember('aperiodic', sections)
 scratch = fullfile(root, 'scratch_aperiodic');
 if ~exist(scratch, 'dir'), mkdir(scratch); end
 copyfile(fullfile(root, 'ascent_sample_data.set'), fullfile(scratch, 'ascent_sample_data.set'));
@@ -33,8 +47,9 @@ EEG = pop_loadset('filename', 'ascent_sample_data.set', 'filepath', scratch);
 
 for dom = {'channel', 'ica'}
     close all
+    say('Figs 4-5: %s-domain aperiodic, static + time-resolved (about 10 min, serial)', dom{1});
     ascent_compute(EEG, 'measure', 'Aperiodic', 'domain', dom{1}, 'timeResolved', true, ...
-        'vis', true, 'progress', false, 'parallel', false);
+        'vis', true, 'progress', true, 'parallel', false);
     figs = findobj('Type', 'figure');
     for k = 1:numel(figs)
         nm = get(figs(k), 'Name');
@@ -46,8 +61,9 @@ for dom = {'channel', 'ica'}
     end
 end
 close all
+end
 
-%% ---- Fig. 6: single-scale group topographies ----
+%% ---- group data: channel order shared by Figs. 6, 7, 10, 11 ----
 addpath(genpath(statRoot));
 data_path = 'C:\Users\ccann\Documents\biosemi_data';
 S = load(fullfile(data_path, 'ascent_outputs_EC_sd_new.mat'), 'chanlocs');
@@ -60,6 +76,9 @@ desired_order = {'Fp1','FPz','FP2','AF7','AF3','AFz','AF4','AF8','F7','F5','F3',
 [~, order_idx] = sort(loc, 'ascend');
 chanlocs = chanlocs(order_idx);
 
+%% ---- Fig. 6: single-scale group topographies ----
+if ismember('uniscale', sections)
+say('Figs 6-7: single-scale statistics (8 measures x 2000 permutations)');
 vars   = {'SampEn','FuzzEn','ExSEnt1','ExSEnt2','ExSEnt3','FracDim','Exponent','Offset'};
 titles = {'SampEn','FuzzEn','ExSEnt (duration)','ExSEnt (amplitude)','ExSEnt (amp + dur)', ...
           'HigFracDim','Aperiodic Exponent','Aperiodic Offset'};
@@ -94,35 +113,102 @@ plot_corrmatrix_with_text(R_global, names7, 'Global Spearman correlations of EC-
 plot_corrmatrix_with_text(R_spatial, names7, 'Spatial correlation of t-maps (EC vs EO)', fullfile(outdir, 'fig7B_corr_tmaps'));
 writematrix(round(R_global, 2), fullfile(outdir, 'fig7A_values.csv'));
 writematrix(round(R_spatial, 2), fullfile(outdir, 'fig7B_values.csv'));
+end
+
+%% ---- Figs. 8-9: multiscale entropy, SD (Fig. 8) and mean (Fig. 9) coarse-graining ----
+% Statistics as in ascent_group_analysis.m (cluster correction, 2000 permutations).
+% Curves: EC-EO difference at each cluster's peak channel, mean +/- 95% CI across
+% subjects (the group script passes tvals as the map, which plots t +/- 1.96).
+if ismember('multiscale', sections)
+for cg = {'sd', 'mean'}
+    E1 = load(fullfile(data_path, sprintf('ascent_outputs_EC_%s_new.mat', cg{1})), 'MSE', 'mMSE', 'MFE', 'RCMFE', 'scales');
+    E2 = load(fullfile(data_path, sprintf('ascent_outputs_EO_%s_new.mat', cg{1})), 'MSE', 'mMSE', 'MFE', 'RCMFE');
+    for m = {'MSE', 'mMSE', 'MFE', 'RCMFE'}
+        say('Figs 8-9: %s, %s coarse-graining', m{1}, cg{1});
+        x1 = E1.(m{1})(order_idx, :, :); x2 = E2.(m{1})(order_idx, :, :);
+        scales = E1.scales;
+        if strcmp(m{1}, 'RCMFE')   % RCMFE keeps scale 1 with mean coarse-graining only
+            if strcmp(cg{1}, 'sd'), x1(:, 1, :) = []; x2(:, 1, :) = []; else, scales = 1:scales(end); end
+        end
+        rng(1);
+        [tvals, pvals, tvals_H0, pvals_H0] = run_stats_permutation(x1, x2, 2000, 'mean', 'dpt');
+        mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, 2, 0.05, chanlocs);
+        tag = sprintf('%s_%s', m{1}, cg{1});
+        if ~any(mask(:)), fprintf('%s: no significant cluster\n', tag); continue, end
+        [mask_clusters, summary_tbl] = pull_clusters_by_sign(mask, tvals, scales, chanlocs, ...
+            'nonlinear', {size(x1,3) size(x2,3)}, []);
+        writetable(summary_tbl, fullfile(outdir, [tag '_summary.csv']));
+        plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
+        title(m{1}); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold');
+        print(gcf, fullfile(outdir, [tag '_main.png']), '-dpng', '-r300');
+        hs = plot_clusters(summary_tbl, mask_clusters, tvals, x1 - x2, scales, chanlocs, ...
+            sprintf('EC - EO %s', m{1}), 'DataType', 'scalp', 'Domain', 'nonlinear');
+        for i = 1:numel(hs.curve)
+            xlim(findobj(hs.curve{i}, 'Type', 'axes'), [scales(1) scales(end)]);
+            print(hs.topo{i},  fullfile(outdir, sprintf('%s_cluster-%g_topo.png', tag, i)), '-dpng', '-r300');
+            print(hs.curve{i}, fullfile(outdir, sprintf('%s_cluster-%g_curve.png', tag, i)), '-dpng', '-r300');
+        end
+        close all
+    end
+end
+end
 
 %% ---- Figs. 10-11: raw and aperiodic-corrected PSD ----
+if ismember('psd', sections)
 P1 = load(fullfile(data_path, 'ascent_outputs_EC_sd_new.mat'), 'PSD', 'PSD_corr', 'freqs');
 P2 = load(fullfile(data_path, 'ascent_outputs_EO_sd_new.mat'), 'PSD', 'PSD_corr');
 freqs = P1.freqs;
 psdSets = {'PSD', 'PSD_raw', 'Eyes closed vs. Eyes open - Classic PSD', 1; ...
            'PSD_corr', 'PSD_corrected', 'Eyes closed vs. Eyes open - Aperiodic-corrected PSD', 0.5};
 for k = 1:2
+    say('Figs 10-11: %s', psdSets{k,3});
     A = 10*log10(P1.(psdSets{k,1})(order_idx,:,:)); B = 10*log10(P2.(psdSets{k,1})(order_idx,:,:));
     rng(1);
     [tvals, pvals, tvals_H0, pvals_H0] = run_stats_permutation(A, B, 2000, 'mean', 'dpt');
     mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, 2, 0.05, chanlocs);
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, freqs, chanlocs, ...
-        'frequency', 'dpt', {size(A,3) size(B,3)}, psdSets{k,4}, [], [], 'g');
+    [mask_clusters, summary_tbl] = pull_clusters_by_sign(mask, tvals, freqs, chanlocs, ...
+        'frequency', {size(A,3) size(B,3)}, psdSets{k,4});
     writetable(summary_tbl, fullfile(outdir, [psdSets{k,2} '_summary.csv']));
     plot_results('frequency', 'scalp', freqs, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
     title(psdSets{k,3});
     set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold');
     print(gcf, fullfile(outdir, [psdSets{k,2} '_main.png']), '-dpng', '-r300');
-    hs = plot_clusters(summary_tbl, mask_clusters, tvals, tvals, freqs, chanlocs, ...
-        'Power (dB)', 'DataType', 'scalp', 'Domain', 'Frequency');
+    % curve = paired EC-EO difference at the peak channel, mean +/- 95% CI across
+    % subjects (passing tvals as the map plotted t +/- 1.96 under a dB label)
+    hs = plot_clusters(summary_tbl, mask_clusters, tvals, A - B, freqs, chanlocs, ...
+        'EC - EO power (dB)', 'DataType', 'scalp', 'Domain', 'Frequency');
     for i = 1:numel(hs.curve)
         print(hs.topo{i},  fullfile(outdir, sprintf('%s_cluster-%g_topo.png', psdSets{k,2}, i)), '-dpng', '-r300');
         print(hs.curve{i}, fullfile(outdir, sprintf('%s_cluster-%g_curve.png', psdSets{k,2}, i)), '-dpng', '-r300');
     end
 end
+end
 
-fid = fopen(fullfile(outdir, 'DONE.txt'), 'w'); fprintf(fid, '%s\n', datestr(now)); fclose(fid);
-disp('All revision figures written to manuscript/figures/regen')
+fid = fopen(fullfile(outdir, 'DONE.txt'), 'w'); fprintf(fid, '%s\n', char(datetime('now'))); fclose(fid);
+say('Done: figures written to manuscript/figures/regen');
+clear sections   % so a later plain run redoes everything
+
+%% ---- local functions ----
+function say(varargin)
+% timestamped progress line, flushed to the command window
+fprintf('[%s] %s\n', char(datetime('now', 'Format', 'HH:mm:ss')), sprintf(varargin{:})); drawnow;
+end
+
+function [masks, tbl] = pull_clusters_by_sign(mask, tvals, xaxis, chanlocs, datatype, n, merge_thresh)
+% compute_mcc forms clusters on |t|, so a significant region can hold adjacent
+% positive and negative effects; pull_clusters then reports it under the sign of
+% its peak. For reporting, extract positive and negative clusters separately.
+masks = {}; parts = {};
+for sg = [1 -1]
+    ms = mask & sign(tvals) == sg;
+    if ~any(ms(:)), continue, end
+    [mk, tb] = pull_clusters(ms, tvals, xaxis, chanlocs, datatype, 'dpt', n, merge_thresh, [], [], 'g');
+    masks = [masks, mk]; parts{end+1} = tb; %#ok<AGROW>
+end
+tbl = vertcat(parts{:});
+[~, ord] = sortrows([tbl.Start tbl.End]); tbl = tbl(ord, :); masks = masks(ord);
+tbl.Cluster = (1:height(tbl))';
+end
 
 %% ---- local functions (from ascent_group_analysis.m) ----
 function plot_corrmatrix_with_text(C, labels, title_str, save_path)
