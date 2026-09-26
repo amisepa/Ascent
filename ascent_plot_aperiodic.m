@@ -438,7 +438,7 @@ if hasCorrected
         hLines(ib) = plot(ax4, times, band_mean, '-', 'Color', clrBands{ib}, ...
             'LineWidth', 1.8, 'DisplayName', [bandNames{ib} ' (corrected)']);
     end
-    ylabel(ax4, 'Corrected (log_{10} ratio)');
+    ylabel(ax4, 'Corrected (log_{10})');   % longer label ran into the tick labels above
     ax4.YColor = [0.35 0.35 0.35];
 end
 
