@@ -107,6 +107,7 @@ p.slidWinSec       = [];
 p.slidOverlap      = [];
 p.slidNAvg         = [];
 p.slidPeakWidthLimits = [];
+p.save               = [];
 
 % ----------------------------
 % GUI or name-value parsing
@@ -205,7 +206,10 @@ else
             case 'slidoverlap',      p.slidOverlap      = double(val);
             case 'slidnavg',         p.slidNAvg         = double(val);
             case 'slidPeakWidthLimits', p.slidPeakWidthLimits         = double(val);
-                
+            case 'save'
+                % Batch-mode save policy consumed here ('never'|'auto'|'always');
+                % ascent_compute acts on it after computing. Not a GUI parameter.
+                p.save = val;
             otherwise
                 error('Unknown option: %s', key);
         end

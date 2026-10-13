@@ -581,8 +581,59 @@ else
 end
 
 % Save dataset with new outputs
-disp("Overwriting .set dataset to save the ASCENT outputs you computed. Note that this does not affect the rest of your EEG dataset.")
-EEG = pop_saveset(EEG, 'filename', EEG.filename, 'filepath', EEG.filepath);
+% ⚠ GUARD (2026-10-04): this save once OVERWROTE sourced data files. Batch
+% scripts that compute on a sliced copy of a dataset (e.g. tmp = EEG;
+% tmp.data = EEG.data(:, s1:s2)) inherit EEG.filename/filepath, so the save
+% silently replaced the ORIGINAL .set on disk with the one-block copy.
+% Behaviour now:
+%   'save', 'auto' (default): save ONLY when the dataset has not been
+%       resampled/referenced/filtered/sliced since load, i.e. when saving is
+%       actually safe; otherwise SKIP with a notice (outputs are in EEG.ascent
+%       in memory either way - callers who need them on disk should save under
+%       their own filename).
+%   'save', 'never': never touch disk.
+%   'save', 'always': old behaviour (explicitly requested overwrite).
+if isfield(p, 'save') && ~isempty(p.save)
+    saveOpt = lower(char(p.save));
+else
+    saveOpt = 'auto';
+end
+doSave = false;
+switch saveOpt
+    case 'never'
+        doSave = false;
+    case 'always'
+        doSave = true;
+    case 'auto'
+        % Save ONLY when the in-memory dataset still matches the file it
+        % claims to come from (channel count, sample count, event count).
+        % The known destructive pattern - batch scripts computing on a
+        % SLICED copy that inherited filename/filepath - always changes
+        % pnts and/or events, and is thereby refused. A plain GUI flow
+        % (load -> compute -> save, no processing in between) still saves
+        % exactly as before. Anything that cannot be verified is not saved.
+        try
+            assert(~isempty(EEG.filename) && ~isempty(EEG.filepath));
+            fpath = fullfile(EEG.filepath, EEG.filename);
+            assert(exist(fpath, 'file') == 2);
+            S0 = load(fpath, 'nbchan', 'pnts', 'EEG');
+            if isfield(S0, 'EEG'), S0 = S0.EEG; end
+            sigNow  = sprintf('%d:%d:%d', EEG.nbchan, EEG.pnts, numel(EEG.event));
+            sigFile = sprintf('%d:%d:%d', S0.nbchan, S0.pnts, numel(S0.event));
+            doSave = strcmp(sigNow, sigFile);
+        catch
+            doSave = false;   % cannot verify -> do not risk overwriting
+        end
+    otherwise
+        warning('ascent_compute: unknown ''save'' option ''%s''; not saving.', saveOpt);
+        doSave = false;
+end
+if doSave
+    disp("Overwriting .set dataset to save the ASCENT outputs you computed. Note that this does not affect the rest of your EEG dataset.")
+    EEG = pop_saveset(EEG, 'filename', EEG.filename, 'filepath', EEG.filepath);
+else
+    disp("ASCENT outputs kept in EEG.ascent (in memory only; dataset on disk NOT overwritten).")
+end
 
 disp('Done!');
 fprintf('Time to compute: %.2f minutes.\n', toc(tstart)/60);
