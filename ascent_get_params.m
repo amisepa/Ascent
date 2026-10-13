@@ -77,6 +77,7 @@ p.progress         = [];
 % Multiscale
 p.coarsing         = [];
 p.num_scales       = [];
+p.IncludeScale1    = [];
 p.zNorm            = [];
 p.filter_mode      = [];
 p.TimeWin          = [];
@@ -180,6 +181,7 @@ else
             case 'progress',         p.progress         = logical(val);
             case 'coarsing',         p.coarsing         = val;
             case 'num_scales',       p.num_scales       = double(val);
+            case 'includescale1',    p.IncludeScale1    = logical(val);
             case 'znorm',            p.zNorm            = double(val);
             case 'filter_mode',      p.filter_mode      = val;
             case 'timewin',          p.TimeWin          = double(val);
@@ -273,6 +275,9 @@ if contains(lower(p.measure), {'mse','mmse','mfe','cmfe','rcmfe','rcmvmfe'})
     if isempty(p.num_scales)
         disp('Number of scales not set: using 30 (default).');
         p.num_scales = 30;
+    end
+    if isempty(p.IncludeScale1)
+        p.IncludeScale1 = false;   % multiscale measures skip scale 1 by default
     end
     % mMSE and RCmvMFE have no varying-tolerance option; say so rather than
     % silently dropping the request.

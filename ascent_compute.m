@@ -152,6 +152,7 @@ parallel         = p.parallel;
 progress         = p.progress;
 coarsing         = p.coarsing;
 num_scales       = p.num_scales;
+IncludeScale1    = p.IncludeScale1;
 zNorm            = p.zNorm;
 filter_mode      = p.filter_mode;
 TimeWin          = p.TimeWin;
@@ -394,6 +395,7 @@ switch lower(measure)
         % Ascent improved MSE (BUG???)
         [entropy, scales] = compute_MSE(data, 'm', m, 'tau', tau, 'r', r, ...
             'coarsing', coarsing, 'num_scales', num_scales, 'zNorm', zNorm, ...
+            'IncludeScale1', IncludeScale1, ...
             'Parallel', parallel, 'Progress', progress);
 
     case 'mmse'
@@ -420,7 +422,8 @@ switch lower(measure)
         % Refined Composite Multiscale Fuzzy Entropy (RCMFE) — Azami & Escudero (2016)
         [entropy, scales] = compute_RCMFE(data, 'm', m, 'tau', tau, ...
             'r', r, 'n', n, 'coarsing', coarsing, 'num_scales', num_scales, ...
-            'zNorm', zNorm, 'Parallel', parallel, 'Progress', progress);
+            'zNorm', zNorm, 'IncludeScale1', IncludeScale1, ...
+            'Parallel', parallel, 'Progress', progress);
 
     case 'rcmvmfe'
         % Refined Composite Multivariate Multiscale Fuzzy Entropy
