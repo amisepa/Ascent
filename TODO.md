@@ -1,4 +1,36 @@
-# ASCENT — TODO
+# ASCENT: TODO
+
+## Status 2026-10-14 (supersedes the 09-25 "NEXT": do NOT submit v15)
+Critical pass on v15 done; v16 is one build away. Detail: worklog/2026-10-13-adversarial-
+pass-v16.md and manuscript/review_2026-10-13/README.md (private folder).
+- FIXED in the working tree, NOT committed: compute_psd.m (detrend across channels),
+  compute_AperiodicFit_sliding.m (pruning column), ascent_plot_multiscale.m (Fig 3 dipole
+  panel shows all dipolar ICs), ascent_compute_gui.m (headers), make_revision_figures.m
+  ('rcmfe' section, single-scale tests with scalp adjacency), Fig S1.
+- DONE (desktop): cached group outputs updated (backups *_before_detrend_fix.mat); Figs 2,
+  4-7, 10-11 regenerated; regen CSVs match the headless checks.
+- NEXT:
+  1. DONE 2026-10-14 11:09: Figs 2-3 regenerated (exact cluster outlines, 13-pt fonts,
+     Fig 2 panels stacked, MRI without the stray slab) and checked composed.
+  2. DONE 2026-10-22: Fig 1 screenshots in manuscript/figures/fig1_v16/ (same files as
+     img/gui_main.png, gui_multiscale.png, gui_aperiodic.png); caption A updated.
+  3. IRB: statements fixed and Informed Consent added (v16_edits_stage1.py). No protocol
+     code in [46] or on OSF; user parked it (2026-10-14): v16 goes without one.
+  4. `bash manuscript/tools/build_v16.sh <scratch> <fig1 dir>`; PDFs with
+     `pwsh -File manuscript/tools/render_pdf.ps1 <docx> ...`; check every figure page and
+     the numbers against manuscript/figures/regen/*.csv; then submit v16 red + letter v6.
+  5. Commit the code fixes when asked (plain messages, no co-author lines).
+- Decided: no disclosure statement added; Fig 2 uses the default 75th-percentile threshold.
+- OPEN (code, not fixed): ascent_compute.m:505-509 drops scale 2 in SD/var plots;
+  (fixed 2026-10-14: 'save' option ignored); tau never passed to SampEn, n never
+  to MFE/RCmvMFE; ascent_group_analysis.m no longer reproduces the paper (needs
+  'zNorm' 1 for MSE, 2 for MFE, IncludeScale1 for RCMFE-mean; EO preprocessing
+  block differs from EC); assess_speed_and_outputs.m cannot be rerun as shipped;
+  single-scale tests in ascent_group_analysis.m:463-468 pass [chan x subj], which
+  the statistics code clusters along the channel list (pass [chan x 1 x subj] as
+  make_revision_figures.m now does); compute_RCmvMFE scale 1 is always 0
+  (compute_RCmvMFE.m:150, by reading, not run);
+  ascent_sample_data.set ships with stale EEG.ascent outputs inside.
 
 ## Status 2026-09-25 (supersedes older notes below where they conflict)
 - DONE: knee-mode aperiodic correction (full Lorentzian removed) — item 2.
