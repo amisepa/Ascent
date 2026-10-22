@@ -19,7 +19,9 @@ pass-v16.md and manuscript/review_2026-10-13/README.md (private folder).
   4. `bash manuscript/tools/build_v16.sh <scratch> <fig1 dir>`; PDFs with
      `pwsh -File manuscript/tools/render_pdf.ps1 <docx> ...`; check every figure page and
      the numbers against manuscript/figures/regen/*.csv; then submit v16 red + letter v6.
-  5. Commit the code fixes when asked (plain messages, no co-author lines).
+  5. DONE 2026-10-22: code committed and pushed (history rewritten and slimmed to 57 MB);
+     GitHub release v2.1 with ASCENT2.1.zip. v16 manuscript + letter v6 built (no PDFs).
+  6. Upload ASCENT2.1.zip to the EEGLAB extension manager (plugin_uploader form).
 - Decided: no disclosure statement added; Fig 2 uses the default 75th-percentile threshold.
 - OPEN (code, not fixed): ascent_compute.m:505-509 drops scale 2 in SD/var plots;
   (fixed 2026-10-14: 'save' option ignored); tau never passed to SampEn, n never
