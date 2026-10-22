@@ -1,4 +1,4 @@
-function [measType, chanlist, tau, m, coarseType, nScales, extraParams, n, vis, parallelComp, progressTrack, dataDomain] = ascent_compute_gui(EEG)
+function [measType, chanlist, tau, m, coarseType, nScales, extraParams, n, vis, parallelComp, progressTrack, dataDomain, EEG] = ascent_compute_gui(EEG)
 % ascent_compute_gui - EEGLAB GUIs for ascent_compute parameter entry.
 %
 % Called internally by ascent_get_params. Not intended for direct use.
@@ -25,6 +25,9 @@ function [measType, chanlist, tau, m, coarseType, nScales, extraParams, n, vis, 
 %   parallelComp  - logical, use parallel computing
 %   progressTrack - logical, track progress in console
 %   dataDomain    - 'channel' (scalp channels) or 'ica' (independent components)
+%   EEG           - the dataset: the input, or the one loaded in GUI #1 (its
+%                   Data row loads a dataset or the sample dataset, as in
+%                   BrainBeats, so the window also opens with no dataset loaded)
 
 % Default outputs
 chanlist = []; tau = []; m = [];
@@ -32,8 +35,8 @@ coarseType = []; nScales = []; extraParams = []; n = [];
 vis = true; parallelComp = true; progressTrack = true;
 dataDomain = 'channel';
 
-if nargin < 1 || isempty(EEG)
-    error('EEG input is required.');
+if nargin < 1 || isempty(EEG) || ~isfield(EEG,'data') || isempty(EEG.data)
+    EEG = [];   % EEGLAB's empty set: GUI #1 offers to load one
 end
 
 % ---------------------------
@@ -59,9 +62,23 @@ domainCallback = [ ...
     'if dmVal == 2, set([hEd(:); hPb(:)],''enable'',''off''); ' ...
     'else, set([hEd(:); hPb(:)],''enable'',''on''); end' ];
 
-uigeom = { [0.5 0.5] [0.5 0.5] [0.5 0.35 0.15] [0.34 0.33 0.33] };
+uigeom   = { [0.25 0.75] [0.5 0.25 0.25] [1] [0.5 0.5] [0.5 0.5] [0.5 0.35 0.15] [0.34 0.33 0.33] };
+geomvert = [ 2 1 0.5 1 1 1 1 ];   % two-line dataset description
 
+% Data row (ascent_gui_data widens the window, adds the header band above it and
+% fills the dataset description). supergui shrinks each text control to the
+% height of its string, so the description starts with two lines (an empty one
+% would be left with no height). Text and pushbuttons give no entry in
+% inputgui's result, so the numbering of the entries parsed below does not change
 uilist = {
+    {'style' 'text'      'string' {'Dataset:' ' '}             'fontweight' 'bold'}
+    {'style' 'text'      'string' {'No dataset loaded.' 'Load one, or the sample dataset.'} ...
+     'tag' 'ascent_data' 'fontweight' 'bold'}
+    {}
+    {'style' 'pushbutton' 'string' 'Load dataset...' 'callback' "ascent_gui_data(gcbf,'load')"}
+    {'style' 'pushbutton' 'string' 'Sample dataset'  'callback' "ascent_gui_data(gcbf,'sample')"}
+    {}
+
     {'style' 'text'      'string' 'Measure to compute:'        'fontweight' 'bold'}   % 1
     {'style' 'popupmenu' 'string' meas 'value' 10}                                    % 2 (default 10 = RCMFE)
 
@@ -71,9 +88,11 @@ uilist = {
     {'style' 'text'      'string' 'M/EEG channels selection:'  'fontweight' 'bold'}   % 5
     {'style' 'edit'      'string' ''}                                                  % 6
     {'style' 'pushbutton' 'string' '...' 'enable' 'on' ...
-     'callback' "tmpEEG=get(gcbf,'userdata'); tmpchanlocs=tmpEEG.chanlocs; " + ...
+     'callback' "tmpEEG=get(gcbf,'userdata'); " + ...
+                "if isempty(tmpEEG), errordlg('Load a dataset first.','ASCENT'); else, " + ...
+                "tmpchanlocs=tmpEEG.chanlocs; " + ...
                 "[tmp,tmpval]=pop_chansel({tmpchanlocs.labels},'withindex','on'); " + ...
-                "set(findobj(gcbf,'style','edit'),'string',tmpval); " + ...
+                "set(findobj(gcbf,'style','edit'),'string',tmpval); end; " + ...
                 "clear tmp tmpEEG tmpchanlocs tmpval" }                                % 7
 
     {'style' 'checkbox'  'string' 'Visualize outputs'  'value' 1 'fontweight' 'bold'} % 8
@@ -81,7 +100,14 @@ uilist = {
     {'style' 'checkbox'  'string' 'Parallel computing' 'value' 1 'fontweight' 'bold'} % 10
     };
 
-param = inputgui(uigeom, uilist, 'pophelp(''ascent_compute'')', 'Ascent EEGLAB plugin', EEG);
+% OK without a dataset: say so and show the window again
+while true
+    [param, EEG] = inputgui('geometry', uigeom, 'geomvert', geomvert, 'uilist', uilist, ...
+        'helpcom', 'pophelp(''ascent_compute'')', 'title', 'Ascent EEGLAB plugin', ...
+        'userdata', EEG, 'eval', 'ascent_gui_data(fig,''init'')');
+    if isempty(param) || ~isempty(EEG), break; end
+    uiwait(errordlg('Load a dataset, or the sample dataset, before pressing OK.', 'ASCENT'));
+end
 
 set(0, 'DefaultFigureCloseRequestFcn', oldCloseFcn);
 
@@ -218,7 +244,7 @@ if strcmpi(measType, 'Aperiodic')
 
     uilistAP = {
         % --- PSD settings ---
-        {'style' 'text' 'string' '— PSD settings —' 'fontweight' 'bold' 'fontsize' 12}
+        {'style' 'text' 'string' 'PSD settings' 'fontweight' 'bold' 'fontsize' 12}
 
         {'style' 'text' 'string' 'Frequency range (Hz):'}
         {'style' 'edit' 'string' '1 40'}
@@ -228,7 +254,7 @@ if strcmpi(measType, 'Aperiodic')
 
         % --- Aperiodic fitting ---
         {}
-        {'style' 'text' 'string' '— Aperiodic fitting (classic fooof/specparam) —' 'fontweight' 'bold' 'fontsize' 12}
+        {'style' 'text' 'string' 'Aperiodic fitting (classic fooof/specparam)' 'fontweight' 'bold' 'fontsize' 12}
 
         {'style' 'text' 'string' 'Aperiodic mode:'}
         {'style' 'popupmenu' 'string' apModes 'value' 1 'callback' apModeCallback}
@@ -250,13 +276,13 @@ if strcmpi(measType, 'Aperiodic')
 
         % --- Correction ---
         {}
-        {'style' 'text'     'string' '— Aperiodic correction —' 'fontweight' 'bold' 'fontsize' 12}
+        {'style' 'text'     'string' 'Aperiodic correction' 'fontweight' 'bold' 'fontsize' 12}
         {'style' 'checkbox' 'string' 'Subtract aperiodic component from PSD' ...
          'value' 1 'fontweight' 'normal'}
 
         % --- Time-resolved ---
         {}
-        {'style' 'text'     'string' '— Time-resolved aperiodic fit (SPRiNT) —' 'fontweight' 'bold' 'fontsize' 12}
+        {'style' 'text'     'string' 'Time-resolved aperiodic fit (SPRiNT)' 'fontweight' 'bold' 'fontsize' 12}
         {'style' 'checkbox' 'string' 'Compute' ...
          'value' 0 'fontweight' 'normal'}
         };

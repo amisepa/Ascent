@@ -1,4 +1,4 @@
-function p = ascent_get_params(EEG, varargin)
+function [p, EEG] = ascent_get_params(EEG, varargin)
 % ascent_get_params - Parse inputs and apply defaults for ascent_compute.
 %
 % Called internally by ascent_compute. Not intended for direct use.
@@ -13,7 +13,8 @@ function p = ascent_get_params(EEG, varargin)
 %   varargin - name-value pairs (empty triggers GUI mode)
 %
 % OUTPUT:
-%   p - parameter struct. Returns [] if the user cancels the GUI.
+%   p   - parameter struct. Returns [] if the user cancels the GUI.
+%   EEG - the input dataset, or in GUI mode the one loaded in the window
 %
 %   General:
 %     p.measure       'RCMFE' | 'SampEn' | 'FuzzEn' | 'ExSEnt' | 'FracDim' |
@@ -117,7 +118,7 @@ if isempty(varargin) || (numel(varargin) == 1 && isempty(varargin{1}))
 
     % --- GUI mode ---
     [p.measure, p.chanlist, p.tau, p.m, p.coarsing, p.num_scales, extraParams, ...
-     p.n, p.vis, p.parallel, p.progress, p.domain] = ascent_compute_gui(EEG);
+     p.n, p.vis, p.parallel, p.progress, p.domain, EEG] = ascent_compute_gui(EEG);   % EEG: may be loaded in the GUI
 
     if isempty(p.measure)
         p = [];     % signal abort to caller

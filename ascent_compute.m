@@ -74,23 +74,23 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %   EEG.ascent.(measure).icawinv            - mixing matrix        (ICA mode only)
 %   EEG.ascent.(measure).icachansind        - channels ICA ran on  (ICA mode only)
 %   EEG.ascent.(measure).scales             - scale vector (multiscale only)
-%   EEG.ascent.aperiodic.data.exponent      - aperiodic exponent [signals x 1]
-%   EEG.ascent.aperiodic.data.offset        - aperiodic offset [signals x 1]
-%   EEG.ascent.aperiodic.data.psd           - raw PSD [signals x freqs]
-%   EEG.ascent.aperiodic.data.freqs         - frequency vector
-%   EEG.ascent.aperiodic.data.psd_corrected - aperiodic-corrected PSD (if requested).
+%   EEG.ascent.Aperiodic.data.exponent      - aperiodic exponent [signals x 1]
+%   EEG.ascent.Aperiodic.data.offset        - aperiodic offset [signals x 1]
+%   EEG.ascent.Aperiodic.data.psd           - raw PSD [signals x freqs]
+%   EEG.ascent.Aperiodic.data.freqs         - frequency vector
+%   EEG.ascent.Aperiodic.data.psd_corrected - aperiodic-corrected PSD (if requested).
 %                                             RATIO to the 1/f fit (dimensionless).
-%   EEG.ascent.aperiodic.data.alpha_raw     - total alpha power [signals x 1], µV²/Hz
+%   EEG.ascent.Aperiodic.data.alpha_raw     - total alpha power [signals x 1], µV²/Hz
 %                                             (includes the aperiodic background)
-%   EEG.ascent.aperiodic.data.alpha_osc     - alpha power above the 1/f fit
+%   EEG.ascent.Aperiodic.data.alpha_osc     - alpha power above the 1/f fit
 %                                             [signals x 1], µV²/Hz (both modes;
 %                                             knee mode uses the Lorentzian model)
-%   EEG.ascent.aperiodic.data.exp_slid      - time-resolved exponent [channels x times]
-%   EEG.ascent.aperiodic.data.off_slid      - time-resolved offset   [channels x times]
-%   EEG.ascent.aperiodic.data.times_slid    - window centre times (s) [1 x times]
-%   EEG.ascent.aperiodic.data.freqs_slid    - frequency vector for sliding PSD
-%   EEG.ascent.aperiodic.data.psd_slid      - sliding PSD [channels x freqs x times]
-%   EEG.ascent.aperiodic.data.psd_corr_slid - sliding corrected PSD (if requested)
+%   EEG.ascent.Aperiodic.data.exp_slid      - time-resolved exponent [channels x times]
+%   EEG.ascent.Aperiodic.data.off_slid      - time-resolved offset   [channels x times]
+%   EEG.ascent.Aperiodic.data.times_slid    - window centre times (s) [1 x times]
+%   EEG.ascent.Aperiodic.data.freqs_slid    - frequency vector for sliding PSD
+%   EEG.ascent.Aperiodic.data.psd_slid      - sliding PSD [channels x freqs x times]
+%   EEG.ascent.Aperiodic.data.psd_corr_slid - sliding corrected PSD (if requested)
 %
 % REFERENCES:
 %   Sample Entropy:
@@ -123,23 +123,21 @@ addpath(fullfile(plugin_path, 'functions'));
 % Input checks
 % ----------------------------
 if nargin < 1, help ascent_compute; return; end
-if isempty(EEG.data),              error('Empty dataset.');          end
-if isempty(EEG.chanlocs(1).labels),error('No channel labels.');      end
-if ~isfield(EEG.chanlocs,'X') || isempty(EEG.chanlocs(1).X)
-    error("Electrode locations are required. Go to 'Edit > Channel locations' and import coordinates.");
-end
-if isempty(EEG.ref)
-    warning('EEG data not referenced. Referencing is strongly recommended (e.g., average-reference).');
-end
+% With no name-value pairs the GUI opens, and it can load a dataset (or the
+% sample dataset) when none is loaded, so the dataset is checked after it
+guiMode = isempty(varargin) || (numel(varargin) == 1 && isempty(varargin{1}));
+if ~guiMode, check_dataset(EEG); end
 
 % ----------------------------
 % Get and validate all parameters
 % ----------------------------
-p = ascent_get_params(EEG, varargin{:});
+[p, EEGin] = ascent_get_params(EEG, varargin{:});
 if isempty(p)
     disp('User abort.');
-    return
+    return          % the dataset passed in, not one loaded in the window
 end
+EEG = EEGin;
+if guiMode, check_dataset(EEG); end
 
 % Unpack struct into local variables for readability below
 measure          = p.measure;
@@ -225,16 +223,16 @@ end
 % ----------------------------
 % Parpool management
 % ----------------------------
-p = gcp('nocreate');
+pool = gcp('nocreate');   % not 'p': p.save is read at the end
 if parallel
-    if isempty(p)
+    if isempty(pool)
         disp('Launching parallel pool...');
         parpool;
     end
 else
-    if ~isempty(p)
+    if ~isempty(pool)
         disp('Shutting down parallel pool (parallel computing OFF).');
-        delete(p);
+        delete(pool);
     end
 end
 
@@ -617,10 +615,18 @@ switch saveOpt
         % exactly as before. Anything that cannot be verified is not saved.
         try
             assert(~isempty(EEG.filename) && ~isempty(EEG.filepath));
+            % never the sample dataset shipped with the plugin
+            assert(~(strcmpi(EEG.filename, 'ascent_sample_data.set') && ...
+                     exist(fullfile(EEG.filepath, 'eegplugin_ascent.m'), 'file') == 2));
             fpath = fullfile(EEG.filepath, EEG.filename);
             assert(exist(fpath, 'file') == 2);
-            S0 = load(fpath, 'nbchan', 'pnts', 'EEG');
-            if isfield(S0, 'EEG'), S0 = S0.EEG; end
+            % '-mat': a .set file is read as ASCII otherwise, which errored and
+            % made this check refuse every save since 2026-10-04
+            if ismember('EEG', who('-file', fpath))          % older .set: one EEG variable
+                S0 = load('-mat', fpath, 'EEG');  S0 = S0.EEG;
+            else
+                S0 = load('-mat', fpath, 'nbchan', 'pnts', 'event');
+            end
             sigNow  = sprintf('%d:%d:%d', EEG.nbchan, EEG.pnts, numel(EEG.event));
             sigFile = sprintf('%d:%d:%d', S0.nbchan, S0.pnts, numel(S0.event));
             doSave = strcmp(sigNow, sigFile);
@@ -641,3 +647,15 @@ end
 disp('Done!');
 fprintf('Time to compute: %.2f minutes.\n', toc(tstart)/60);
 disp('All outputs are stored in EEG.ascent.');
+
+
+%% Dataset checks (before computing)
+function check_dataset(EEG)   % no closing END: the main function has none
+if isempty(EEG) || ~isfield(EEG,'data') || isempty(EEG.data), error('Empty dataset.'); end
+if isempty(EEG.chanlocs) || isempty(EEG.chanlocs(1).labels), error('No channel labels.'); end
+if ~isfield(EEG.chanlocs,'X') || isempty(EEG.chanlocs(1).X)
+    error("Electrode locations are required. Go to 'Edit > Channel locations' and import coordinates.");
+end
+if isempty(EEG.ref)
+    warning('EEG data not referenced. Referencing is strongly recommended (e.g., average-reference).');
+end

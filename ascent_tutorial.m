@@ -42,7 +42,7 @@ fprintf("\n");
 
 %% Launch main GUI
 
-EEG = ascent_compute(EEG);  % or Tools > Compute entropy
+EEG = ascent_compute(EEG);  % or click ASCENT in the EEGLAB menu bar
 
 %% SampEn via command line with default parameters
 

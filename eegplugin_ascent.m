@@ -22,30 +22,22 @@ function vers = eegplugin_ascent(fig,try_strings,catch_strings)
 
 % Plugin version
 vers = '2.1';
+if nargin < 3, return; end
 
 % Add paths to subfolders
 p = fileparts(which('eegplugin_ascent.m'));
 addpath(p);
 addpath(fullfile(p,'functions'))
 
-% --- define callbacks
-cb_compute = [ try_strings.check_data '[EEG,LASTCOM] = ascent_compute(EEG);' catch_strings.new_and_hist ];
-% cb_compute = [ try_strings.no_check '[EEG,LASTCOM] = ascent_compute(EEG);' catch_strings.new_and_hist ];
-
-% % create new option in Tools
-% toolsmenu = findobj(fig, 'tag', 'tools');
-% uimenu(toolsmenu, 'label', 'Compute entropy/complexity measures', 'userdata', 'startup:off;epoch:off;study:off', ...
-%     'callback', cb_compute, 'position', 15);
-
-% create a new top-level Tab on the EEGLAB menubar
-menu_root = uimenu(fig, ...
-    'Label',     'ASCENT', ...
-    'Tag',       'menu_ascent', ...
-    'Separator', 'on', ...
-    'Position',  8);  % adjust position to place it where you like
-
-% add items
-uimenu(menu_root, 'Label', 'Compute entropy/complexity measures', 'Callback', cb_compute);
+% One 'ASCENT' entry in the EEGLAB menu bar that opens the ASCENT window directly
+% (as BrainBeats does). Enabled at startup too: with no dataset loaded the window
+% loads one, or the sample dataset (ascent_compute_gui). Epoched data work as
+% well (ascent_compute concatenates epochs). The command goes to the history and
+% the dataset with its outputs becomes a new EEGLAB dataset.
+cb_compute = [ try_strings.no_check '[EEG,LASTCOM] = ascent_compute(EEG);' catch_strings.new_and_hist ];
+uimenu(fig, 'Label', 'ASCENT', 'Tag', 'menu_ascent', ...
+    'userdata', 'startup:on;continuous:on;epoch:on;study:off;erpset:off', ...
+    'Callback', cb_compute);
 
 end
 
