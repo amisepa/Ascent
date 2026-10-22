@@ -1,5 +1,41 @@
 # ASCENT: TODO
 
+## Status 2026-10-22 (supersedes the 10-14 "NEXT" below)
+Plugin v2.1 is on GitHub (release v2.1, ASCENT2.1.zip). Manuscript v16 and letter v6 are built
+in manuscript/ (no PDFs); only the aperiodic figures are still being regenerated.
+- NEXT (paper, to submit the revision):
+  1. When `sections = {'aperiodic'}; make_revision_figures` has finished (new colours in the
+     time-course panels), rebuild v16:
+     `bash manuscript/tools/build_v16.sh <scratch dir> manuscript/figures/fig1_v16`
+     (writes v16 clean, red, tracked and letter v6 in manuscript/).
+  2. Check Figs 4-5 in the composed figures (manuscript/figures/regen_v16/) and copy them to
+     the README: img/fig4_aperiodic_channels.png, img/fig5_aperiodic_ics.png (1800 px wide).
+  3. Final read of v16 red + letter v6, then submit. IRB protocol code: none available,
+     v16 cites the IONS IRB and the dataset paper.
+- NEXT (plugin):
+  - Upload ASCENT2.1.zip to the EEGLAB extension manager
+    (https://sccn.ucsd.edu/eeglab/plugin_uploader/upload_form.php, name ASCENT, version 2.1).
+  - Remove the old copies: eeglab/plugins/Ascent (full repo copy), Ascent_rewritten.git,
+    Ascent_slim.git; install the plugin from ASCENT2.1.zip.
+  - Optional: ask GitHub Support to purge unreferenced objects after the history rewrite.
+  - Optional: GitHub Actions smoke test (matlab-actions + EEGLAB, README commands on a 20-s
+    excerpt of the sample).
+- PLANNED v2.2 (after the paper; not in the paper): attractor measure
+  - 3-D time-delay embedding of 20-s windows, x(t), x(t+tau), x(t+2*tau), tau about 4-5 ms
+    (1 sample at 250 Hz), data 1-50 Hz; minimum-volume enclosing ellipsoid (Khachiyan
+    algorithm); radius ratio = shortest / longest axis (1 = sphere, awake; lower = flatter,
+    loss of consciousness). Sliding windows (5-s steps) for the time course. Optional
+    correlation dimension (Grassberger-Procaccia).
+  - Outlier-robust option (trim extreme points or principal axes), since the enclosing
+    ellipsoid is stretched by single artifacts. Note in the help: at short delays the ratio
+    tracks fast vs slow activity (rho 0.71-0.91 with gamma power in Eagleman et al. 2019).
+  - Figures: topography of the ratio, 3-D point clouds with the fitted ellipsoid for chosen
+    channels or ICs, ratio over time. GUI entry, README tutorial step, references.
+  - References: Eagleman, Chander, Reynolds, Ouellette & MacIver (2019) PLoS ONE 14,
+    e0223921; Eagleman, Drover, Drover, Ouellette & MacIver (2018) Front Hum Neurosci 12,
+    173; Eagleman, Vaughn, et al. (2018) Front Neurosci 12, 645; MacIver & Bland (2014)
+    Front Syst Neurosci 8, 203; Khachiyan (1980); Takens (1981).
+
 ## Status 2026-10-14 (supersedes the 09-25 "NEXT": do NOT submit v15)
 Critical pass on v15 done; v16 is one build away. Detail: worklog/2026-10-13-adversarial-
 pass-v16.md and manuscript/review_2026-10-13/README.md (private folder).
@@ -31,8 +67,8 @@ pass-v16.md and manuscript/review_2026-10-13/README.md (private folder).
   single-scale tests in ascent_group_analysis.m:463-468 pass [chan x subj], which
   the statistics code clusters along the channel list (pass [chan x 1 x subj] as
   make_revision_figures.m now does); compute_RCmvMFE scale 1 is always 0
-  (compute_RCmvMFE.m:150, by reading, not run);
-  ascent_sample_data.set ships with stale EEG.ascent outputs inside.
+  (compute_RCmvMFE.m:150, by reading, not run).
+  (fixed 2026-10-22: ascent_sample_data.set no longer carries stale EEG.ascent outputs.)
 
 ## Status 2026-09-25 (supersedes older notes below where they conflict)
 - DONE: knee-mode aperiodic correction (full Lorentzian removed) - item 2.
