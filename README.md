@@ -40,21 +40,21 @@ Requires MATLAB and EEGLAB. Download or clone this repository into the `plugins`
 
 1. Start EEGLAB and click **ASCENT** in the menu bar.
 
-<img alt="ASCENT in the EEGLAB menu bar" src="img/gui_tab.png" width="45%" />
+<img alt="ASCENT in the EEGLAB menu bar" src="img/gui_tab.png" width="380" />
 
 2. If no dataset is loaded in EEGLAB, load one from the ASCENT window (*Load dataset...*), or click *Sample dataset* to load the 64-channel BioSemi recording provided with the plugin (resting state with eyes closed, with an ICA decomposition and dipole fits).
 
-<img alt="ASCENT main window" src="img/gui_main.png" width="60%" />
+<img alt="ASCENT main window" src="img/gui_main.png" width="520" />
 
 3. Select the measure, the data to use (scalp channels or ICs), the channels (all by default), and whether to plot the outputs, track progress in the command window, and use parallel computing. Then click *Ok*.
 
 4. A second window sets the parameters of the selected measure. Default values follow published guidelines (e.g., m = 2, r = 0.15). For the multiscale measures, users can also choose the coarse-graining method and the number of scale factors.
 
-<img alt="Multiscale parameters" src="img/gui_multiscale.png" width="60%" />
+<img alt="Multiscale parameters" src="img/gui_multiscale.png" width="380" />
 
 For the aperiodic measure, this window sets the power spectrum estimation and the spectral parameterization (fixed or knee mode, number and width of the peaks), whether to remove the aperiodic component from the spectrum, and whether to also estimate it over time.
 
-<img alt="Aperiodic parameters" src="img/gui_aperiodic.png" width="60%" />
+<img alt="Aperiodic parameters" src="img/gui_aperiodic.png" width="290" />
 
 5. The outputs are plotted and stored in `EEG.ascent.<measure>` (e.g., `EEG.ascent.RCMFE.data`, channels x scales). The dataset with its outputs is added to EEGLAB, and the command is saved in the EEGLAB history (type `eegh`), so that the same analysis can be run from a script. If the dataset was not modified since it was loaded, the outputs are also saved in its .set file.
 
