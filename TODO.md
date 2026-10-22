@@ -2,7 +2,7 @@
 
 ## Status 2026-10-22 (supersedes the 10-14 "NEXT" below)
 Plugin v2.1 is on GitHub (release v2.1, ASCENT2.1.zip). Manuscript v16 and letter v6 are built
-in manuscript/ (no PDFs); only the aperiodic figures are still being regenerated.
+in manuscript/ (no PDFs), with all figures current; next is the final read and submission.
 - NEXT (paper, to submit the revision):
   1. DONE 2026-10-22 14:48: aperiodic figures regenerated, v16 and letter v6 rebuilt
      (manuscript/), README Figs 4-5 updated.
