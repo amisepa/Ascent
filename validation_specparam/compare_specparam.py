@@ -1,4 +1,4 @@
-# compare_specparam.py — agreement stats + supplementary figure for ASCENT vs specparam
+# compare_specparam.py: agreement stats + supplementary figure for ASCENT vs specparam
 import os, sys
 import numpy as np
 import scipy.io as sio
@@ -85,7 +85,7 @@ scatter_panel(axes[1,0], M['expMR'], P['expPR'], 'Real EEG exponent (64 ch)')
 scatter_panel(axes[1,1], M['offMR'], P['offPR'], 'Real EEG offset (64 ch)')
 ba_panel(axes[1,2], M['expMR'], P['expPR'], 'Real exponent (B-A)')
 ba_panel(axes[1,3], M['offMR'], P['offPR'], 'Real offset (B-A)')
-fig.suptitle('ASCENT (MATLAB) vs specparam 2.0.0rc6 (Python) — matched settings, fixed mode, 1–40 Hz', fontsize=12)
+fig.suptitle('ASCENT (MATLAB) vs specparam 2.0.0rc6 (Python): matched settings, fixed mode, 1–40 Hz', fontsize=12)
 fig.tight_layout(rect=[0, 0, 1, 0.96])
 png = os.path.join(outdir, sys.argv[2] if len(sys.argv) > 2 else 'specparam_validation_figure.png')
 fig.savefig(png, dpi=300)

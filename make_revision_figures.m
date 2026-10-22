@@ -2,6 +2,10 @@
 % the Sept 2026 revision, with the current ASCENT code. Run from the MATLAB
 % desktop (figure rendering hangs under matlab -batch on this machine).
 %
+%   Figs. 2-3 : RCMFE on the sample dataset (channels: mean and SD
+%            coarse-graining, 50 scales; ICs: SD, 30 scales, with the
+%            dipole/region figure). The Oct 2026 pass found that the earlier
+%            exports predated the current cluster centroid rule.
 %   Fig. 4 : channel-domain aperiodic, static + time-resolved
 %   Fig. 5 : ICA-domain aperiodic, static + time-resolved
 %   Fig. 6 : single-scale EC vs EO topographies (ExSEnt HDA now corrected
@@ -16,20 +20,24 @@
 %
 % To redo only some figures, set `sections` in the command window first, e.g.
 %   sections = {'psd'}; make_revision_figures
-% ('aperiodic' = Figs 4-5, 'uniscale' = Figs 6-7, 'multiscale' = Figs 8-9,
-%  'psd' = Figs 10-11)
+% ('rcmfe' = Figs 2-3, 'aperiodic' = Figs 4-5, 'uniscale' = Figs 6-7,
+%  'multiscale' = Figs 8-9, 'psd' = Figs 10-11)
 
-if ~exist('sections', 'var'), sections = {'aperiodic', 'uniscale', 'multiscale', 'psd'}; end
+if ~exist('sections', 'var'), sections = {'rcmfe', 'aperiodic', 'uniscale', 'multiscale', 'psd'}; end
+% Percentile threshold of the cluster overlay in Figs 2-3 (ascent_plot default: 0.75).
+% The earlier Fig 2 used 0.8 (mean) and 0.5 (SD); set e.g. rcmfeThresh = [0.8 0.5 0.75]
+% in the command window to reproduce that, and state it in the caption.
+if ~exist('rcmfeThresh', 'var'), rcmfeThresh = [0.75 0.75 0.75]; end
 root    = fileparts(mfilename('fullpath'));
 eegRoot = fullfile(fileparts(root), 'eeglab');
 statRoot = fullfile(fileparts(root), 'eeg_robust_statistics');
 outdir  = fullfile(root, 'manuscript', 'figures', 'regen');
 if ~exist(outdir, 'dir'), mkdir(outdir); end
 
-% EEGLAB plugin compat/legacy folders shadow MATLAB built-ins (pwelch, mean, randi, ...):
-% add everything quietly, then drop them
+% EEGLAB sets its own paths (genpath on the EEGLAB folder makes it warn at its next start).
+% Plugin compat/legacy folders shadow MATLAB built-ins (pwelch, mean, randi, ...): drop them
 warning('off', 'MATLAB:dispatcher:nameConflict');
-addpath(genpath(eegRoot)); addpath(root); addpath(fullfile(root, 'functions'));
+addpath(eegRoot); eeglab('nogui'); addpath(root); addpath(fullfile(root, 'functions'));
 bad = {fullfile(eegRoot,'plugins','Biosig3.8.5'), fullfile(eegRoot,'plugins','Fieldtrip-lite250523')};
 for k = 1:numel(bad), if exist(bad{k},'dir'), rmpath(genpath(bad{k})); end, end
 pp = strsplit(path, pathsep);
@@ -37,6 +45,79 @@ pp = pp(startsWith(pp, fullfile(eegRoot, 'plugins')) & ~cellfun(@isempty, regexp
 if ~isempty(pp), rmpath(pp{:}); end
 warning('on', 'MATLAB:dispatcher:nameConflict');
 say('Sections: %s', strjoin(sections, ', '));
+
+%% ---- Figs. 2-3: RCMFE, sample dataset ----
+% Arrays are cached in scratch_aperiodic/rcmfe_<run>.mat (R, sc): a serial run
+% takes about 10 min each. Delete the cache files to recompute.
+if ismember('rcmfe', sections)
+scratch = fullfile(root, 'scratch_aperiodic');
+if ~exist(scratch, 'dir'), mkdir(scratch); end
+copyfile(fullfile(root, 'ascent_sample_data.set'), fullfile(scratch, 'ascent_sample_data.set'));
+EEG = pop_loadset('filename', 'ascent_sample_data.set', 'filepath', scratch);
+% run tag, domain, coarse-graining, number of scales, keep scale 1, font size
+% scale 1 off everywhere, as in the GUI walkthrough of Section 2.7 (GUI defaults).
+% Font size 13 gives about 6 pt in print: every panel is 1000 px wide and each
+% figure 5 in wide (compose_v16.py stacks the Fig 2 panels).
+runs = {'chan_mean', 'channel', 'mean', 50, false, 13; ...
+        'chan_sd',   'channel', 'sd',   50, false, 13; ...
+        'ica_sd',    'ica',     'sd',   30, false, 13};
+fidc = fopen(fullfile(outdir, 'rcmfe_clusters.txt'), 'w');
+logf = fullfile(outdir, 'rcmfe_console.txt');   % console output of the plots
+if exist(logf, 'file'), delete(logf); end
+diary(logf)
+for k = 1:size(runs, 1)
+    close all
+    cachef = fullfile(scratch, ['rcmfe_' runs{k,1} '.mat']);
+    if exist(cachef, 'file')
+        say('Figs 2-3: %s from cache', runs{k,1});
+        C = load(cachef); R = C.R; sc = C.sc;
+        if sc(1) == 1 && ~runs{k,5}, R = R(:, 2:end); sc = sc(2:end); end   % cache made with scale 1
+    else
+        say('Figs 2-3: computing RCMFE, %s (about 10 min, serial)', runs{k,1});
+        E2 = ascent_compute(EEG, 'measure', 'RCMFE', 'domain', runs{k,2}, 'coarsing', runs{k,3}, ...
+            'num_scales', runs{k,4}, 'IncludeScale1', runs{k,5}, ...
+            'vis', false, 'progress', true, 'parallel', false, 'save', 'never');
+        R = E2.ascent.RCMFE.data; sc = E2.ascent.RCMFE.scales;
+        save(cachef, 'R', 'sc');
+    end
+    if strcmp(runs{k,2}, 'ica')
+        ici = EEG.icachansind; if isempty(ici), ici = 1:EEG.nbchan; end
+        locs = EEG.chanlocs(ici);
+        args = {'ICA', true, 'icawinv', EEG.icawinv};
+        if isfield(EEG, 'dipfit') && ~isempty(EEG.dipfit), args = [args, {'dipfit', EEG.dipfit}]; end %#ok<AGROW>
+        names = arrayfun(@(i) sprintf('IC%d', i), 1:size(R,1), 'UniformOutput', false);
+    else
+        locs = EEG.chanlocs; args = {}; names = {EEG.chanlocs.labels};
+    end
+    % ascent_plot is called directly: the plotting branch of ascent_compute drops
+    % the first column again for SD coarse-graining (scale 2, see TODO.md)
+    ascent_plot(R, locs, 'RCMFE', sc, 'ClusterThresh', rcmfeThresh(k), 'FontSize', runs{k,6}, args{:});
+    drawnow
+    figs = findobj('Type', 'figure');
+    for f = 1:numel(figs)
+        nm = get(figs(f), 'Name');
+        if contains(nm, 'Multiscale entropy'), suffix = '';
+        elseif contains(nm, 'Dipole sources'), suffix = '_dipoles';
+        else, continue
+        end
+        print(figs(f), fullfile(outdir, sprintf('rcmfe_%s%s.png', runs{k,1}, suffix)), '-dpng', '-r300');
+    end
+    % cluster sizes and peaks as printed on the figure, for the Results text
+    fprintf(fidc, '%s (threshold %.2f, %d x %d, scales %d-%d)\n', runs{k,1}, rcmfeThresh(k), size(R,1), size(R,2), sc(1), sc(end));
+    sm = mean(R, 1, 'omitnan'); hot = sm >= prctile(sm(isfinite(sm)), rcmfeThresh(k)*100);
+    tc = prctile(R(isfinite(R)), rcmfeThresh(k)*100);
+    d = diff([0 hot 0]); st = find(d == 1); en = find(d == -1) - 1;
+    for r = 1:numel(st)
+        in = mean(R(:, st(r):en(r)), 2, 'omitnan') >= tc;
+        [~, pc] = max(mean(R(:, st(r):en(r)), 2, 'omitnan')); [~, ps] = max(mean(R(in, :), 1, 'omitnan'));
+        fprintf(fidc, '  scales %d-%d (%d scales), %d signals, peak %s at scale %d, mass %.1f\n', ...
+            sc(st(r)), sc(en(r)), en(r)-st(r)+1, sum(in), names{pc}, sc(ps), sum(sum(R(in, st(r):en(r)), 'omitnan')));
+    end
+end
+fclose(fidc);
+diary off
+close all
+end
 
 %% ---- Figs. 4-5: aperiodic, sample dataset ----
 if ismember('aperiodic', sections)
@@ -89,17 +170,27 @@ dmap = flipud(max(0, min(1, rdbu)));
 
 figure('Name', 'Fig 6', 'Color', 'w', 'Position', [50 50 1600 900]);
 tvals_all = zeros(numel(chanlocs), numel(vars));
+fid6 = fopen(fullfile(outdir, 'uniscale_summary.csv'), 'w');
+fprintf(fid6, 'Measure,NumChannels,PeakChannel,Tvalue,HedgesG,NotSignificant\n');
 for v = 1:numel(vars)
-    x1 = EC.(vars{v})(order_idx, :); x2 = EO.(vars{v})(order_idx, :);
+    % [chan x 1 x subj]: as [chan x subj] the statistics code takes the channel list
+    % for a time axis and clusters consecutive list entries instead of scalp neighbours
+    x1 = reshape(EC.(vars{v})(order_idx, :), numel(chanlocs), 1, []);
+    x2 = reshape(EO.(vars{v})(order_idx, :), numel(chanlocs), 1, []);
     rng(1);
     [tvals, pvals, tvals_H0, pvals_H0] = run_stats_permutation(x1, x2, 2000, 'mean', 'dpt');
     tvals_all(:, v) = tvals(:);
     mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, 2, 0.05, chanlocs);   % cluster-based
+    tvals = tvals(:); mask = logical(mask(:));
+    ts = tvals; ts(~mask) = 0; [~, ip] = max(abs(ts)); nsub = size(x1, 3);
+    fprintf(fid6, '%s,%d,%s,%.2f,%.2f,%s\n', titles{v}, sum(mask), chanlocs(ip).labels, tvals(ip), ...
+        tvals(ip)/sqrt(nsub) * (1 - 3/(4*(nsub-1)-1)), strjoin({chanlocs(~mask).labels}, ' '));
     subplot(2, 4, v)
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, 'verbose', 'off', 'whitebk', 'on');
     c = colorbar; ylabel(c, 't-values', 'FontWeight', 'bold', 'FontSize', 12)
     title(titles{v})
 end
+fclose(fid6);
 set(findall(gcf, 'type', 'axes'), 'FontSize', 12, 'FontWeight', 'bold', 'CLim', [-10 10]);
 print(gcf, fullfile(outdir, 'fig_uniscales.png'), '-dpng', '-r300');
 

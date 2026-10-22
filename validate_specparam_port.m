@@ -19,7 +19,7 @@ eegRoot = 'C:\Users\ccann\Documents\MATLAB\eeglab';
 outdir  = fullfile(root, 'validation_specparam');
 if ~exist(outdir, 'dir'), mkdir(outdir); end
 
-addpath(genpath(eegRoot));
+addpath(eegRoot); eeglab('nogui');   % not genpath: EEGLAB warns at its next start
 addpath(root);
 addpath(fullfile(root, 'functions'));
 warning('off', 'all');
