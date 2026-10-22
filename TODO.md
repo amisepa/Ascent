@@ -4,17 +4,15 @@
 Plugin v2.1 is on GitHub (release v2.1, ASCENT2.1.zip). Manuscript v16 and letter v6 are built
 in manuscript/ (no PDFs); only the aperiodic figures are still being regenerated.
 - NEXT (paper, to submit the revision):
-  1. When `sections = {'aperiodic'}; make_revision_figures` has finished (new colours in the
-     time-course panels), rebuild v16:
-     `bash manuscript/tools/build_v16.sh <scratch dir> manuscript/figures/fig1_v16`
-     (writes v16 clean, red, tracked and letter v6 in manuscript/).
-  2. Check Figs 4-5 in the composed figures (manuscript/figures/regen_v16/) and copy them to
-     the README: img/fig4_aperiodic_channels.png, img/fig5_aperiodic_ics.png (1800 px wide).
-  3. Final read of v16 red + letter v6, then submit. IRB protocol code: none available,
+  1. DONE 2026-10-22 14:48: aperiodic figures regenerated, v16 and letter v6 rebuilt
+     (manuscript/), README Figs 4-5 updated.
+  2. Final read of v16 red + letter v6, then submit (see 3).
+  3. Submit v16 red + letter v6. IRB protocol code: none available,
      v16 cites the IONS IRB and the dataset paper.
 - NEXT (plugin):
-  - Upload ASCENT2.1.zip to the EEGLAB extension manager
-    (https://sccn.ucsd.edu/eeglab/plugin_uploader/upload_form.php, name ASCENT, version 2.1).
+  - Get ASCENT2.1.zip into the EEGLAB extension manager: the upload form errors (2026-10-22);
+    submit through an issue on github.com/sccn/eeglab with the zip attached, or send it to
+    Arnaud Delorme.
   - Remove the old copies: eeglab/plugins/Ascent (full repo copy), Ascent_rewritten.git,
     Ascent_slim.git; install the plugin from ASCENT2.1.zip.
   - Optional: ask GitHub Support to purge unreferenced objects after the history rewrite.
