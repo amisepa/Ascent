@@ -10,11 +10,11 @@ in manuscript/ (no PDFs), with all figures current; next is the final read and s
   3. Submit v16 red + letter v6. IRB protocol code: none available,
      v16 cites the IONS IRB and the dataset paper.
 - NEXT (plugin):
-  - Get ASCENT2.1.zip into the EEGLAB extension manager: the upload form errors (2026-10-22);
-    submit through an issue on github.com/sccn/eeglab with the zip attached, or send it to
-    Arnaud Delorme.
-  - Remove the old copies: eeglab/plugins/Ascent (full repo copy), Ascent_rewritten.git,
-    Ascent_slim.git; install the plugin from ASCENT2.1.zip.
+  - Upload ASCENT2.1.zip through the EEGLAB plugin form once it works again (down on
+    2026-10-22, a server-side PHP issue according to Arnaud Delorme): name ASCENT, version 2.1,
+    docs https://github.com/amisepa/Ascent.
+  - DONE 2026-10-22: Ascent_rewritten.git and Ascent_slim.git deleted. Still check that
+    eeglab/plugins holds only the clean install from ASCENT2.1.zip.
   - Optional: ask GitHub Support to purge unreferenced objects after the history rewrite.
   - Optional: GitHub Actions smoke test (matlab-actions + EEGLAB, README commands on a 20-s
     excerpt of the sample).
