@@ -40,6 +40,7 @@
 % compute_mse.m and compute_se.m, Cedric Cannard, 2022)
 
 function [mse, scales] = compute_MSE_azami_original(signal, m, r, tau, coarseType, nScales, verbose)
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 if ~exist('m','var') || isempty(m)
     m = 2;

@@ -41,13 +41,11 @@ function [HD, HA, HDA, info] = compute_ExSEnt(data, varargin)
 %                                     'ChanLabels', {EEG.chanlocs.labels});
 %
 % Reference:
-%   Kamali, S., Baroni, F., & Varona, P. (2025). ExSEnt: Extrema-Segmented
-%   Entropy Analysis of Time Series. arXiv:2509.07751
+%   Kamali, S., Baroni, F., & Varona, P. (2026). ExSEnt: Extrema-segmented entropy
+%     analysis of time series. Nonlinear Dyn, 114, 980.
 %
 % -------------------------------------------------------------------------
-% Copyright (C) 2025
-% EEGLAB Ascent plugin — Author: Cedric Cannard
-% License: GNU GPL v2 or later
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 % -------------------------------------------------------------------------
 
 % ---------------- Parse inputs ----------------
@@ -160,7 +158,7 @@ switch plotMode
             chanLabels = arrayfun(@(i) sprintf('Ch%d',i), 1:nchan, 'UniformOutput', false);
         end
 
-        % Collect (channel, signal value, HDA) — one row per sample
+        % Collect (channel, signal value, HDA) - one row per sample
         temp_bif = cell(1, nchan);
         for ch = 1:nchan
             sig = data(ch,:);

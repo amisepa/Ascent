@@ -107,6 +107,8 @@ function [MSx, CI] = compute_MSE_ori(Sig, Mobj, varargin)
 %           Entropy
 %           17 (2015): 1197–1203
 % 
+%
+% Included in the ASCENT EEGLAB plugin from EntropyHub (Flood & Grimm, 2021; Apache License 2.0), for validation.
 narginchk(2,10)
 Sig = squeeze(Sig);
 p = inputParser;

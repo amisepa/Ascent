@@ -99,6 +99,8 @@ function [MFuzz, B0, Bt, B1] = MvFuzzEn(Data, varargin)
 %           "Multivariate multiscale entropy analysis."
 %           IEEE signal processing letters 19.2 (2011): 91-94.
 % 
+%
+% Included in the ASCENT EEGLAB plugin from EntropyHub (Flood & Grimm, 2021; Apache License 2.0).
 narginchk(1,13)
 p = inputParser;
 Data = squeeze(Data);

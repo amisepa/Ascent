@@ -1,5 +1,7 @@
 %% Calculate speed improvements made in ASCENT algorithms compared to
 % original and validate outputs' integrity.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 
 %% Sample Entropy

@@ -4,6 +4,8 @@ function r_s = scale_tolerance(sig, s, coarseType, r, zNorm, minBinsHard, m)
 %   factor is taken from the unshifted (offset-1) coarse-grained series so that
 %   composite averaging (CMFE) and phi-pooling (RCMFE) stay coherent: every
 %   offset at a given scale uses the same r. zNorm=0 returns the fixed r.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 if zNorm == 0
     r_s = r;
     return

@@ -27,6 +27,8 @@ function [fe, pm, pm1] = fuzz_engine_raw(signal, m, r, n_exp, tau, kernelType, d
 %   • 'local' corresponds to the classical FuzEn-style local detrending of
 %     each embedded vector before distance calculation.
 %   • 'global' compares raw embedded vectors directly.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 if nargin < 8 || isempty(blockSize)
     blockSize = 2000;

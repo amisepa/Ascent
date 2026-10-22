@@ -1,4 +1,6 @@
 %% Save High-res GUI figures for tutorial
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 
 %% Normal figures

@@ -17,7 +17,7 @@ function ascent_plot_aperiodic(exponent_mat, chanlocs, opt)
 % derived with compute_AperiodicBandPower -- the same function ascent_compute
 % uses -- so the numbers are identical either way.
 %
-% Copyright (C) - ASCENT EEGLAB PLUGIN - Cedric Cannard, 2021-2025
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 isICA            = opt.isICA;
 icawinv          = opt.icawinv;

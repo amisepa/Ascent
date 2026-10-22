@@ -1,5 +1,7 @@
 function p = match_fraction_cheby_exact(V, r, blockSize, pdistMaxGB)
 % Exact fraction of pairs with Chebyshev distance <= r
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 M = size(V,1);
 if M < 2

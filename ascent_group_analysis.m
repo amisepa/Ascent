@@ -89,7 +89,7 @@
 %     Addressing problems of smoothing, threshold dependence and localisation
 %     in cluster inference. NeuroImage, 44, 83-98.
 %
-% Author  : Cedric Cannard, 2021 - ASCENT EEGLAB Plugin
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 % Contact : ccannard@pm.me
 % GitHub  : https://github.com/amisepa/ascent
 

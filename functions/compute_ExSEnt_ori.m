@@ -1,4 +1,9 @@
 function [HD, HA, H_joint,M,range_D,range_A,r_D,r_A, segment_ids] = compute_ExSEnt_ori(signal,lambda,m,r)
+% Based on the original ExSEnt code by Sara Kamali (Kamali et al., 2026); kept in the ASCENT EEGLAB plugin for validation.
+% References:
+%   Kamali, S., Baroni, F., & Varona, P. (2026). ExSEnt: Extrema-segmented entropy
+%     analysis of time series. Nonlinear Dyn, 114, 980.
+%
 
 % COMPUTE_ExSEnt
 %   Computes Sample Entropy (SampEn) on:

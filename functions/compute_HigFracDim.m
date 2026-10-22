@@ -61,9 +61,7 @@ function [D, SD, info] = compute_HigFracDim(data, varargin)
 %   Sen, P.K. (1968). JASA, 63, 1379-1389.  [Theil-Sen regression]
 %
 % -------------------------------------------------------------------------
-% Copyright (C) 2025
-% EEGLAB Ascent Plugin - Author: Cedric Cannard
-% License: GNU GPL v2 or later
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 % -------------------------------------------------------------------------
 
 %% ---------- Parse inputs ----------

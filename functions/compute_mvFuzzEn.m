@@ -41,9 +41,11 @@ function [mvFuzzEn, phi_m, phi_m1] = compute_mvFuzzEn(data, varargin)
 %   Multivariate embedding structure:
 %	Ahmed, M. U., & Mandic, D. P. (2011). Multivariate multiscale entropy: 
 %A tool for complexity analysis of multichannel data. Physical Review 
-%E—Statistical, Nonlinear, and Soft Matter Physics, 84(6), 061918.
+%E-Statistical, Nonlinear, and Soft Matter Physics, 84(6), 061918.
 %
 % Adapted and improved for the ASCENT EEGLAB plugin by Cedric Cannard, 2025.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 
 % ---------- Parse inputs ----------

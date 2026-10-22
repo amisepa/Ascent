@@ -5,7 +5,11 @@ function [ e, A, B ] = compute_mse_costa( x, m, r, tau, coarsing)
 % By Madalena Costa, Ary L. Goldberger, and C.-K. Peng
 % Published on 18 February 2005 in Phys. Rev. E 71, 021906.
 %
-% Author: Cedric Cannard
+% References:
+%   Costa, M., Goldberger, A. L., & Peng, C.-K. (2002). Multiscale entropy analysis of
+%     complex physiologic time series. Phys Rev Lett, 89, 068102.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 switch nargin
     case 1

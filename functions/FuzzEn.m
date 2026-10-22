@@ -88,6 +88,8 @@ function [Fuzz, Ps1, Ps2] = FuzzEn(Sig, varargin)
 %           IEEE Access
 %           7 (2019): 104833-104847
 %           
+%
+% Included in the ASCENT EEGLAB plugin from EntropyHub (Flood & Grimm, 2021; Apache License 2.0).
 narginchk(1,11)
 Sig = squeeze(Sig);
 p = inputParser;

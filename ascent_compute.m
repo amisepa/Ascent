@@ -93,24 +93,60 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %   EEG.ascent.Aperiodic.data.psd_corr_slid - sliding corrected PSD (if requested)
 %
 % REFERENCES:
-%   Sample Entropy:
-%     Richman & Moorman (2000). Am J Physiol Heart Circ Physiol, 278(6).
-%   Fuzzy Entropy:
-%     Chen et al. (2009). IEEE Trans Biomed Eng, 56(5).
-%   Multiscale Entropy (MSE):
-%     Costa et al. (2002). Phys Rev Lett, 89(6).
+%   Sample entropy:
+%       Richman, J. S., & Moorman, J. R. (2000). Physiological time-series analysis using
+%       approximate entropy and sample entropy. Am J Physiol Heart Circ Physiol, 278,
+%       H2039-H2049.
+%   Fuzzy entropy:
+%       Chen, W., Zhuang, J., Yu, W., & Wang, Z. (2009). Measuring complexity using
+%       FuzzyEn, ApEn, and SampEn. Med Eng Phys, 31, 61-68.
+%   ExSEnt:
+%       Kamali, S., Baroni, F., & Varona, P. (2026). ExSEnt: Extrema-segmented entropy
+%       analysis of time series. Nonlinear Dyn, 114, 980.
+%   Fractal dimension (box-counting):
+%       Esteller, R., Vachtsevanos, G., Echauz, J., & Litt, B. (2001). A comparison of
+%       waveform fractal dimension algorithms. IEEE Trans Circuits Syst I, 48, 177-183.
+%   Higuchi fractal dimension:
+%       Higuchi, T. (1988). Approach to an irregular time series on the basis of the
+%       fractal theory. Physica D, 31, 277-283.
+%   Multiscale entropy (MSE):
+%       Costa, M., Goldberger, A. L., & Peng, C.-K. (2002). Multiscale entropy analysis
+%       of complex physiologic time series. Phys Rev Lett, 89, 068102.
+%       Costa, M. D., & Goldberger, A. L. (2015). Generalized multiscale entropy
+%       analysis: Application to quantifying the complex volatility of human heartbeat
+%       time series. Entropy, 17, 1197-1203.
 %   Modified MSE (mMSE):
-%     Kosciessa et al. (2020). NeuroImage, 211.
-%   Multiscale Fuzzy Entropy (MFE / RCMFE):
-%     Azami & Escudero (2016). Entropy, 18(10).
-%   Aperiodic / 1/f parameterization (specparam):
-%     Donoghue et al. (2020). Nature Neuroscience, 23.
-%   Higuchi Fractal Dimension:
-%     Higuchi (1988). Physica D, 31(2).
-%   Fractal Dimension (box-counting):
-%     Esteller et al. (2001). IEEE Trans Circuits Syst, 48(2).
+%       Kosciessa, J. Q., Kloosterman, N. A., & Garrett, D. D. (2020). Standard
+%       multiscale entropy reflects neural dynamics at mismatched temporal scales: What's
+%       signal irregularity got to do with it? PLoS Comput Biol, 16, e1007885.
+%       Kloosterman, N. A., Kosciessa, J. Q., Lindenberger, U., Fahrenfort, J. J., &
+%       Garrett, D. D. (2020). Boosts in brain signal variability track liberal shifts in
+%       decision bias. eLife, 9, e54201.
+%   MFE, CMFE, RCMFE:
+%       Wu, S.-D., Wu, C.-W., Lin, S.-G., Wang, C.-C., & Lee, K.-Y. (2013). Time series
+%       analysis using composite multiscale entropy. Entropy, 15, 1069-1084.
+%       Azami, H., Fernandez, A., & Escudero, J. (2017). Refined multiscale fuzzy entropy
+%       based on standard deviation for biomedical signal analysis. Med Biol Eng Comput,
+%       55, 2037-2052.
+%       Azami, H., & Escudero, J. (2018). Coarse-graining approaches in univariate
+%       multiscale sample and dispersion entropy. Entropy, 20, 138.
+%   mvFuzzEn, RCmvMFE:
+%       Ahmed, M. U., & Mandic, D. P. (2011). Multivariate multiscale entropy: A tool for
+%       complexity analysis of multichannel data. Phys Rev E, 84, 061918.
+%       Azami, H., Smith, K., & Escudero, J. (2016). MEMD-enhanced multivariate fuzzy
+%       entropy for the evaluation of complexity in biomedical signals. Proc IEEE EMBC
+%       2016, 3761-3764.
+%       Azami, H., & Escudero, J. (2017). Refined composite multivariate generalized
+%       multiscale fuzzy entropy: A tool for complexity analysis of multichannel signals.
+%       Physica A, 465, 261-276.
+%   Aperiodic (specparam) and time-resolved (SPRiNT):
+%       Donoghue, T., Haller, M., Peterson, E. J., et al. (2020). Parameterizing neural
+%       power spectra into periodic and aperiodic components. Nat Neurosci, 23,
+%       1655-1665.
+%       Wilson, L. E., da Silva Castanheira, J., & Baillet, S. (2022). Time-resolved
+%       parameterization of aperiodic and periodic brain activity. eLife, 11, e77348.
 %
-% Copyright - Ascent EEGLAB plugin, Cedric Cannard, 2022
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 com    = '';
 tstart = tic;
@@ -239,7 +275,7 @@ end
 % ----------------------------
 % Signal selection
 % ----------------------------
-% Extract data up front — avoids struct broadcast overhead in parfor.
+% Extract data up front - avoids struct broadcast overhead in parfor.
 % Note: from here on nChan counts *signals*, i.e. ICs when domain = 'ica'.
 % chanlocs always describes scalp channels: in ICA mode it is the set the
 % decomposition was run on, and is what icawinv back-projects onto.
@@ -280,12 +316,12 @@ scales = {};
 switch lower(measure)
 
     case 'sampen'
-        % Sample Entropy — Richman & Moorman (2000)
+        % Sample Entropy - Richman & Moorman (2000)
         entropy = compute_SampEn(data, 'm', m, 'r', r, ...
             'Parallel', parallel, 'Progress', progress);
 
     case 'fuzzen'
-        % Fuzzy Entropy — Chen et al. (2009)
+        % Fuzzy Entropy - Chen et al. (2009)
         entropy = compute_FuzzEn(data, 'm', m, 'tau', tau, 'n', n, 'r', r, ...
             'Kernel', kernel_meth, ...
             'Parallel', parallel, 'Progress', progress);
@@ -303,20 +339,20 @@ switch lower(measure)
             'Parallel', parallel, 'Progress', progress);
 
     case 'fracdim'
-        % Box-counting Fractal Dimension — Esteller et al. (2001)
+        % Box-counting Fractal Dimension - Esteller et al. (2001)
         [entropy, ~, ~] = compute_FracDim(data, ...
             'RejectBursts', true, 'WinFrac', 0.02, 'ZThresh', 6, ...
             'RobustFit', 'theilsen', 'ScaleTrimIQR', true, ...
             'Parallel', parallel, 'Progress', progress);
 
     case 'higfracdim'
-        % Higuchi Fractal Dimension — Higuchi (1988)
+        % Higuchi Fractal Dimension - Higuchi (1988)
         [entropy, SD, info] = compute_HigFracDim(data, ...
             'Kmax', 16, 'RobustFit', 'theilsen', 'MinScales', 4, ...
             'Parallel', true, 'Progress', true);
 
     case 'aperiodic'
-        % Aperiodic (1/f) exponent and offset — Donoghue et al. (2020)
+        % Aperiodic (1/f) exponent and offset - Donoghue et al. (2020)
 
         % Step 1: Welch PSD (linear, µV²/Hz)
         [psd, freqs] = compute_psd(data, fs, ...
@@ -341,8 +377,8 @@ switch lower(measure)
 
         % Step 3: aperiodic model, band power, and corrected PSD (all modes)
         % Two different quantities, deliberately kept apart:
-        %   psd_corrected — RATIO to the fit (dimensionless, ~1 where the fit is good)
-        %   alpha_osc     — absolute oscillatory power in uV^2/Hz (alpha_raw minus fit)
+        %   psd_corrected - RATIO to the fit (dimensionless, ~1 where the fit is good)
+        %   alpha_osc     - absolute oscillatory power in uV^2/Hz (alpha_raw minus fit)
         % They are not on a common scale; do not plot them against each other.
         % Knee mode uses the full Lorentzian model (offset - log10(knee+f^exp)),
         % matching upstream specparam/FOOOF, whose flattened spectrum is
@@ -381,7 +417,7 @@ switch lower(measure)
         end
 
     case 'mse'
-        % % Multiscale Entropy — Costa et al. (2002)
+        % % Multiscale Entropy - Costa et al. (2002)
         % entropy = nan(nChan, num_scales);
         % for iChan = 1:EEG.nbchan
         %     for iScale = 1:num_scales
@@ -397,7 +433,7 @@ switch lower(measure)
             'Parallel', parallel, 'Progress', progress);
 
     case 'mmse'
-        % Modified MSE — Kosciessa et al. (2020)
+        % Modified MSE - Kosciessa et al. (2020)
         [entropy, scales, info] = compute_mMSE(data, 'Fs', fs, ...
             'm', m, 'tau', tau, 'r', r, 'num_scales', num_scales, 'coarsing', coarsing, ...
             'filter_mode', filter_mode, ...
@@ -405,19 +441,19 @@ switch lower(measure)
             'Parallel', parallel, 'Progress', progress);
 
     case 'mfe'
-        % Multiscale Fuzzy Entropy — Azami & Escudero (2016)
+        % Multiscale Fuzzy Entropy - Azami & Escudero (2016)
         [entropy, scales] = compute_MFE(data, 'm', m, ...
             'tau', tau, 'r', r, 'coarsing', coarsing, 'num_scales', num_scales, ...
             'zNorm', zNorm, 'Parallel', parallel, 'Progress', progress);
 
     case 'cmfe'
-        % Composite Multiscale Fuzzy Entropy (CMFE) — Azami & Escudero (2016)
+        % Composite Multiscale Fuzzy Entropy (CMFE) - Azami & Escudero (2016)
         [entropy, scales] = compute_CMFE(data, 'm', m, 'tau', tau, ...
             'r', r, 'n', n, 'coarsing', coarsing, 'num_scales', num_scales, ...
             'zNorm', zNorm, 'Parallel', parallel, 'Progress', progress);
 
     case 'rcmfe'
-        % Refined Composite Multiscale Fuzzy Entropy (RCMFE) — Azami & Escudero (2016)
+        % Refined Composite Multiscale Fuzzy Entropy (RCMFE) - Azami & Escudero (2016)
         [entropy, scales] = compute_RCMFE(data, 'm', m, 'tau', tau, ...
             'r', r, 'n', n, 'coarsing', coarsing, 'num_scales', num_scales, ...
             'zNorm', zNorm, 'IncludeScale1', IncludeScale1, ...

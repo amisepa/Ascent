@@ -44,6 +44,17 @@ function [CMFE, scales] = compute_CMFE(data, varargin)
 %     for mean/median coarse-graining.
 %   • For best agreement with the original FuzEn-style literature, use
 %     'Mode','local'. Use 'global' for a SampEn-like variant.
+%
+% References:
+%   Wu, S.-D., Wu, C.-W., Lin, S.-G., Wang, C.-C., & Lee, K.-Y. (2013). Time series
+%     analysis using composite multiscale entropy. Entropy, 15, 1069-1084.
+%   Azami, H., Fernandez, A., & Escudero, J. (2017). Refined multiscale fuzzy entropy
+%     based on standard deviation for biomedical signal analysis. Med Biol Eng Comput,
+%     55, 2037-2052.
+%   Chen, W., Zhuang, J., Yu, W., & Wang, Z. (2009). Measuring complexity using
+%     FuzzyEn, ApEn, and SampEn. Med Eng Phys, 31, 61-68.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 p = inputParser;
 p.addRequired('data', @(x) (isstruct(x) && isfield(x,'data')) || (isnumeric(x) && ndims(x)==2));

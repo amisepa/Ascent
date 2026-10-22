@@ -1,6 +1,6 @@
 function [exponent, offset, info] = compute_AperiodicFit(freqs, psd, varargin)
 % Aperiodic exponent and offset via spectral parameterization (FOOOF/specparam).
-% Pure MATLAB reimplementation — no Python, no external toolboxes required.
+% Pure MATLAB reimplementation - no Python, no external toolboxes required.
 %
 %   [exponent, offset, info] = compute_AperiodicFit(freqs, psd, ...
 %       'FreqRange', [1 40], 'AperiodicMode', 'fixed', ...
@@ -15,8 +15,8 @@ function [exponent, offset, info] = compute_AperiodicFit(freqs, psd, varargin)
 %   Name-Value pairs:
 %     'FreqRange'       : [fmin fmax] Hz to fit (default [1 40])
 %     'AperiodicMode'   : 'fixed' (default) | 'knee'
-%                         'fixed'  — log P = offset - exponent * log F
-%                         'knee'   — log P = offset - log(knee + F^exponent)
+%                         'fixed'  - log P = offset - exponent * log F
+%                         'knee'   - log P = offset - log(knee + F^exponent)
 %     'MaxPeaks'        : maximum number of Gaussian peaks to fit (default 3)
 %     'MinPeakHeight'   : minimum peak height above aperiodic, in log10 power
 %                         units (default 0.05)
@@ -78,9 +78,7 @@ function [exponent, offset, info] = compute_AperiodicFit(freqs, psd, varargin)
 %   approach; cite Donoghue et al. (2020) regardless of which port is used.
 %
 % -------------------------------------------------------------------------
-% Copyright (C) 2025
-% EEGLAB Ascent Plugin - Author: Cedric Cannard
-% License: GNU GPL v2 or later
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 % -------------------------------------------------------------------------
 
 % Parse inputs
@@ -344,7 +342,7 @@ if strcmp(mode, 'fixed')
     params = [beta(1); beta(2)];
 
 else
-    % Knee mode: nonlinear — use lsqcurvefit or fminsearch
+    % Knee mode: nonlinear - use lsqcurvefit or fminsearch
     % Initial guess: run fixed first for offset/exponent, knee = median power
     X       = [ones(size(logf)) -logf];
     beta0   = X \ logp;

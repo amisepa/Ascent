@@ -28,6 +28,13 @@ function [psd, freqs] = compute_psd(data, fs, varargin)
 % USAGE:
 %   [psd, freqs] = compute_psd(EEG.data, EEG.srate, 'freqRange', [1 40], ...
 %       'winSec', 4, 'overlap', 0.5, 'window', 'hann', 'nfft', [], 'detrend', true);
+%
+% References:
+%   Donoghue, T., Haller, M., Peterson, E. J., et al. (2020). Parameterizing neural
+%     power spectra into periodic and aperiodic components. Nat Neurosci, 23,
+%     1655-1665.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 % --- parse inputs ---
 p = inputParser;

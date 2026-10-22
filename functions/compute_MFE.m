@@ -49,6 +49,17 @@ function [MFE, scales, CI] = compute_MFE(data, varargin)
 %   NOTE ON DEFAULTS: the default coarse-graining is now 'mean' (classic
 %   multiscale entropy). 'std'/'var' coarse-graining yield generalized
 %   (variance-based) MFE and remain available as options.
+%
+% References:
+%   Costa, M., Goldberger, A. L., & Peng, C.-K. (2002). Multiscale entropy analysis of
+%     complex physiologic time series. Phys Rev Lett, 89, 068102.
+%   Chen, W., Zhuang, J., Yu, W., & Wang, Z. (2009). Measuring complexity using
+%     FuzzyEn, ApEn, and SampEn. Med Eng Phys, 31, 61-68.
+%   Azami, H., Fernandez, A., & Escudero, J. (2017). Refined multiscale fuzzy entropy
+%     based on standard deviation for biomedical signal analysis. Med Biol Eng Comput,
+%     55, 2037-2052.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 % ---------------- Parse inputs ----------------
 p = inputParser;

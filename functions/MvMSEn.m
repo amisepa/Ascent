@@ -69,6 +69,8 @@ function [MSx, CI] = MvMSEn(Data, Mobj, varargin)
 %           analysis of multichannel data."
 %           Physical Review E 84.6 (2011): 061918.
 %
+%
+% Included in the ASCENT EEGLAB plugin from EntropyHub (Flood & Grimm, 2021; Apache License 2.0).
 narginchk(2,8)
 Data = squeeze(Data);
 Dn = size(Data,2);

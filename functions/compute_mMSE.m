@@ -24,7 +24,17 @@ function [mse, scales, info] = compute_mMSE(data, varargin)
 % by selecting every s-th sample, so applying mean/std/variance operators to
 % bins would change the measure's meaning and defeat the purpose of the spectral isolation.
 %
-% Author: Cedric Cannard, 2025
+% References:
+%   Kosciessa, J. Q., Kloosterman, N. A., & Garrett, D. D. (2020). Standard multiscale
+%     entropy reflects neural dynamics at mismatched temporal scales: What's signal
+%     irregularity got to do with it? PLoS Comput Biol, 16, e1007885.
+%   Kloosterman, N. A., Kosciessa, J. Q., Lindenberger, U., Fahrenfort, J. J., &
+%     Garrett, D. D. (2020). Boosts in brain signal variability track liberal shifts in
+%     decision bias. eLife, 9, e54201.
+%   Costa, M., Goldberger, A. L., & Peng, C.-K. (2002). Multiscale entropy analysis of
+%     complex physiologic time series. Phys Rev Lett, 89, 068102.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 % EEGLAB ASCENT PLUGIN
 
 % -------- Parse inputs
@@ -196,7 +206,7 @@ for ch = 1:nChan
 end
 
 % =========================================================================
-%  SCALE LOOP — PARALLEL
+%  SCALE LOOP - PARALLEL
 %  Loop variable s is the array index (1:S-1).
 %  Actual scale value is actualScale = s+1.
 % =========================================================================
@@ -296,7 +306,7 @@ if useParScales
 
 else
     % =========================================================================
-    %  SCALE LOOP — SERIAL
+    %  SCALE LOOP - SERIAL
     %  Same convention: s is array index (1:S-1), actualScale = s+1.
     % =========================================================================
     for s = 1:S-1

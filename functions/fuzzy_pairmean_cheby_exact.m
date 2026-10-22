@@ -11,6 +11,8 @@ function fi = fuzzy_pairmean_cheby_exact(V, r, n, blockSize, pdistMaxGB, kernelT
 %   blockSize  : block size for exact blocked fallback
 %   pdistMaxGB : max temporary memory allowed for pdist vector, in GB
 %   kernelType : 'exponential' or 'gaussian' (default = 'exponential')
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 if nargin < 6 || isempty(kernelType)
     kernelType = 'exponential';

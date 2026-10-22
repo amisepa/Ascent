@@ -282,6 +282,8 @@ clear sections   % so a later plain run redoes everything
 %% ---- local functions ----
 function say(varargin)
 % timestamped progress line, flushed to the command window
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 fprintf('[%s] %s\n', char(datetime('now', 'Format', 'HH:mm:ss')), sprintf(varargin{:})); drawnow;
 end
 

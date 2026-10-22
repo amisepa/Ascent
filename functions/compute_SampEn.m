@@ -27,6 +27,13 @@ function SampEn = compute_SampEn(data, varargin)
 %     absolute Chebyshev tolerance.
 %   • Pairwise Chebyshev match fractions are computed exactly using pdist
 %     when memory allows, otherwise an exact blocked fallback is used.
+%
+% References:
+%   Richman, J. S., & Moorman, J. R. (2000). Physiological time-series analysis using
+%     approximate entropy and sample entropy. Am J Physiol Heart Circ Physiol, 278,
+%     H2039-H2049.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 % ---------------- Parse inputs ----------------
 p = inputParser;

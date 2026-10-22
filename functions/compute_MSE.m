@@ -48,6 +48,17 @@ function [MSE, scales, CI] = compute_MSE(data, varargin)
 %   NOTE ON DEFAULTS: the default coarse-graining is now 'mean' (classic
 %   Costa MSE). 'std'/'var' coarse-graining yield generalized MSE
 %   (Costa & Goldberger, 2015) and remain available as options.
+%
+% References:
+%   Costa, M., Goldberger, A. L., & Peng, C.-K. (2002). Multiscale entropy analysis of
+%     complex physiologic time series. Phys Rev Lett, 89, 068102.
+%   Costa, M. D., & Goldberger, A. L. (2015). Generalized multiscale entropy analysis:
+%     Application to quantifying the complex volatility of human heartbeat time series.
+%     Entropy, 17, 1197-1203.
+%   Azami, H., & Escudero, J. (2018). Coarse-graining approaches in univariate
+%     multiscale sample and dispersion entropy. Entropy, 20, 138.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 % ---------------- Parse inputs ----------------
 p = inputParser;

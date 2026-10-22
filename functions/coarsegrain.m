@@ -4,6 +4,8 @@ function cg = coarsegrain(Y, coarseType)
 %   1 x nBins row vector, one value per window, using the requested statistic.
 %   Shared helper for the ASCENT multiscale entropy measures
 %   (MSE, MFE, mMSE, CMFE, RCMFE).
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 switch lower(strtrim(coarseType))
     case 'mean'
         cg = mean(Y, 1, 'omitnan');

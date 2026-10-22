@@ -39,7 +39,7 @@ function ascent_plot(entropyData, chanlocs, entropyType, scales, varargin)
 %   Time-resolved positional:
 %       varargin{1} = time_sec      [1 x time]
 %
-% Copyright (C) - ASCENT EEGLAB PLUGIN - Cedric Cannard, 2021-2025
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 % Strip named pairs before positional parsing
 opt.isICA         = false;

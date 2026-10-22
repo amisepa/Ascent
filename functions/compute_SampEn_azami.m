@@ -21,6 +21,8 @@ function Out_En = compute_SampEn_azami(x,m,r)
 % Hamed Azami
 % hmd.azami@gmail.com - hazami@mgh.harvard.edu
 %  20-March-2020
+%
+% Original code by Hamed Azami; included in the ASCENT EEGLAB plugin for validation.
 
 
 x = x-mean(x);

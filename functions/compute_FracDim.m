@@ -33,15 +33,13 @@ function [D, SD, info] = compute_FracDim(data, varargin)
 % References:
 %   Kirkby, M. J. (1983). The fractal geometry of nature. Earth Surface 
 %       Processes and Landforms.
-%   Esteller, R., Vachtsevanos, G., Echauz, J., & Litt, B. (2002). A 
+%   Esteller, R., Vachtsevanos, G., Echauz, J., & Litt, B. (2001). A 
 %       comparison of waveform fractal dimension algorithms. IEEE 
 %       Transactions on Circuits and Systems I: Fundamental Theory and 
 %       Applications, 48(2), 177-183.
 % 
 % -------------------------------------------------------------------------
-% Copyright (C) 2025
-% EEGLAB Ascent Plugin — Author: Cedric Cannard
-% License: GNU GPL v2 or later
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 % -------------------------------------------------------------------------
 
 % ---------- Parse inputs ----------

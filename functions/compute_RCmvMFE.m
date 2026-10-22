@@ -32,6 +32,18 @@ function [RCmvMFE, scales] = compute_RCmvMFE(data, varargin)
 %   • This implementation follows the original RCmvMFE structure where, at each scale,
 %     offset-specific phi_m and phi_m+1 terms are summed across offsets and the entropy
 %     is computed as log(sum(phi_m) / sum(phi_m+1)).
+%
+% References:
+%   Azami, H., & Escudero, J. (2017). Refined composite multivariate generalized
+%     multiscale fuzzy entropy: A tool for complexity analysis of multichannel signals.
+%     Physica A, 465, 261-276.
+%   Ahmed, M. U., & Mandic, D. P. (2011). Multivariate multiscale entropy: A tool for
+%     complexity analysis of multichannel data. Phys Rev E, 84, 061918.
+%   Azami, H., Smith, K., & Escudero, J. (2016). MEMD-enhanced multivariate fuzzy
+%     entropy for the evaluation of complexity in biomedical signals. Proc IEEE EMBC
+%     2016, 3761-3764.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 % ---------- Parse inputs ----------
 p = inputParser;

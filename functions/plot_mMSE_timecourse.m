@@ -7,9 +7,9 @@ function plot_mMSE_timecourse(mse_time, time_sec, scales, varargin)
 %   plot_mMSE_timecourse(mse_time, time_sec, scales, 'Alpha', 0.25)
 %
 % Inputs:
-%   mse_time  : [nChan x nScales x nTime]  — from info.mse_time
-%   time_sec  : [1 x nTime]                — from info.time_sec
-%   scales    : cell array of scale labels — from compute_mMSE output
+%   mse_time  : [nChan x nScales x nTime]  - from info.mse_time
+%   time_sec  : [1 x nTime]                - from info.time_sec
+%   scales    : cell array of scale labels - from compute_mMSE output
 %
 % Optional name-value:
 %   'ScaleIdx' : indices of scales to plot (default: all)
@@ -20,6 +20,8 @@ function plot_mMSE_timecourse(mse_time, time_sec, scales, varargin)
 %   'XLabel'   : x-axis label (default: 'Time (s)')
 %
 % Output: figure handle (returned implicitly)
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 p2 = inputParser;
 p2.addParameter('ScaleIdx', [], @(x) isnumeric(x) && isvector(x));
@@ -70,7 +72,7 @@ for ii = 1:nPlot
     m = mu(ii,:);
     e = se(ii,:);
 
-    % Shaded SE region — excluded from legend
+    % Shaded SE region - excluded from legend
     tFill = [t, fliplr(t)];
     yFill = [m + e, fliplr(m - e)];
     if any(isfinite(yFill))
@@ -79,7 +81,7 @@ for ii = 1:nPlot
              'HandleVisibility', 'off');
     end
 
-    % Mean line — appears in legend
+    % Mean line - appears in legend
     if s_idx <= numel(scales)
         lbl = scales{s_idx};
     else

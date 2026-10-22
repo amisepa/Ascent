@@ -10,7 +10,7 @@ function ascent_gui_data(fig, action)
 %   ascent_gui_data(fig, 'sample')  % ascent_sample_data.set
 %   ascent_gui_data(fig, 'show')    % refresh the description only
 %
-% Copyright (C) - ASCENT EEGLAB PLUGIN - Cedric Cannard, 2026
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 root = fileparts(which('eegplugin_ascent.m'));
 E = [];

@@ -87,9 +87,7 @@ function [exponent_t, offset_t, times, freqs, psd_t, psd_corrected_t, fit_error_
 %     periodic and aperiodic components. Nature Neuroscience, 23, 1655-1665.
 %
 % -------------------------------------------------------------------------
-% Copyright (C) 2025
-% EEGLAB Ascent Plugin - Author: Cedric Cannard
-% License: GNU GPL v2 or later
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 % -------------------------------------------------------------------------
 
 %% --- Parse inputs ---

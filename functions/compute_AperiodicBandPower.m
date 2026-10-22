@@ -8,7 +8,7 @@ function [bp_raw, bp_osc, ap_model] = compute_AperiodicBandPower(freqs, psd, exp
 %
 % Single source of truth for the aperiodic ("1/f") model in Ascent. Anything
 % that needs the model, a corrected spectrum, or a band power should call this
-% rather than re-deriving 10.^(offset - exponent*log10(f)) locally — that
+% rather than re-deriving 10.^(offset - exponent*log10(f)) locally - that
 % formula was previously duplicated across ascent_compute, the sliding-window
 % fit and the plotting layer, and the three had drifted apart.
 %
@@ -29,7 +29,7 @@ function [bp_raw, bp_osc, ap_model] = compute_AperiodicBandPower(freqs, psd, exp
 % Outputs
 %   bp_raw   : total band power per signal [nSig x 1], µV²/Hz.
 %              Includes the aperiodic background, so it is dominated by
-%              broadband power for signals with a steep 1/f — it is NOT a
+%              broadband power for signals with a steep 1/f - it is NOT a
 %              measure of oscillatory activity on its own.
 %   bp_osc   : oscillatory band power per signal [nSig x 1], µV²/Hz.
 %              bp_raw minus the aperiodic model over the same band, i.e. the
@@ -40,7 +40,12 @@ function [bp_raw, bp_osc, ap_model] = compute_AperiodicBandPower(freqs, psd, exp
 %              A corrected spectrum in the ratio sense is psd ./ ap_model.
 %              Valid in BOTH fixed and knee mode.
 %
-% Copyright (C) - ASCENT EEGLAB PLUGIN - Cedric Cannard, 2021-2025
+% References:
+%   Donoghue, T., Haller, M., Peterson, E. J., et al. (2020). Parameterizing neural
+%     power spectra into periodic and aperiodic components. Nat Neurosci, 23,
+%     1655-1665.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 if nargin < 5 || isempty(band), band = [8 13]; end
 if nargin < 6, knee = []; end

@@ -1,4 +1,5 @@
 function hits = pairwise_match_count_cheby_blocked(V, r, blockSize)
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 m = size(V,1);
 pdim = size(V,2);

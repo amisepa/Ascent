@@ -39,6 +39,8 @@ function entr = compute_FuzzEn_azami(ts, m, mf, rn, local,tau)
 %
 %
 % Example x=rand(1,1000);FuzEn_MFs(x, 2, 'Bell_shaped', [0.1414*std(x) 2], 0,1)
+%
+% Original code by Peng Li and Hamed Azami; included in the ASCENT EEGLAB plugin for validation.
 
 
 if nargin == 5, tau = 1; end

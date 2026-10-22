@@ -1,5 +1,7 @@
 function S = pairwise_fuzzy_sum_cheby_blocked_double(V, r, n, blockSize, kernelType)
 % Exact sum_{i<j} kernel(d_ij), with Chebyshev distance, using blocks.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 if nargin < 5 || isempty(kernelType)
     kernelType = 'exponential';

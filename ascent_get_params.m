@@ -61,6 +61,8 @@ function [p, EEG] = ascent_get_params(EEG, varargin)
 %     p.correctAperiodic subtract aperiodic model from PSD    (default: true)
 %     p.alphaBand      [fMin fMax] Hz for saved alpha power   (default: [8 13])
 %     p.timeResolved   sliding-window aperiodic fit           (default: false)
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 % ----------------------------
 % Initialize all fields to []

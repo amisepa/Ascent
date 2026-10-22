@@ -6,7 +6,7 @@
 %   Cannard, C., & Delorme, A. (2022). An open-source EEGLAB plugin for 
 %   computing entropy-based measures on MEEG signals.
 % 
-% Copyright (C) - ASCENT EEGLAB PLUGIN - Cedric Cannard, 2021-2025
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 clear; close all; clc
 

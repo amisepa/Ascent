@@ -3,6 +3,8 @@ function f = zNorm_scale(x, zNorm)
 %   multiscale entropy. Shared helper for the ASCENT measures.
 %     0  fixed (factor 1) | 1  population std | 2  population var
 %     3  mad(mean) | 4  mad(median)
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 switch zNorm
     case 1, f = std(x, 1);      % population standard deviation
     case 2, f = var(x, 1);      % population variance

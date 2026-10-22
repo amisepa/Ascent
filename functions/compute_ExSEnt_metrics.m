@@ -2,6 +2,7 @@
 % to yield a more nuanced picture of the irregularities of the time series. The detailed explanations of the method
 % is included in:  https://doi.org/10.48550/arXiv.2509.07751
 % Sara Kamali, sara.kamali@uam.es, sara.kamali@gmail.com, UAM, GNB lab
+% Original ExSEnt code by Sara Kamali (Kamali et al., 2026); included in the ASCENT EEGLAB plugin for validation.
 
 
 

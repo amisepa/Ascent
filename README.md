@@ -12,24 +12,23 @@ ASCENT is an EEGLAB plugin to compute entropy, fractal, and aperiodic (1/f) meas
 ## Measures supported
 
 Uniscale measures:
-- Sample entropy (SampEn)
-- Fuzzy entropy (FuzzEn)
-- Extrema-segmented entropy (ExSEnt; improved SampEn from Kamali 2025)
-- Fractal dimension/volatility (FracDim)
-- Higuchi fractal dimension (HigFracDim)
-- Aperiodic exponent and offset of the power spectrum (specparam algorithm from Donoghue 2020), static or time-resolved
+- Sample entropy (SampEn; Richman & Moorman, 2000)
+- Fuzzy entropy (FuzzEn; Chen et al., 2009)
+- Extrema-segmented entropy (ExSEnt; Kamali et al., 2026), on the durations and amplitudes of the signal's extrema segments
+- Fractal dimension, box-counting (FracDim; Esteller et al., 2001)
+- Higuchi fractal dimension (HigFracDim; Higuchi, 1988)
+- Aperiodic exponent and offset of the power spectrum (specparam algorithm; Donoghue et al., 2020), static or time-resolved (SPRiNT; Wilson et al., 2022)
 
 Multiscale measures:
-- Multiscale entropy (MSE; enhanced version of Costa 2002)
-- Modified multiscale entropy (mMSE; enhanced version of Kloosterman 2020 and Kosciessa 2020)
-- Multiscale fuzzy entropy (MFE; enhanced version of Azami 2017)
-- Refined composite multiscale fuzzy entropy (RCMFE; enhanced version of Azami 2017)
+- Multiscale entropy (MSE; Costa et al., 2002), with mean, median, standard deviation, or variance coarse-graining (Costa & Goldberger, 2015; Azami & Escudero, 2018)
+- Modified multiscale entropy (mMSE; Kosciessa et al., 2020; Kloosterman et al., 2020)
+- Multiscale fuzzy entropy (MFE), composite MFE (CMFE; Wu et al., 2013), and refined composite multiscale fuzzy entropy (RCMFE; Azami et al., 2017)
 
 Multivariate measures:
-- Multivariate fuzzy entropy (mvFuzzEn; Ahmed 2011, Azami 2017)
-- Refined composite multivariate multiscale fuzzy entropy (RCmvMFE; Azami 2017)
+- Multivariate fuzzy entropy (mvFuzzEn; Ahmed & Mandic, 2011; Azami et al., 2016)
+- Refined composite multivariate multiscale fuzzy entropy (RCmvMFE; Azami & Escudero, 2017)
 
-All algorithms were modified to significantly increase computation speed while preserving the integrity of the estimates, using vectorization, matrix operations, parallel computing, and blockwise distance calculations that avoid allocating the full pairwise matrix when memory is limited.
+All algorithms were modified to significantly increase computation speed while preserving the integrity of the estimates, using vectorization, matrix operations, parallel computing, and blockwise distance calculations that avoid allocating the full pairwise matrix when memory is limited. Some functions used for validation are included from EntropyHub (Flood & Grimm, 2021) and from the original authors of the methods, with their notices.
 
 ## Installation
 
@@ -149,7 +148,9 @@ EEG = ascent_compute(EEG, 'measure', 'RCmvMFE',  'chanlist', {'Fz' 'Cz' 'Pz' 'Oz
 
 ## Please cite
 
-https://psyarxiv.com/xwmyk/
+Cannard, C., & Delorme, A. Introducing the ASCENT EEGLAB plugin: Aperiodic Signal Complexity Estimation for Neurophysiological Time series. Under review. Preprint of an earlier version: https://psyarxiv.com/xwmyk/
+
+Please also cite the papers of the methods you use (see References below).
 
 ## Main results (eyes closed vs eyes open, N = 40)
 
@@ -172,3 +173,30 @@ Power spectral density, raw (first) and after removing the aperiodic component (
 <img alt="PSD, raw" src="img/fig10_psd_raw_group.png" width="70%" />
 
 <img alt="PSD, aperiodic-corrected" src="img/fig11_psd_corrected_group.png" width="70%" />
+
+## References
+
+- Ahmed, M. U., & Mandic, D. P. (2011). Multivariate multiscale entropy: A tool for complexity analysis of multichannel data. *Physical Review E*, 84, 061918.
+- Azami, H., & Escudero, J. (2017). Refined composite multivariate generalized multiscale fuzzy entropy: A tool for complexity analysis of multichannel signals. *Physica A*, 465, 261-276.
+- Azami, H., & Escudero, J. (2018). Coarse-graining approaches in univariate multiscale sample and dispersion entropy. *Entropy*, 20, 138.
+- Azami, H., Fernández, A., & Escudero, J. (2017). Refined multiscale fuzzy entropy based on standard deviation for biomedical signal analysis. *Medical & Biological Engineering & Computing*, 55, 2037-2052.
+- Azami, H., Smith, K., & Escudero, J. (2016). MEMD-enhanced multivariate fuzzy entropy for the evaluation of complexity in biomedical signals. *Proceedings of the 38th Annual International Conference of the IEEE EMBC*, 3761-3764.
+- Cannard, C., Wahbeh, H., & Delorme, A. (2021). Validating the wearable MUSE headset for EEG spectral analysis and frontal alpha asymmetry. *IEEE International Conference on Bioinformatics and Biomedicine (BIBM)*, 3603-3610. (Source of the sample and group datasets.)
+- Chen, W., Zhuang, J., Yu, W., & Wang, Z. (2009). Measuring complexity using FuzzyEn, ApEn, and SampEn. *Medical Engineering & Physics*, 31, 61-68.
+- Costa, M. D., & Goldberger, A. L. (2015). Generalized multiscale entropy analysis: Application to quantifying the complex volatility of human heartbeat time series. *Entropy*, 17, 1197-1203.
+- Costa, M., Goldberger, A. L., & Peng, C.-K. (2002). Multiscale entropy analysis of complex physiologic time series. *Physical Review Letters*, 89, 068102.
+- Delorme, A., & Makeig, S. (2004). EEGLAB: An open source toolbox for analysis of single-trial EEG dynamics including independent component analysis. *Journal of Neuroscience Methods*, 134, 9-21.
+- Donoghue, T., Haller, M., Peterson, E. J., et al. (2020). Parameterizing neural power spectra into periodic and aperiodic components. *Nature Neuroscience*, 23, 1655-1665.
+- Esteller, R., Vachtsevanos, G., Echauz, J., & Litt, B. (2001). A comparison of waveform fractal dimension algorithms. *IEEE Transactions on Circuits and Systems I*, 48, 177-183.
+- Flood, M. W., & Grimm, B. (2021). EntropyHub: An open-source toolkit for entropic time series analysis. *PLoS ONE*, 16, e0259448.
+- Higuchi, T. (1988). Approach to an irregular time series on the basis of the fractal theory. *Physica D*, 31, 277-283.
+- Kamali, S., Baroni, F., & Varona, P. (2026). ExSEnt: Extrema-segmented entropy analysis of time series. *Nonlinear Dynamics*, 114, 980.
+- Kloosterman, N. A., Kosciessa, J. Q., Lindenberger, U., Fahrenfort, J. J., & Garrett, D. D. (2020). Boosts in brain signal variability track liberal shifts in decision bias. *eLife*, 9, e54201.
+- Kosciessa, J. Q., Kloosterman, N. A., & Garrett, D. D. (2020). Standard multiscale entropy reflects neural dynamics at mismatched temporal scales: What's signal irregularity got to do with it? *PLoS Computational Biology*, 16, e1007885.
+- Richman, J. S., & Moorman, J. R. (2000). Physiological time-series analysis using approximate entropy and sample entropy. *American Journal of Physiology - Heart and Circulatory Physiology*, 278, H2039-H2049.
+- Wilson, L. E., da Silva Castanheira, J., & Baillet, S. (2022). Time-resolved parameterization of aperiodic and periodic brain activity. *eLife*, 11, e77348.
+- Wu, S.-D., Wu, C.-W., Lin, S.-G., Wang, C.-C., & Lee, K.-Y. (2013). Time series analysis using composite multiscale entropy. *Entropy*, 15, 1069-1084.
+
+## Author and license
+
+ASCENT is developed by Cedric Cannard. Copyright (C) 2021-2026 Cedric Cannard. It is free software released under the GNU General Public License v3 or later (see [LICENSE](LICENSE)). Functions included from EntropyHub keep their Apache License 2.0 notice.

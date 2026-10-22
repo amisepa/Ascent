@@ -1,4 +1,4 @@
-% validate_specparam_port.m — ASCENT vs Python specparam validation (TODO 2c)
+% validate_specparam_port.m - ASCENT vs Python specparam validation (TODO 2c)
 %
 % Benchmarks ASCENT's compute_AperiodicFit (MATLAB) against the Python
 % specparam 2.0 reference implementation on:
@@ -7,12 +7,14 @@
 %   (B) 64 real channel PSDs from the sample dataset (Welch, 1-40 Hz).
 %
 % Matched settings: fixed mode, freqs 1-40 Hz, peak_width_limits [1 12],
-% max_n_peaks 3, min_peak_height 0.05, peak_threshold 2.0 — ASCENT defaults.
+% max_n_peaks 3, min_peak_height 0.05, peak_threshold 2.0 - ASCENT defaults.
 %
 % Outputs (written to validation_specparam/):
-%   matlab_results.mat  — exponent/offset/peaks/r2/MAE per spectrum
+%   matlab_results.mat  - exponent/offset/peaks/r2/MAE per spectrum
 %   (Python side writes python_results.csv; compare_specparam.m merges both,
 %    computes agreement stats, and renders the supplementary figure.)
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 root    = 'C:\Users\ccann\Documents\MATLAB\Ascent';
 eegRoot = 'C:\Users\ccann\Documents\MATLAB\eeglab';

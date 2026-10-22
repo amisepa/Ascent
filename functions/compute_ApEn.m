@@ -8,7 +8,11 @@
 % Outputs:
 %   ae - approximate entropy
 %
-% Cedric Cannard
+% References:
+%   Pincus, S. M. (1991). Approximate entropy as a measure of system complexity. Proc
+%     Natl Acad Sci USA, 88, 2297-2301.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 
 function ae = compute_ApEn(signal, m, r)

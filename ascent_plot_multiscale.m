@@ -14,7 +14,7 @@ function ascent_plot_multiscale(entropyData, chanlocs, entropyType, scales, opt)
 % In ICA mode, topos are the cluster-mean entropy back-projected to the scalp
 % through icawinv, and chanlocs are the channels the decomposition ran on.
 %
-% Copyright (C) - ASCENT EEGLAB PLUGIN - Cedric Cannard, 2021-2025
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 isICA         = opt.isICA;
 icawinv       = opt.icawinv;
@@ -467,7 +467,7 @@ for ik = 1:n_ics
 end
 
 if numel(brain_ics) < 3
-    warning('ascent_plot: only %d ICs passed RV<%.0f%% — skipping region plot.', ...
+    warning('ascent_plot: only %d ICs passed RV<%.0f%% - skipping region plot.', ...
             numel(brain_ics), rv_thresh*100);
     return;
 end
@@ -534,7 +534,7 @@ if ~isempty(dipfit) && isfield(dipfit,'mrifile') && ~isempty(ic_idx)
             end
         end
     catch ME
-        warning('ascent_plot: dipplot capture failed — %s', ME.message);
+        warning('ascent_plot: dipplot capture failed - %s', ME.message);
     end
 end
 

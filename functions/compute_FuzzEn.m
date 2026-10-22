@@ -36,6 +36,12 @@ function FuzzEn = compute_FuzzEn(data, varargin)
 %     of using r = 0.15 * SD(original signal).
 %
 % See also: fuzz_engine_raw, compute_CMFE, compute_RCMFE
+%
+% References:
+%   Chen, W., Zhuang, J., Yu, W., & Wang, Z. (2009). Measuring complexity using
+%     FuzzyEn, ApEn, and SampEn. Med Eng Phys, 31, 61-68.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 p = inputParser;
 p.addRequired('data', @(x) isnumeric(x) && ndims(x) == 2);

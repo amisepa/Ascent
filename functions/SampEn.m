@@ -45,6 +45,8 @@ function [Samp, A, B, Vcp_Ka_Kb] = SampEn(Sig, varargin)
 %           American Journal of Physiology-Regulatory, Integrative and Comparative Physiology
 %           283, no. 3 (2002): R789-R797.
 % 
+%
+% Included in the ASCENT EEGLAB plugin from EntropyHub (Flood & Grimm, 2021; Apache License 2.0).
 narginchk(1,11)
 if size(Sig,1) == 1
     Sig = Sig';

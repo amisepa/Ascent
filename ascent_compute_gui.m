@@ -28,6 +28,8 @@ function [measType, chanlist, tau, m, coarseType, nScales, extraParams, n, vis, 
 %   EEG           - the dataset: the input, or the one loaded in GUI #1 (its
 %                   Data row loads a dataset or the sample dataset, as in
 %                   BrainBeats, so the window also opens with no dataset loaded)
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 % Default outputs
 chanlist = []; tau = []; m = [];
@@ -40,7 +42,7 @@ if nargin < 1 || isempty(EEG) || ~isfield(EEG,'data') || isempty(EEG.data)
 end
 
 % ---------------------------
-% GUI #1 — all measures
+% GUI #1 - all measures
 % ---------------------------
 meas = {'Aperiodic' 'SampEn' 'FuzzEn' 'ExSEnt' 'FracDim' 'HigFracDim' ...
         'MSE' 'mMSE' 'MFE' 'RCMFE' 'mvFuzzEn' 'RCmvMFE'};
@@ -116,7 +118,7 @@ if isempty(param)
     return;
 end
 
-% Parse GUI #1 — only interactive controls produce entries (text labels and the
+% Parse GUI #1 - only interactive controls produce entries (text labels and the
 % '...' pushbutton do not), hence: 1=measure 2=domain 3=chanlist 4..6=checkboxes
 measType = meas{param{1}};
 
@@ -137,7 +139,7 @@ progressTrack = logical(param{5});
 parallelComp  = logical(param{6});
 
 % ---------------------------
-% GUI #2b — multiscale / fuzzy measures (includes tau and m)
+% GUI #2b - multiscale / fuzzy measures (includes tau and m)
 % ---------------------------
 isMS = contains(lower(measType), {'mse','mmse','mfe','cmfe','rcmfe','rcmvmfe'});
 isFZ = contains(lower(measType), {'fuzzen','mfe','rcmfe','rcmvmfe'});
@@ -196,7 +198,7 @@ if isMS || isFZ
     return;
 end
 
-% GUI #2a — tau and m only (SampEn, ExSEnt)
+% GUI #2a - tau and m only (SampEn, ExSEnt)
 % FracDim and HigFracDim require no parameter GUI
 if any(strcmpi(measType, {'SampEn', 'ExSEnt'}))
 
@@ -220,7 +222,7 @@ end
 coarseType = []; nScales = []; n = []; extraParams = [];
 
 % ---------------------------
-% GUI #2c — Aperiodic parameters (no tau/m needed)
+% GUI #2c - Aperiodic parameters (no tau/m needed)
 % ---------------------------
 if strcmpi(measType, 'Aperiodic')
 
@@ -295,7 +297,7 @@ if strcmpi(measType, 'Aperiodic')
         return;
     end
 
-    % Parse — positions match uilistAP control order (headers and spacers
+    % Parse - positions match uilistAP control order (headers and spacers
     % do not produce output entries; only interactive controls do)
     psdFreqRange = str2num(paramAP{1});                         %#ok<ST2NM>
     winSec       = str2double(paramAP{2});

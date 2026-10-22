@@ -35,7 +35,7 @@ pass-v16.md and manuscript/review_2026-10-13/README.md (private folder).
   ascent_sample_data.set ships with stale EEG.ascent outputs inside.
 
 ## Status 2026-09-25 (supersedes older notes below where they conflict)
-- DONE: knee-mode aperiodic correction (full Lorentzian removed) — item 2.
+- DONE: knee-mode aperiodic correction (full Lorentzian removed) - item 2.
 - DONE: compute_AperiodicFit now ports specparam 2.0 exactly (robust initial
   fit, peak search in Hz with edge/overlap drops, plain final refit). Validation
   vs Python specparam (validation_specparam/matlab_results_v2.mat): r > 0.999 for
@@ -56,7 +56,7 @@ pass-v16.md and manuscript/review_2026-10-13/README.md (private folder).
 - OPEN (eeg_robust_statistics repo): pull_clusters' 2D path labels clusters on
   the unsigned mask, so adjacent positive/negative regions merge; ASCENT scripts
   now use a local pull_clusters_by_sign. Consider a sign-split option there.
-- OPEN: knee mode still differs from specparam (offset MAE ~0.5) — starting
+- OPEN: knee mode still differs from specparam (offset MAE ~0.5) - starting
   guesses/bounds of the knee fit.
 - OPEN: ascent_compute passes no tau to compute_SampEn (tau always 1);
   'slidPeakWidthLimits' name-value never matches (lowercased key);
@@ -179,7 +179,7 @@ pass-v16.md and manuscript/review_2026-10-13/README.md (private folder).
   and agree on ALL pending code improvements so everything is batched into a
   single rerun (avoid repeated partial reruns).
 - New numbers for manuscript (FINAL, Sept 10 2026 rerun with P_max=3 + robust
-  fit + SPRiNT pruning; sample dataset, 64ch, ~75s @256Hz) — user has pasted
+  fit + SPRiNT pruning; sample dataset, 64ch, ~75s @256Hz) - user has pasted
   these into the Google Doc §3.2.2 already:
   - Channel static: r(exp,off)=0.901; exp mean 1.045 sd 0.540; offset mean
     1.137 sd 0.430; alpha raw 5.76 uV2/Hz, above-fit 4.34 (~25% aperiodic).

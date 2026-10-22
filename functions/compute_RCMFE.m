@@ -47,6 +47,17 @@ function [RCMFE, scales] = compute_RCMFE(data, varargin)
 %     NOT re-normalized. With zNorm=0 the tolerance r is fixed across scales.
 %   • Scale 1 is skipped by default so the scale range matches the other
 %     multiscale measures. Set IncludeScale1=true to add it for mean/median.
+%
+% References:
+%   Azami, H., Fernandez, A., & Escudero, J. (2017). Refined multiscale fuzzy entropy
+%     based on standard deviation for biomedical signal analysis. Med Biol Eng Comput,
+%     55, 2037-2052.
+%   Azami, H., & Escudero, J. (2018). Coarse-graining approaches in univariate
+%     multiscale sample and dispersion entropy. Entropy, 20, 138.
+%   Chen, W., Zhuang, J., Yu, W., & Wang, Z. (2009). Measuring complexity using
+%     FuzzyEn, ApEn, and SampEn. Med Eng Phys, 31, 61-68.
+%
+% Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 p = inputParser;
 p.addRequired('data', @(x) (isstruct(x) && isfield(x,'data')) || (isnumeric(x) && ndims(x)==2));
