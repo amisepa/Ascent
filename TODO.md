@@ -13,8 +13,8 @@ in manuscript/ (no PDFs), with all figures current; next is the final read and s
   - Upload ASCENT2.1.zip through the EEGLAB plugin form once it works again (down on
     2026-10-22, a server-side PHP issue according to Arnaud Delorme): name ASCENT, version 2.1,
     docs https://github.com/amisepa/Ascent.
-  - DONE 2026-10-22: Ascent_rewritten.git and Ascent_slim.git deleted. Still check that
-    eeglab/plugins holds only the clean install from ASCENT2.1.zip.
+  - DONE 2026-10-22: old copies deleted; eeglab/plugins/ASCENT is the clean install from
+    ASCENT2.1.zip (52 files, no .git).
   - Optional: ask GitHub Support to purge unreferenced objects after the history rewrite.
   - Optional: GitHub Actions smoke test (matlab-actions + EEGLAB, README commands on a 20-s
     excerpt of the sample).
