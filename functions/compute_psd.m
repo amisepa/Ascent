@@ -76,7 +76,10 @@ fprintf(['PSD settings: window = %s, segLen = %d samples (%.2f s), ' ...
 
 % --- optionally linear-detrend entire signal before Welch ---
 if opt.detrend
-    data = detrend(data, 'linear');  % operates row-wise: [channels x samples]
+    % detrend works down columns, and data is [channels x samples]: transpose so
+    % each channel is detrended over time (detrend(data) removes a trend across
+    % channels at every sample instead)
+    data = detrend(data', 'linear')';
 end
 
 % --- compute Welch PSD per channel ---

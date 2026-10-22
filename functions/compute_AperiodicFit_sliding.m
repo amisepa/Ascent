@@ -289,7 +289,8 @@ if opt.PrunePeaks
             remove = false(size(pkList, 1), 1);
             for iP = 1:size(pkList, 1)
                 % SPRiNT counts the current peak as its own neighbour
-                nNb = sum(abs(pkList(:, 2) - pkList(iP, 2)) <= opt.PruneTimeBins & ...
+                % (pkList columns: 1 = CF, 2 = power, 3 = BW, 4 = time bin)
+                nNb = sum(abs(pkList(:, 4) - pkList(iP, 4)) <= opt.PruneTimeBins & ...
                           abs(pkList(:, 1) - pkList(iP, 1)) <= opt.PruneFreqTol) - 1;
                 if nNb < opt.PruneMinPeaks
                     remove(iP) = true;
@@ -306,7 +307,7 @@ if opt.PrunePeaks
             if origCount(iTime) == 0
                 continue;                       % never had peaks (SPRiNT skips)
             end
-            keptNow = pkList(pkList(:, 2) == iTime, 1:3);
+            keptNow = pkList(pkList(:, 4) == iTime, 1:3);
             if size(keptNow, 1) == origCount(iTime)
                 continue;                       % unchanged (SPRiNT: continue)
             end
