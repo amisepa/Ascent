@@ -317,8 +317,8 @@ exp_sd   = std(exponent_t,  0, 1, 'omitnan');
 off_mean = mean(offset_t,   1, 'omitnan');
 off_sd   = std(offset_t,    0, 1, 'omitnan');
 
-clrExp   = [0.18 0.45 0.87];
-clrOff   = [0.40 0.40 0.40];
+clrExp   = [0.00 0.45 0.74];   % blue
+clrOff   = [0.85 0.33 0.10];   % vermillion (grey was hard to tell from the shading)
 fAlpha   = 0.15;
 
 nRows = 3 + hasCorrected;   % 3 always + 1 optional corrected heatmap
@@ -392,7 +392,7 @@ hold(ax4, 'on');
 
 bandNames  = {'Theta', 'Alpha', 'Beta'};
 bandEdges  = [4 8; 8 13; 13 30];
-clrBands   = {[0.47 0.67 0.19], [0.85 0.33 0.10], [0.49 0.18 0.56]};
+clrBands   = {[0.00 0.62 0.45], [0.90 0.55 0.00], [0.45 0.25 0.75]};   % green, orange, purple
 
 hLinesRaw  = gobjects(1, 3);
 hLines     = gobjects(1, 3);
@@ -413,11 +413,12 @@ for ib = 1:3
     raw_sd   = std(band_raw_avg,  0, 1, 'omitnan');
     fill(ax4, [times fliplr(times)], ...
          [raw_mean + raw_sd  fliplr(raw_mean - raw_sd)], ...
-         clrBands{ib} * 0.55 + 0.45, 'FaceAlpha', fAlpha, ...
+         clrBands{ib}, 'FaceAlpha', 0.08, ...
          'EdgeColor', 'none', 'HandleVisibility', 'off');
+    % raw: dashed in the full band colour (the faded colour was hard to see)
     hLinesRaw(ib) = plot(ax4, times, raw_mean, '--', ...
-        'Color', clrBands{ib} * 0.55 + 0.45, ...
-        'LineWidth', 1.2, 'DisplayName', [bandNames{ib} ' (raw)']);
+        'Color', clrBands{ib}, ...
+        'LineWidth', 1.5, 'DisplayName', [bandNames{ib} ' (raw)']);
 end
 ylabel(ax4, 'Raw (log_{10} \muV^2/Hz)');
 ax4.YColor = [0.35 0.35 0.35];
@@ -434,9 +435,9 @@ if hasCorrected
         band_sd   = std(band_freq_avg,  0, 1, 'omitnan');
         fill(ax4, [times fliplr(times)], ...
              [band_mean + band_sd  fliplr(band_mean - band_sd)], ...
-             clrBands{ib}, 'FaceAlpha', fAlpha, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+             clrBands{ib}, 'FaceAlpha', 0.08, 'EdgeColor', 'none', 'HandleVisibility', 'off');
         hLines(ib) = plot(ax4, times, band_mean, '-', 'Color', clrBands{ib}, ...
-            'LineWidth', 1.8, 'DisplayName', [bandNames{ib} ' (corrected)']);
+            'LineWidth', 2.2, 'DisplayName', [bandNames{ib} ' (corrected)']);
     end
     ylabel(ax4, 'Corrected (log_{10})');   % longer label ran into the tick labels above
     ax4.YColor = [0.35 0.35 0.35];
@@ -500,8 +501,11 @@ for ax = plotAxesNo4
     ax.Position = [refLeft, pp(2), refWidth, pp(4)];
 end
 drawnow;
-pp4 = ax4.Position;
-ax4.Position = [refLeft, pp4(2), refWidth - 0.085, pp4(4)];  % room for right ylabel
+% Rows 3 and 4 both have a right-hand axis and label: same, narrower width
+for ax = [ax3 ax4]
+    pp = ax.Position;
+    ax.Position = [refLeft, pp(2), refWidth - 0.085, pp(4)];  % room for right ylabel
+end
 cbW   = 0.025;
 cbGap = 0.008;
 for ii = 1:numel(cbAxes)
