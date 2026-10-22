@@ -20,6 +20,8 @@ isICA         = opt.isICA;
 icawinv       = opt.icawinv;
 clusterThresh = opt.clusterThresh;
 dipfit        = opt.dipfit;
+if isfield(opt,'fontSize') && ~isempty(opt.fontSize), fs = opt.fontSize; else, fs = 9; end
+lw            = max(1, fs/9);   % line widths grow with the font for small prints
 
 isTimeResolved = ndims(entropyData)==3;
 if isTimeResolved
@@ -33,11 +35,11 @@ multiChan = nChan>1;
 
 if multiscale && multiChan
     % -------------------------------------------------------
-    % Multiscale + multichannel
-    % Layout: 3 rows x 4 cols
-    %   Cols 1-2 (all rows): heatmap
-    %   Col 3-4, row k:      topo | curve for cluster k
-    %   Up to 3 clusters shown; unused rows are blanked.
+    % Multiscale + multichannel: heatmap with the cluster outlines, plus
+    % panels for each cluster (up to 3). Layout:
+    %   one cluster, channels : heatmap left; topo top right, curve below it
+    %   one cluster, ICs      : heatmap left; IC bar top right, curve | topo below it
+    %   2-3 clusters          : heatmap left, one topo | curve row per cluster
     % -------------------------------------------------------
 
     finiteMask=isfinite(entropyData);
@@ -48,7 +50,8 @@ if multiscale && multiChan
     % Cluster detection (up to 3)
     [clusterMasks,nClusters,centroids,usedCluster] = ...
         find_entropy_clusters(entropyData, clusterThresh, 3);
-    nShow = min(nClusters,3);
+    nShow   = min(nClusters,3);
+    compact = nShow == 1;
 
     % Shared cluster colours: used for both heatmap contours and curve plots.
     % Chosen to be visible on the dark parula heatmap AND on white axes.
@@ -61,58 +64,53 @@ if multiscale && multiChan
                  'Name','Multiscale entropy visualization',...
                  'Toolbar','none','Menu','none','NumberTitle','Off');
     try icadefs; set(hFig2,'color',BACKCOLOR); catch; end %#ok<NODEF>
+    if compact
+        % One cluster: a smaller figure, so the cluster panels do not leave
+        % two empty rows
+        if isICA, sz = [1000 600]; else, sz = [1000 540]; end
+        set(hFig2,'Units','pixels'); p0 = get(hFig2,'Position');
+        set(hFig2,'Position',[p0(1) max(40, p0(2)+p0(4)-sz(2)) sz]);
+    end
 
-    nScales=size(entropyData,2);
+    nScales = size(entropyData,2);
+    xvals   = ifelse(isnumeric(scales), scales, 1:nScales);
 
-    % Heatmap: cols 1-2 across all 3 rows -> subplot indices [1 2 5 6 9 10]
-    ax_heat=subplot(3,4,[1 2 5 6 9 10]);
+    % Compact layouts use OuterPosition so that MATLAB fits tick labels, axis
+    % labels and the colorbar inside each panel (subplot slots let a large font
+    % run into the neighbouring panel)
+    if compact
+        ax_heat = axes(hFig2,'OuterPosition',[0 0 0.56 1]);
+    else
+        ax_heat = subplot(3,4,[1 2 5 6 9 10]);
+    end
     imagesc(ax_heat,1:nScales,1:nChan,entropyData); axis(ax_heat,'tight');
-    set(ax_heat,'TickDir','out'); box(ax_heat,'on');
-
-    if isICA
-        Yticks=arrayfun(@(x){sprintf('IC%d',x)},1:nChan);
-    else
-        Yticks={chanlocs.labels};
-    end
-    newY=1:nChan; if nChan>30, newY=round(linspace(1,nChan,20)); end
-    set(ax_heat,'YTick',newY,'YTickLabel',Yticks(newY),'FontWeight','normal');
-
-    if iscell(scales)
-        Xticks=scales; nX=numel(scales);
-    else
-        Xticks=arrayfun(@(x){num2str(x)},scales); nX=numel(scales);
-    end
-    newX=1:nX; if nX>30, newX=round(linspace(1,nX,20)); end
-    set(ax_heat,'XTick',newX,'XTickLabel',Xticks(newX),'FontWeight','normal');
+    set(ax_heat,'TickDir','out','Box','off');   % box ticks would poke into the title
     ax_heat.TickLabelInterpreter='none';
-    ax_heat.XTickLabelRotation=45;
-    ax_heat.PositionConstraint='outerposition';
-    drawnow;
-    outer=ax_heat.OuterPosition; ti=ax_heat.TightInset;
-    newBottom=max(outer(2),ti(2)+0.02);
-    newHeight=max(outer(4)-(newBottom-outer(2))-(ti(4)+0.01),0.1);
-    ax_heat.OuterPosition=[outer(1),newBottom,outer(3),newHeight];
-
     colormap(ax_heat,'parula');
-    ch=colorbar(ax_heat); ylabel(ch,'Entropy','FontWeight','bold','FontSize',9);
+    ch=colorbar(ax_heat); ch.Label.String='Entropy';
     xlabel(ax_heat,'Scales');
     ylabel(ax_heat,ifelse(isICA,'ICs','EEG channels'));
     title(ax_heat,entropyType,'Interpreter','none');
+    set(ax_heat,'FontSize',fs,'FontWeight','bold'); ch.FontSize=fs;
+    set_heat_ticks(ax_heat, scales, nChan, isICA, chanlocs, fs);
 
-    % Overlay cluster boundaries using the shared cluster colours.
-    % The binary mask is Gaussian-smoothed before contouring to fill small
-    % channel-membership gaps and produce a single clean boundary per cluster.
+    % Overlay cluster boundaries using the shared cluster colours. The outline
+    % follows the mask exactly: the member signals over the cluster's scales.
+    % Rows are signals in list order, so members need not be adjacent and one
+    % cluster can be several boxes; the old smoothing (sigma 1.5 cells, level
+    % 0.35) dropped isolated rows and drew a far smaller cluster than reported.
+    % The mask is upsampled f times and smoothed by a quarter cell, which only
+    % rounds the corners.
     if usedCluster
-        sigma = 1.5;
-        hw    = ceil(3 * sigma);
-        [gx, gy] = meshgrid(-hw:hw, -hw:hw);
-        kern  = exp(-(gx.^2 + gy.^2) / (2 * sigma^2));
-        kern  = kern / sum(kern(:));
+        f  = 8;
+        g  = exp(-((-f:f).^2) / (2*(f/4)^2));  g = g / sum(g);
+        xs = ((1:(nScales+2)*f) - 0.5)/f - 0.5;   % cell centres at 1..n after a
+        ys = ((1:(nChan+2)*f)   - 0.5)/f - 0.5;   % one-cell zero border
         hold(ax_heat,'on');
         for k = 1:nShow
-            mk_smooth = conv2(double(clusterMasks(:,:,k)), kern, 'same');
-            contour(ax_heat, 1:nScales, 1:nChan, mk_smooth, [0.35 0.35], ...
-                    'Color', clrCluster{k}, 'LineWidth', 1.8);
+            U = kron(padarray0(double(clusterMasks(:,:,k))), ones(f));
+            contour(ax_heat, xs, ys, conv2(g, g, U, 'same'), [0.5 0.5], ...
+                    'Color', clrCluster{k}, 'LineWidth', 1.2*lw);
         end
         hold(ax_heat,'off');
     end
@@ -131,21 +129,29 @@ if multiscale && multiChan
         doShading = (range(sc_lo) > 1) || (range(sc_hi) > 1);
     end
 
-    % Right-side subplot slot indices in a 3x4 grid
+    % Right-side subplot slot indices in the 3x4 grid (2-3 clusters)
     % Row 1: 3,4 | Row 2: 7,8 | Row 3: 11,12
     topoSlots  = [3  7  11];
     curveSlots = [4  8  12];
+    unit = ifelse(isICA, 'ICs', 'ch');
+    ic_idx_1 = [];  pc_1 = 1;   % cluster 1, for the dipole figure
 
-    ic_idx_k = [];  pc_k = 1;   % initialised here; set inside each branch
+    for k = 1:ifelse(compact, 1, 3)
+        if compact && ~isICA
+            ax_topo  = axes(hFig2,'OuterPosition',[0.56 0.5 0.44 0.5]);
+            ax_curve = axes(hFig2,'OuterPosition',[0.56 0   0.44 0.5]);
+        elseif compact
+            ax_bar   = axes(hFig2,'OuterPosition',[0.56 0.5 0.44 0.5]);
+            ax_curve = axes(hFig2,'OuterPosition',[0.56 0   0.22 0.5]);
+            ax_topo  = axes(hFig2,'OuterPosition',[0.78 0   0.22 0.5]);
+        else
+            ax_topo  = subplot(3,4, topoSlots(k));
+            ax_curve = subplot(3,4, curveSlots(k));
+            if k > nShow
+                axis(ax_topo,'off'); axis(ax_curve,'off'); continue
+            end
+        end
 
-    if isICA && nShow == 1
-        % ---------------------------------------------------------------
-        % Single ICA cluster: vertical 3-panel layout in cols 3-4
-        %   Row 1  [3 4]  : IC bar chart
-        %   Row 2  [7 8]  : Entropy curve
-        %   Row 3 [11 12] : Back-projected scalp topo
-        % ---------------------------------------------------------------
-        k = 1;
         mask_k      = clusterMasks(:,:,k);
         scaleMask_k = any(mask_k,1);
         chanMask_k  = any(mask_k,2);
@@ -156,38 +162,76 @@ if multiscale && multiChan
         pc_k  = centroids(k,1);
         ps_k  = centroids(k,2);
         if iscell(scales), scLabel_k = scales{ps_k}; else, scLabel_k = num2str(scales(ps_k)); end
-        if usedCluster
-            rowLabel = sprintf('Cluster 1  (%d ICs x %d sc, IC%d sc%s)', ...
-                               nCh_k, nSc_k, pc_k, scLabel_k);
+        if isICA, sigName = sprintf('IC%d', pc_k); else, sigName = chanlocs(pc_k).labels; end
+        sc_idx_k = find(scaleMask_k);
+        if isempty(sc_idx_k)
+            scRange = scLabel_k;
+        elseif isnumeric(scales)
+            scRange = sprintf('%g-%g', scales(sc_idx_k(1)), scales(sc_idx_k(end)));
         else
-            rowLabel = sprintf('Peak  IC%d, sc %s', pc_k, scLabel_k);
+            scRange = sprintf('%s-%s', scales{sc_idx_k(1)}, scales{sc_idx_k(end)});
         end
+        if k == 1, ic_idx_1 = find(chanMask_k); pc_1 = pc_k; end
+
+        % Console summary
         if usedCluster
-            fprintf('Cluster 1: %d ICs x %d scales  (centroid IC%d, scale %s)\n',...
-                    nCh_k, nSc_k, pc_k, scLabel_k);
-        else
-            fprintf('No cluster found - peak: IC%d, scale %s\n', pc_k, scLabel_k);
+            fprintf('Cluster %d: %d %s x %d scales  (centroid %s, scale %s)\n', ...
+                    k, nCh_k, unit, nSc_k, sigName, scLabel_k);
+        elseif k == 1
+            fprintf('No cluster found - peak: %s, scale %s\n', sigName, scLabel_k);
         end
 
-        % -- Row 1: IC bar --
-        ax_bar = subplot(3,4,[3 4]);
-        bar(ax_bar, topo_vals_k, 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none');
-        hold(ax_bar,'on');
-        if usedCluster
-            ic_idx = find(chanMask_k);
-            bar(ax_bar, ic_idx, topo_vals_k(ic_idx), ...
-                'FaceColor', clrCluster{k}, 'EdgeColor', 'none');
+        % Panel titles: short in the compact layouts; two lines in the narrow
+        % IC curve and topo panels
+        if compact && isICA
+            topoTitle = {'Back-projected', ['scales ' scRange]};
+            if usedCluster
+                curveTitle = {'Cluster mean', sprintf('(%d ICs)', nCh_k)};
+            else
+                curveTitle = {'Peak', sigName};
+            end
+        elseif compact
+            topoTitle = sprintf('Scales %s, peak %s sc %s', scRange, sigName, scLabel_k);
+            curveTitle = ifelse(usedCluster, sprintf('Cluster mean (%d ch)', nCh_k), ['Peak ' sigName]);
+        else
+            if usedCluster
+                topoTitle = sprintf('Cluster %d  (%d %s x %d sc, %s sc%s)', k, nCh_k, unit, ...
+                                    nSc_k, sigName, scLabel_k);
+                curveTitle = sprintf('Cluster %d mean  (%d %s)', k, nCh_k, unit);
+            else
+                topoTitle  = sprintf('Peak  %s, sc %s', sigName, scLabel_k);
+                curveTitle = 'Peak curve';
+            end
         end
-        bar(ax_bar, pc_k, topo_vals_k(pc_k), 'FaceColor', 'r', 'EdgeColor', 'none');
-        xlabel(ax_bar,'IC'); ylabel(ax_bar,'Entropy');
-        title(ax_bar, rowLabel, 'Interpreter','none','FontSize',9);
-        box(ax_bar,'on');
 
-        % -- Row 2: Entropy curve --
-        ax_curve = subplot(3,4,[7 8]);
+        % IC bar (one cluster, ICs)
+        if compact && isICA
+            bar(ax_bar, topo_vals_k, 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none');
+            hold(ax_bar,'on');
+            if usedCluster
+                bar(ax_bar, ic_idx_1, topo_vals_k(ic_idx_1), ...
+                    'FaceColor', clrCluster{k}, 'EdgeColor', 'none');
+            end
+            bar(ax_bar, pc_k, topo_vals_k(pc_k), 'FaceColor', 'r', 'EdgeColor', 'none');
+            xlim(ax_bar, [0 nChan+1]);
+            xlabel(ax_bar,'IC'); ylabel(ax_bar,'Entropy'); box(ax_bar,'on');
+            if usedCluster
+                title(ax_bar, sprintf('%d ICs x %d scales, peak %s sc %s', nCh_k, nSc_k, ...
+                      sigName, scLabel_k), 'Interpreter','none');
+            else
+                title(ax_bar, sprintf('Peak %s, sc %s', sigName, scLabel_k), 'Interpreter','none');
+            end
+        end
+
+        % Topo: channel entropy, or for ICs the cluster mean back-projected
+        % to the scalp through icawinv
+        if isICA, tv = icawinv * topo_vals_k; else, tv = topo_vals_k; end
+        plot_topo(ax_topo, tv, chanlocs, max(7, round(7*lw)));
+        title(ax_topo, topoTitle, 'Interpreter','none');
+
+        % Curve
         hold(ax_curve,'on'); box(ax_curve,'on');
         if all(~isfinite(curve_k)), curve_k = nan(1,nScales); end
-        xvals = ifelse(isnumeric(scales), scales, 1:nScales);
         if doShading && isnumeric(scales) && any(scaleMask_k)
             x_lo = xvals(find(scaleMask_k,1,'first'));
             x_hi = xvals(find(scaleMask_k,1,'last'));
@@ -200,170 +244,21 @@ if multiscale && multiChan
                       clrCluster{k},'FaceAlpha',0.15,'EdgeColor','none');
             end
         end
-        plot(ax_curve, xvals, curve_k, 'LineWidth', 2, 'Color', clrCluster{k});
+        plot(ax_curve, xvals, curve_k, 'LineWidth', 2*lw, 'Color', clrCluster{k});
         xlim(ax_curve,[xvals(1) xvals(end)]);
-        xlabel(ax_curve,'Scale');
-        curveTitle = ifelse(usedCluster, ...
-            sprintf('Cluster 1 mean  (%d ICs)', nCh_k), 'Peak IC curve');
-        title(ax_curve, curveTitle, 'Interpreter','none','FontSize',9);
-
-        % -- Row 3: Back-projected scalp topo --
-        ax_topo_s = subplot(3,4,[11 12]);
-        bp_vals = icawinv * topo_vals_k;
-        finBP   = bp_vals(isfinite(bp_vals));
-        if ~isempty(finBP)
-            try
-                axes(ax_topo_s); %#ok<LAXES>
-                topoplot(bp_vals, chanlocs, 'emarker', {'.','k',7,1}, 'electrodes','on');
-                if min(finBP) < max(finBP), clim(ax_topo_s,[min(finBP) max(finBP)]); end
-                colormap(ax_topo_s,'parula');
-            catch
-                bar(ax_topo_s, bp_vals); box(ax_topo_s,'on');
-                ylabel(ax_topo_s,'Weight');
-            end
-        end
-        sc_idx_k = find(scaleMask_k);
-        if isnumeric(scales)
-            scRangeStr = sprintf('sc %g-%g', scales(sc_idx_k(1)), scales(sc_idx_k(end)));
-        else
-            scRangeStr = sprintf('sc %s-%s', scales{sc_idx_k(1)}, scales{sc_idx_k(end)});
-        end
-        title(ax_topo_s, sprintf('Back-projected topo  (cluster mean, %s)', scRangeStr), ...
-              'Interpreter','none','FontSize',9);
-        ic_idx_k = find(chanMask_k);
-
-    else
-        % ---------------------------------------------------------------
-        % Standard per-row layout: one row per cluster.
-        % For ICA: topo slot = back-projected scalp map, curve slot = curve.
-        % For non-ICA: topo slot = channel entropy topo, curve slot = curve.
-        % ---------------------------------------------------------------
-        for k = 1:3
-            ax_topo  = subplot(3,4, topoSlots(k));
-            ax_curve = subplot(3,4, curveSlots(k));
-
-            if k > nShow
-                axis(ax_topo,'off'); axis(ax_curve,'off'); continue
-            end
-
-            mask_k      = clusterMasks(:,:,k);
-            scaleMask_k = any(mask_k,1);
-            chanMask_k  = any(mask_k,2);
-            topo_vals_k = mean(entropyData(:, scaleMask_k), 2, 'omitnan');
-            curve_k     = mean(entropyData(chanMask_k, :), 1, 'omitnan');
-
-            nCh_k = sum(chanMask_k);
-            nSc_k = sum(scaleMask_k);
-            pc_k  = centroids(k,1);
-            ps_k  = centroids(k,2);
-            if iscell(scales), scLabel_k = scales{ps_k}; else, scLabel_k = num2str(scales(ps_k)); end
-
-            if usedCluster
-                centStr  = ifelse(isICA, sprintf('IC%d sc%s',pc_k,scLabel_k), ...
-                                         sprintf('%s sc%s',chanlocs(pc_k).labels,scLabel_k));
-                rowLabel = sprintf('Cluster %d  (%d %s x %d sc, %s)', k, nCh_k, ...
-                                   ifelse(isICA,'ICs','ch'), nSc_k, centStr);
-            else
-                rowLabel = ifelse(isICA, ...
-                    sprintf('Peak  IC%d, sc %s',pc_k,scLabel_k), ...
-                    sprintf('Peak  %s, sc %s',chanlocs(pc_k).labels,scLabel_k));
-            end
-
-            % Console summary
-            if usedCluster
-                if isICA
-                    fprintf('Cluster %d: %d ICs x %d scales  (centroid IC%d, scale %s)\n',...
-                        k,nCh_k,nSc_k,pc_k,scLabel_k);
-                else
-                    fprintf('Cluster %d: %d ch x %d scales  (centroid %s, scale %s)\n',...
-                        k,nCh_k,nSc_k,chanlocs(pc_k).labels,scLabel_k);
-                end
-            elseif k==1
-                if isICA
-                    fprintf('No cluster found - peak: IC%d, scale %s\n',pc_k,scLabel_k);
-                else
-                    fprintf('No cluster found - peak: ch %s, scale %s\n',...
-                        chanlocs(pc_k).labels,scLabel_k);
-                end
-            end
-
-            % Topo slot
-            finV = topo_vals_k(isfinite(topo_vals_k));
-            if isICA
-                % Back-projected scalp topo
-                bp_vals = icawinv * topo_vals_k;
-                finBP   = bp_vals(isfinite(bp_vals));
-                if ~isempty(finBP)
-                    try
-                        axes(ax_topo); %#ok<LAXES>
-                        topoplot(bp_vals, chanlocs, 'emarker', {'.','k',7,1}, 'electrodes','on');
-                        if min(finBP) < max(finBP), clim(ax_topo,[min(finBP) max(finBP)]); end
-                        colormap(ax_topo,'parula');
-                    catch
-                        bar(ax_topo, bp_vals); box(ax_topo,'on');
-                        ylabel(ax_topo,'Weight');
-                    end
-                else
-                    axis(ax_topo,'off');
-                end
-                title(ax_topo, rowLabel, 'Interpreter','none','FontSize',9);
-            else
-                if isempty(finV)
-                    axis(ax_topo,'off');
-                    text(0.5,0.5,'No finite values','Parent',ax_topo,...
-                         'HorizontalAlignment','center','VerticalAlignment','middle');
-                else
-                    try
-                        axes(ax_topo); %#ok<LAXES>
-                        topoplot(topo_vals_k,chanlocs,'emarker',{'.','k',7,1},'electrodes','on');
-                        lo=min(finV); hi=max(finV);
-                        if isfinite(lo)&&isfinite(hi)&&lo<hi, clim(ax_topo,[lo hi]); end
-                        colormap(ax_topo,'parula');
-                        title(ax_topo,rowLabel,'Interpreter','none','FontSize',9);
-                    catch
-                        bar(ax_topo,topo_vals_k); box(ax_topo,'on');
-                        title(ax_topo,rowLabel,'Interpreter','none','FontSize',9);
-                        ylabel(ax_topo,'Entropy');
-                    end
-                end
-            end
-
-            % Curve slot
-            axes(ax_curve); %#ok<LAXES>
-            hold(ax_curve,'on'); box(ax_curve,'on');
-            if all(~isfinite(curve_k)), curve_k=nan(1,nScales); end
-            xvals = ifelse(isnumeric(scales), scales, 1:nScales);
-
-            if doShading && isnumeric(scales) && any(scaleMask_k)
-                x_lo = xvals(find(scaleMask_k,1,'first'));
-                x_hi = xvals(find(scaleMask_k,1,'last'));
-                finC = curve_k(isfinite(curve_k));
-                if ~isempty(finC)
-                    yl_pre=[min(finC)*0.95 max(finC)*1.05];
-                    if yl_pre(1)==yl_pre(2), yl_pre=yl_pre+[-0.1 0.1]; end
-                    patch(ax_curve,[x_lo x_hi x_hi x_lo],...
-                          [yl_pre(1) yl_pre(1) yl_pre(2) yl_pre(2)],...
-                          clrCluster{k},'FaceAlpha',0.15,'EdgeColor','none');
-                end
-            end
-
-            plot(ax_curve,xvals,curve_k,'LineWidth',2,'Color',clrCluster{k});
-            xlim(ax_curve,[xvals(1) xvals(end)]);
-            xlabel(ax_curve,'Scale'); ylabel(ax_curve,'Entropy');
-            curveTitle = ifelse(usedCluster,...
-                sprintf('Cluster %d mean  (%d %s)',k,nCh_k,ifelse(isICA,'ICs','ch')),...
-                'Peak channel curve');
-            title(ax_curve,curveTitle,'Interpreter','none','FontSize',9);
-        end
+        xlabel(ax_curve,'Scale'); ylabel(ax_curve,'Entropy');
+        title(ax_curve, curveTitle, 'Interpreter','none');
     end
 
     colormap(hFig2,parula);
-    set(findall(hFig2,'type','axes'),'FontSize',9,'FontWeight','bold');
+    set(findall(hFig2,'type','axes'),'FontSize',fs,'FontWeight','bold', ...
+        'TitleFontSizeMultiplier',1,'LabelFontSizeMultiplier',1);
+    set(findall(hFig2,'type','colorbar'),'FontSize',fs);
+    ch.Label.FontSize = fs; ch.Label.FontWeight = 'bold';
 
     % Region entropy + dipole sources figure (ICA + dipfit only)
     if isICA && ~isempty(dipfit)
-        xvals_num = ifelse(isnumeric(scales), scales, 1:size(entropyData,2));
-        plot_regions(entropyData, xvals_num, dipfit, ic_idx_k, pc_k);
+        plot_regions(entropyData, xvals, dipfit, ic_idx_1, pc_1, entropyType, fs, clrCluster{1});
     end
 
 elseif ~multiscale && multiChan
@@ -393,9 +288,9 @@ elseif ~multiscale && multiChan
         end
         colormap(hFig3,parula);
         c=colorbar(ax_uni);
-        c.Label.String='Entropy'; c.Label.FontSize=11; c.Label.FontWeight='bold';
+        c.Label.String='Entropy'; c.Label.FontSize=fs+2; c.Label.FontWeight='bold';
     end
-    set(findall(hFig3,'type','axes'),'FontSize',10,'FontWeight','bold');
+    set(findall(hFig3,'type','axes'),'FontSize',fs+1,'FontWeight','bold');
 
 elseif multiscale && ~multiChan
     % Single channel/IC curve
@@ -404,11 +299,11 @@ elseif multiscale && ~multiChan
     try icadefs; set(hFig4,'color',BACKCOLOR); catch; end %#ok<NODEF>
     ax_s=axes(hFig4);
     xvals = ifelse(isnumeric(scales), scales, 1:numel(scales));
-    plot(ax_s,xvals,entropyData,'LineWidth',2);
+    plot(ax_s,xvals,entropyData,'LineWidth',2*lw);
     xlabel(ax_s,'Scale'); ylabel(ax_s,'Entropy');
     title(ax_s,entropyType,'Interpreter','none');
     axis(ax_s,'tight');
-    set(findall(hFig4,'type','axes'),'FontSize',10,'FontWeight','bold');
+    set(findall(hFig4,'type','axes'),'FontSize',fs+1,'FontWeight','bold');
 
 elseif ~multiscale && ~multiChan
     % Scalar
@@ -433,7 +328,7 @@ elseif ~multiscale && ~multiChan
                  'HorizontalAlignment','center','FontSize',9,'Color',[0.5 0.5 0.5],'Interpreter','none');
         end
     end
-    set(findall(hFig5,'type','axes'),'FontSize',10,'FontWeight','bold');
+    set(findall(hFig5,'type','axes'),'FontSize',fs+1,'FontWeight','bold');
 
 else
     error('ascent_plot: data format not recognized.')
@@ -556,10 +451,11 @@ end
 
 
 %% Region entropy comparison + dipole sources (ICA + dipfit)
-function plot_regions(rcmfe, scales, dipfit, ic_idx, pc_k, rv_thresh)
-if nargin < 6, rv_thresh = 0.15; end
+function plot_regions(ent, scales, dipfit, ic_idx, pc_k, entropyType, fs, clu_color, rv_thresh)
+if nargin < 9, rv_thresh = 0.15; end
+lw = max(1, fs/9);
 
-n_ics = size(rcmfe, 1);
+n_ics = size(ent, 1);
 brain_ics = [];  ic_pos = [];
 
 for ik = 1:n_ics
@@ -577,9 +473,10 @@ if numel(brain_ics) < 3
 end
 fprintf('Region plot: %d ICs (RV<%.0f%%)\n', numel(brain_ics), rv_thresh*100);
 
+% No blue or orange here: the dipole panel uses them for the other and the cluster ICs
 region_names = {'Frontal','Temporal','Central','Parietal','Occipital'};
-region_clrs  = {[0.20 0.55 0.90],[0.10 0.72 0.35],...
-                [0.90 0.40 0.10],[0.75 0.20 0.75],[0.50 0.50 0.50]};
+region_clrs  = {[0.13 0.63 0.30],[0.45 0.30 0.85],...
+                [0.85 0.60 0.00],[0.85 0.20 0.55],[0.45 0.45 0.45]};
 
 ic_regions = cell(numel(brain_ics),1);
 for ii = 1:numel(brain_ics)
@@ -592,35 +489,47 @@ for ii = 1:numel(brain_ics)
     end
 end
 
-rcmfe_sel = rcmfe(brain_ics,:);
-mean_ent  = mean(rcmfe_sel, 2, 'omitnan');
+ent_sel  = ent(brain_ics,:);
+mean_ent = mean(ent_sel, 2, 'omitnan');
 
 % ---- Run dipplot into temp figure, capture as image --------------------
 dip_img = [];
-if ~isempty(dipfit) && isfield(dipfit,'mrifile') && nargin >= 4 && ~isempty(ic_idx)
+if ~isempty(dipfit) && isfield(dipfit,'mrifile') && ~isempty(ic_idx)
     try
-        dot_color  = [0.30 0.55 1.00];
+        % All dipolar ICs of the decomposition (the set the region plots below use),
+        % cluster ICs in orange, their centroid in red, the others in blue. Few
+        % cluster ICs may be dipolar, so plotting only those can leave 3-4 dots.
+        oth_color  = [0.30 0.55 1.00];
         cent_color = [0.85 0.10 0.10];
-        sources = struct('posxyz',{},'momxyz',{},'rv',{},'color',{});
-        for ii = 1:numel(ic_idx)
-            ik = ic_idx(ii);
-            if ik > numel(dipfit.model), continue; end
+        sources = struct('posxyz',{},'momxyz',{},'rv',{});
+        colors  = {};
+        for ik = 1:numel(dipfit.model)
             m = dipfit.model(ik);
-            if isempty(m.posxyz) || m.rv > rv_thresh, continue; end
+            if isempty(m.posxyz) || isempty(m.rv) || m.rv > rv_thresh, continue; end
             sources(end+1).posxyz = m.posxyz(1,:); %#ok<AGROW>
             sources(end).momxyz   = [0 0 0];
             sources(end).rv       = m.rv;
-            sources(end).color    = ifelse(ik==pc_k, cent_color, dot_color);
+            if ik == pc_k, colors{end+1} = cent_color;          %#ok<AGROW>
+            elseif ismember(ik, ic_idx), colors{end+1} = clu_color; %#ok<AGROW>
+            else, colors{end+1} = oth_color;                    %#ok<AGROW>
+            end
         end
+        n_clu_dip = sum(cellfun(@(c) ~isequal(c, oth_color), colors));
         if ~isempty(sources)
             pre_figs = findall(0,'Type','figure');
-            dipplot(sources,'mri',dipfit.mrifile,'coordformat','MNI',...
-                'summary','3d','dipolesize',12,'dipolelength',0,'gui','off','mesh','off');
+            dipplot(sources,'mri',template_mri_without_slab(dipfit),'coordformat','MNI','color',colors,...
+                'summary','3d','dipolesize',15,'dipolelength',0,'gui','off','mesh','off');
             drawnow; pause(0.3);
             new_figs = setdiff(findall(0,'Type','figure'),pre_figs);
             if ~isempty(new_figs)
-                tmp_fig  = new_figs(end);
-                dip_img  = getframe(tmp_fig).cdata;
+                tmp_fig = new_figs(end);
+                hide_edge_on_slices(tmp_fig);
+                set(tmp_fig,'Color','k','InvertHardcopy','off');
+                try
+                    dip_img = print(tmp_fig,'-RGBImage','-r300');  % sharper than getframe
+                catch
+                    dip_img = getframe(tmp_fig).cdata;
+                end
                 close(tmp_fig);
             end
         end
@@ -631,25 +540,29 @@ end
 
 % ---- Combined figure layout --------------------------------------------
 has_dip = ~isempty(dip_img);
-fig = figure('Color','w','NumberTitle','off',...
-             'Name','Dipole sources + RCMFE by region');
+fig = figure('Color','w','InvertHardCopy','off','NumberTitle','off',...
+             'Name','Dipole sources + entropy by region');
+try icadefs; set(fig,'color',BACKCOLOR); catch; end %#ok<NODEF>
+set(fig,'Units','pixels'); p0 = get(fig,'Position');
 if has_dip
-    fig.Position = [60 60 1100 700];
-    ax_dip = axes(fig,'Position',[0.03 0.50 0.94 0.46]);
-    image(ax_dip, dip_img); axis(ax_dip,'off');   % no 'image' — fills panel without clipping
-    title(ax_dip, sprintf('Dipole sources  (cluster ICs, RV<%.0f%%)', rv_thresh*100),...
-          'FontSize',10,'FontWeight','bold');
-    bot = 0.13; ht = 0.33;
+    sz = [1000 720]; rowH = 0.50;
 else
-    fig.Position = [60 60 1100 420];
-    bot = 0.18; ht = 0.72;
+    sz = [1000 420]; rowH = 1;
 end
-ax1 = axes(fig,'Position',[0.07 bot 0.57 ht]);
-ax2 = axes(fig,'Position',[0.71 bot 0.26 ht]);
+set(fig,'Position',[p0(1) max(40, p0(2)+p0(4)-sz(2)) sz]);
+if has_dip
+    ax_dip = axes(fig,'Position',[0.01 0.50 0.98 0.43]);
+    image(ax_dip, dip_img); axis(ax_dip,'image','off');
+    title(ax_dip, sprintf('Dipole sources, RV<%.0f%%: %d ICs (cluster ICs in orange: %d)', ...
+          rv_thresh*100, numel(sources), n_clu_dip), 'FontSize',fs,'FontWeight','bold');
+end
+% OuterPosition: MATLAB fits the tick labels, axis labels and titles inside
+ax1 = axes(fig,'OuterPosition',[0    0 0.64 rowH]);
+ax2 = axes(fig,'OuterPosition',[0.64 0 0.36 rowH]);
 hold(ax1,'on'); box(ax1,'on');
 hold(ax2,'on'); box(ax2,'on');
 
-xpos=0; xt_pos=[]; xt_lbl={}; leg_h=gobjects(0);
+xpos=0; xt_pos=[]; xt_lbl={}; leg_h=gobjects(0); allv=[];
 min_n = 3;
 for rr = 1:numel(region_names)
     rname = region_names{rr};
@@ -658,32 +571,152 @@ for rr = 1:numel(region_names)
     if n_r < min_n, continue; end
     clr = region_clrs{rr};
 
-    mu  = mean(rcmfe_sel(idx,:),1,'omitnan');
-    sem = std( rcmfe_sel(idx,:),0,1,'omitnan') / sqrt(n_r);
+    mu  = mean(ent_sel(idx,:),1,'omitnan');
+    sem = std( ent_sel(idx,:),0,1,'omitnan') / sqrt(n_r);
     fill(ax1,[scales fliplr(scales)],[mu+sem fliplr(mu-sem)],...
          clr,'FaceAlpha',0.15,'EdgeColor','none');
-    leg_h(end+1) = plot(ax1,scales,mu,'Color',clr,'LineWidth',2.2,...
+    leg_h(end+1) = plot(ax1,scales,mu,'Color',clr,'LineWidth',2.2*lw,...
         'DisplayName',sprintf('%s (n=%d)',rname,n_r)); %#ok<AGROW>
 
     xpos = xpos+1;
-    vals = mean_ent(idx);
-    scatter(ax2,xpos+(rand(n_r,1)-0.5)*0.3,vals,30,clr,...
+    vals = mean_ent(idx); allv = [allv; vals]; %#ok<AGROW>
+    scatter(ax2,xpos+(rand(n_r,1)-0.5)*0.3,vals,30*lw^2,clr,...
             'filled','MarkerFaceAlpha',0.55,'MarkerEdgeColor','none');
     plot(ax2,xpos+[-0.3 0.3],repmat(mean(vals,'omitnan'),1,2),...
-         '-','Color',clr*0.6,'LineWidth',2.5);
-    xt_pos(end+1)=xpos; xt_lbl{end+1}=sprintf('%s (n=%d)',rname,n_r); %#ok<AGROW>
+         '-','Color',clr*0.6,'LineWidth',2.5*lw);
+    xt_pos(end+1)=xpos; xt_lbl{end+1}=rname; %#ok<AGROW> (n is in the legend)
 end
 
-xlabel(ax1,'Scale'); ylabel(ax1,'RCMFE');
+xlim(ax1,[scales(1) scales(end)]);
+xlabel(ax1,'Scale'); ylabel(ax1,entropyType,'Interpreter','none');
 title(ax1,'Scale-resolved entropy by region  (mean \pm SEM)');
-legend(ax1,leg_h,'Location','best','Box','off','FontSize',9);
 set(ax1,'TickDir','out');
 
 xlim(ax2,[0 xpos+1]);
+allv = allv(isfinite(allv));
+if numel(allv) > 1 && max(allv) > min(allv)   % pad so no point sits on the frame
+    pad = 0.08*(max(allv)-min(allv)); ylim(ax2,[min(allv)-pad max(allv)+pad]);
+end
 set(ax2,'XTick',xt_pos,'XTickLabel',xt_lbl,'TickDir','out','XTickLabelRotation',30);
-ylabel(ax2,'Mean RCMFE');
+ylabel(ax2,['Mean ' entropyType],'Interpreter','none');
 title(ax2,'Mean entropy by region');
-set(findall(fig,'type','axes'),'FontSize',10,'FontWeight','bold');
+set([ax1 ax2],'FontSize',fs,'FontWeight','bold', ...
+    'TitleFontSizeMultiplier',1,'LabelFontSizeMultiplier',1);
+legend(ax1,leg_h,'Location','best','Box','off','FontSize',max(fs-1,8));
+end
+
+
+%% dipplot '3d' summary: show only the slice each view faces
+function hide_edge_on_slices(fig)
+% Each of the three views shows one MRI slice face-on; hide the two seen
+% edge-on and use exact axis views with an orthographic projection. (The bar
+% above the coronal view was not one of these: see template_mri_without_slab.)
+for ax = findall(fig,'Type','axes')'
+    hs = findall(ax,'Type','surface','Tag','img');
+    if isempty(hs), continue; end
+    v = get(ax,'CameraPosition') - get(ax,'CameraTarget');
+    [~, d] = max(abs(v));                        % coordinate the view looks along
+    e = zeros(1,3); e(d) = sign(v(d)); view(ax, e);
+    set(ax,'Projection','orthographic');
+    w = zeros(numel(hs),1);
+    for i = 1:numel(hs)
+        c = get(hs(i), {'XData','YData','ZData'}); c = c{d};
+        w(i) = max(c(:)) - min(c(:));             % slice extent along the view
+    end
+    [~, keep] = min(w);
+    set(hs(setdiff(1:numel(hs), keep)), 'Visible','off');
+end
+end
+
+
+%% EEGLAB template MRI without the stray tissue above the scalp
+function mri = template_mri_without_slab(dipfit)
+% The top slices of EEGLAB's template MRI (dipfit standard_mri.mat) hold stray
+% tissue 5-8 mm above the scalp, which dipplot draws as a bar over the coronal
+% view and blobs over the sagittal one. Blank every voxel above 60 mm that lies
+% more than 4 mm above the scalp of the BEM head model. Any other case (other
+% MRI or head model, rotated voxel grid, read error) returns the file name, so
+% dipplot shows the MRI as before.
+mri = dipfit.mrifile;
+try
+    M = load('-mat', dipfit.mrifile);  A = M.mri.anatomy;  T = M.mri.transform;
+    if any(any(abs(T(1:3,1:3) - diag(diag(T(1:3,1:3)))) > 1e-9)), return; end
+    H = load('-mat', dipfit.hdmfile);  P = [];
+    for b = H.vol.bnd(:)'                      % scalp: the outermost surface
+        if isfield(b,'pos'), q = b.pos; else, q = b.pnt; end
+        if isempty(P) || max(q(:,3)) > max(P(:,3)), P = q; end
+    end
+    x = T(1,1)*(1:size(A,1)) + T(1,4);         % voxel centres in mm (1-based)
+    y = T(2,2)*(1:size(A,2)) + T(2,4);
+    z = T(3,3)*(1:size(A,3)) + T(3,4);
+    Q = sortrows(P(P(:,3) > 0, :), -3);       % upper half; highest point first
+    [~, iu] = unique(Q(:,1:2), 'rows', 'stable');  Q = Q(iu,:);   % one point per column
+    [X, Y] = ndgrid(x, y);
+    ztop = griddata(Q(:,1), Q(:,2), Q(:,3), X, Y, 'linear');   % scalp height per column
+    ztop(isnan(ztop)) = -Inf;                  % outside the scalp footprint
+    A(bsxfun(@gt, reshape(z,1,1,[]), max(ztop + 4, 60))) = 0;
+    mri = M.mri;  mri.anatomy = A;
+catch
+end
+end
+
+
+%% Zero border of one cell around a matrix (padarray needs a toolbox)
+function B = padarray0(A)
+B = zeros(size(A) + 2);  B(2:end-1, 2:end-1) = A;
+end
+
+
+%% Heatmap ticks
+function set_heat_ticks(ax, scales, nChan, isICA, chanlocs, fs)
+% As many tick labels as fit the axes at font size fs (points): at most 20
+% signal labels, and round scale values with the first scale added.
+drawnow;
+pp  = getpixelposition(ax);
+ptx = fs*96/72;                                   % font height in pixels
+if isICA, ylab = arrayfun(@(x) sprintf('IC%d',x), 1:nChan, 'UniformOutput', false);
+else,     ylab = {chanlocs.labels};
+end
+nY = max(2, min([20, nChan, floor(pp(4)/(1.6*ptx))]));
+yt = unique(round(linspace(1, nChan, nY)));
+set(ax,'YTick',yt,'YTickLabel',ylab(yt));
+
+nS = numel(scales);
+if iscell(scales) || nS < 2 || any(diff(double(scales(:))) <= 0)
+    xl = scales; if ~iscell(xl), xl = arrayfun(@num2str, xl, 'UniformOutput', false); end
+    xt = 1:nS; if nS > 30, xt = round(linspace(1,nS,20)); end
+    set(ax,'XTick',xt,'XTickLabel',xl(xt),'XTickLabelRotation',45);
+    return
+end
+sv   = double(scales(:)');
+maxX = max(3, floor(pp(3)/(2.5*ptx)));
+for step = [1 2 5 10 20 25 50 100 200 500 1000]
+    tv = step*ceil(sv(1)/step) : step : sv(end);
+    if numel(tv) <= maxX, break; end
+end
+if isempty(tv) || tv(1) - sv(1) >= step/2, tv = [sv(1) tv]; end
+set(ax,'XTick',interp1(sv, 1:nS, tv),'XTickLabel',arrayfun(@num2str, tv, 'UniformOutput', false), ...
+    'XTickLabelRotation',0);
+end
+
+
+%% Topography for one cluster panel
+function plot_topo(ax, vals, chanlocs, ems)
+fin = vals(isfinite(vals));
+if isempty(fin)
+    axis(ax,'off');
+    text(0.5,0.5,'No finite values','Parent',ax,...
+         'HorizontalAlignment','center','VerticalAlignment','middle');
+    return
+end
+try
+    axes(ax); %#ok<LAXES>
+    topoplot(vals, chanlocs, 'emarker', {'.','k',ems,1}, 'electrodes','on');
+    if min(fin) < max(fin), clim(ax,[min(fin) max(fin)]); end
+    colormap(ax,'parula');
+catch
+    bar(ax, vals); box(ax,'on'); ylabel(ax,'Entropy');
+end
 end
 
 

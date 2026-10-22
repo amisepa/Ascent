@@ -24,6 +24,9 @@ function ascent_plot(entropyData, chanlocs, entropyType, scales, varargin)
 %       'icawinv',       EEG.icawinv  [nChans x nICs]
 %       'ClusterThresh', scalar in (0,1)  percentile threshold (default 0.75)
 %       'dipfit',        EEG.dipfit   (ICA only; adds the region/dipole figure)
+%       'FontSize',      font size in points for the multiscale and region figures
+%                        (default 9). Raise it for figures that will be printed
+%                        small, e.g. 15-18 for a panel 6-12 cm wide.
 %       'alphaPower',    struct('raw',[sig x 1],'osc',[sig x 1],'band',[f1 f2])
 %                        Precomputed by ascent_compute. Aperiodic only. When
 %                        omitted it is derived with compute_AperiodicBandPower.
@@ -44,6 +47,7 @@ opt.icawinv       = [];
 opt.clusterThresh = 0.75;
 opt.dipfit        = [];
 opt.alphaPower    = [];
+opt.fontSize      = 9;
 rmIdx             = [];
 for vi = 1:(numel(varargin)-1)
     if ischar(varargin{vi}) || isstring(varargin{vi})
@@ -63,6 +67,9 @@ for vi = 1:(numel(varargin)-1)
             case 'alphapower'
                 opt.alphaPower = varargin{vi+1};
                 rmIdx          = [rmIdx vi vi+1]; %#ok<AGROW>
+            case 'fontsize'
+                opt.fontSize = varargin{vi+1};
+                rmIdx        = [rmIdx vi vi+1]; %#ok<AGROW>
         end
     end
 end
