@@ -451,17 +451,18 @@ end
 
 
 %% Region entropy comparison + dipole sources (ICA + dipfit)
-function plot_regions(ent, scales, dipfit, ic_idx, pc_k, entropyType, fs, clu_color, rv_thresh)
+function plot_regions(ent, scales, dipfit, ~, ~, entropyType, fs, ~, rv_thresh)   % cluster ICs, centroid, colour: unused
 if nargin < 9, rv_thresh = 0.15; end
 lw = max(1, fs/9);
 
 n_ics = size(ent, 1);
 brain_ics = [];  ic_pos = [];
 
+inBrain = brain_test(dipfit);   % dipoles outside the brain are artifact ICs (eyes, muscle)
 for ik = 1:n_ics
     if ik > numel(dipfit.model), continue; end
     m = dipfit.model(ik);
-    if isempty(m.posxyz) || m.rv > rv_thresh, continue; end
+    if isempty(m.posxyz) || m.rv > rv_thresh || ~inBrain(m.posxyz(1,:)), continue; end
     brain_ics(end+1) = ik;           %#ok<AGROW>
     ic_pos(end+1,:)  = m.posxyz(1,:);%#ok<AGROW>
 end
@@ -473,10 +474,9 @@ if numel(brain_ics) < 3
 end
 fprintf('Region plot: %d ICs (RV<%.0f%%)\n', numel(brain_ics), rv_thresh*100);
 
-% No blue or orange here: the dipole panel uses them for the other and the cluster ICs
 region_names = {'Frontal','Temporal','Central','Parietal','Occipital'};
-region_clrs  = {[0.13 0.63 0.30],[0.45 0.30 0.85],...
-                [0.85 0.60 0.00],[0.85 0.20 0.55],[0.45 0.45 0.45]};
+region_clrs  = {[0.00 0.45 0.74],[0.45 0.30 0.85],...     % blue, violet,
+                [0.90 0.55 0.00],[0.85 0.20 0.55],[0.45 0.45 0.45]};   % orange, magenta, grey
 
 ic_regions = cell(numel(brain_ics),1);
 for ii = 1:numel(brain_ics)
@@ -494,27 +494,26 @@ mean_ent = mean(ent_sel, 2, 'omitnan');
 
 % ---- Run dipplot into temp figure, capture as image --------------------
 dip_img = [];
-if ~isempty(dipfit) && isfield(dipfit,'mrifile') && ~isempty(ic_idx)
+if ~isempty(dipfit) && isfield(dipfit,'mrifile')
     try
         % All dipolar ICs of the decomposition (the set the region plots below use),
-        % cluster ICs in orange, their centroid in red, the others in blue. Few
-        % cluster ICs may be dipolar, so plotting only those can leave 3-4 dots.
-        oth_color  = [0.30 0.55 1.00];
-        cent_color = [0.85 0.10 0.10];
+        % coloured by their mean entropy across scales (the value of the right-hand
+        % region plot). Cluster membership is not marked: few high-entropy ICs are
+        % dipolar, and a dipole position only means something for those that are.
         sources = struct('posxyz',{},'momxyz',{},'rv',{});
-        colors  = {};
-        for ik = 1:numel(dipfit.model)
+        vals = [];
+        for ik = 1:min(numel(dipfit.model), n_ics)
             m = dipfit.model(ik);
-            if isempty(m.posxyz) || isempty(m.rv) || m.rv > rv_thresh, continue; end
+            if isempty(m.posxyz) || isempty(m.rv) || m.rv > rv_thresh || ~inBrain(m.posxyz(1,:)), continue; end
             sources(end+1).posxyz = m.posxyz(1,:); %#ok<AGROW>
             sources(end).momxyz   = [0 0 0];
             sources(end).rv       = m.rv;
-            if ik == pc_k, colors{end+1} = cent_color;          %#ok<AGROW>
-            elseif ismember(ik, ic_idx), colors{end+1} = clu_color; %#ok<AGROW>
-            else, colors{end+1} = oth_color;                    %#ok<AGROW>
-            end
+            vals(end+1) = mean(ent(ik,:), 'omitnan');    %#ok<AGROW>
         end
-        n_clu_dip = sum(cellfun(@(c) ~isequal(c, oth_color), colors));
+        cmap = plasma_map(256);   % purple to yellow, no green, readable on the grey MRI
+        cl = [min(vals) max(vals)]; if ~(cl(2) > cl(1)), cl = cl + [-1 1]*eps(cl(1)+1); end
+        ci = 1 + round((vals - cl(1)) / (cl(2) - cl(1)) * 255);
+        colors = arrayfun(@(i) cmap(i,:), ci, 'UniformOutput', false);
         if ~isempty(sources)
             pre_figs = findall(0,'Type','figure');
             dipplot(sources,'mri',template_mri_without_slab(dipfit),'coordformat','MNI','color',colors,...
@@ -551,10 +550,13 @@ else
 end
 set(fig,'Position',[p0(1) max(40, p0(2)+p0(4)-sz(2)) sz]);
 if has_dip
-    ax_dip = axes(fig,'Position',[0.01 0.50 0.98 0.43]);
+    ax_dip = axes(fig,'Position',[0.01 0.52 0.88 0.41]);   % room on the right for the colour bar and its label
     image(ax_dip, dip_img); axis(ax_dip,'image','off');
-    title(ax_dip, sprintf('Dipole sources, RV<%.0f%%: %d ICs (cluster ICs in orange: %d)', ...
-          rv_thresh*100, numel(sources), n_clu_dip), 'FontSize',fs,'FontWeight','bold');
+    colormap(ax_dip, cmap); clim(ax_dip, cl);
+    cb = colorbar(ax_dip, 'eastoutside'); cb.FontSize = fs; cb.FontWeight = 'bold';
+    cb.Label.String = ['Mean ' entropyType]; cb.Label.FontSize = fs; cb.Label.FontWeight = 'bold';
+    title(ax_dip, sprintf('Equivalent dipoles inside the brain, RV < %.0f%%: %d ICs, coloured by mean %s', ...
+          rv_thresh*100, numel(sources), entropyType), 'FontSize',fs,'FontWeight','bold','Interpreter','none');
 end
 % OuterPosition: MATLAB fits the tick labels, axis labels and titles inside
 ax1 = axes(fig,'OuterPosition',[0    0 0.64 rowH]);
@@ -603,6 +605,34 @@ title(ax2,'Mean entropy by region');
 set([ax1 ax2],'FontSize',fs,'FontWeight','bold', ...
     'TitleFontSizeMultiplier',1,'LabelFontSizeMultiplier',1);
 legend(ax1,leg_h,'Location','best','Box','off','FontSize',max(fs-1,8));
+end
+
+
+%% Is a dipole position inside the brain (innermost BEM surface)?
+function f = brain_test(dipfit)
+% Returns a function handle pos -> logical. Uses the innermost surface of the
+% head model (dipfit.hdmfile, BEM); without one, every position counts as inside.
+f = @(p) true;
+try
+    H = load('-mat', dipfit.hdmfile);
+    B = H.vol.bnd(:); ext = zeros(numel(B),1); P = cell(numel(B),1);
+    for i = 1:numel(B)
+        if isfield(B(i),'pos'), P{i} = B(i).pos; else, P{i} = B(i).pnt; end
+        ext(i) = max(max(P{i}) - min(P{i}));
+    end
+    [~, k] = min(ext);
+    DT = delaunayTriangulation(P{k});
+    f = @(p) ~isnan(pointLocation(DT, p(:)'));
+catch
+end
+end
+
+
+%% Purple-to-yellow colour map (anchors of matplotlib's plasma)
+function c = plasma_map(n)
+a = [0.050 0.030 0.528; 0.417 0.000 0.658; 0.692 0.165 0.565; 0.881 0.393 0.383; ...
+     0.988 0.652 0.211; 0.940 0.975 0.131];
+c = interp1(linspace(0,1,size(a,1)), a, linspace(0,1,n));
 end
 
 

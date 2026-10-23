@@ -204,9 +204,14 @@ EEG = ascent_compute(EEG, 'measure', 'RCMFE', 'domain', 'ica', ...
 
 % DIPFIT setup + fitting
 dipfitPath = fileparts(which('dipfitdefs'));
+% coord_transform aligns the channel locations with the MNI head model. EEGLAB channel
+% coordinates have the nose along +X, MNI along +Y: for locations looked up from standard_1005
+% this is a -90 deg rotation about z (EEGLAB's default for this template). For other montages,
+% use the coregistration in pop_dipfit_settings (or coregister) instead.
 EEG = pop_dipfit_settings(EEG, 'hdmfile', fullfile(dipfitPath,'standard_BEM','standard_vol.mat'), ...
     'coordformat','MNI','mrifile',fullfile(dipfitPath,'standard_BEM','standard_mri.mat'), ...
-    'chanfile',fullfile(dipfitPath,'standard_BEM','elec','standard_1005.elc'),'chansel',1:EEG.nbchan);
+    'chanfile',fullfile(dipfitPath,'standard_BEM','elec','standard_1005.elc'), ...
+    'coord_transform',[0 0 0 0 0 -pi/2 1 1 1],'chansel',1:EEG.nbchan);
 EEG = pop_multifit(EEG, 1:size(EEG.icaweights,1), 'threshold',100, 'dipplot','off'); % include all ICs (the plot does the classic selection with RV<15)
 EEG = pop_saveset(EEG, 'filepath', EEG.filepath, 'filename', EEG.filename);
 
