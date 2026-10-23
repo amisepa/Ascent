@@ -58,7 +58,7 @@ if multiscale && multiChan
     % ICLabel class and equivalent dipole of each IC (ICA only)
     icinfo = [];
     if isICA && (~isempty(iclabel) || ~isempty(dipfit))
-        icinfo = ascent_ic_info(nChan, iclabel, dipfit, chanlocs);
+        icinfo = ascent_ic_info(nChan, iclabel, dipfit, chanlocs, [], icawinv);
     end
     isBrainIC = [];
     if ~isempty(icinfo) && ~all(cellfun(@isempty, {icinfo.iclabel}))
@@ -282,9 +282,9 @@ if multiscale && multiChan
     set(findall(hFig2,'type','colorbar'),'FontSize',fs);
     ch.Label.FontSize = fs; ch.Label.FontWeight = 'bold';
 
-    % Region entropy + dipole sources figure (ICA + dipfit only)
+    % Dipole sources + entropy by region (ICA + dipfit only)
     if isICA && ~isempty(dipfit)
-        plot_regions(entropyData, xvals, icinfo, dipfit, entropyType, fs);
+        ascent_plot_dipoles(entropyData, icinfo, dipfit, entropyType, fs, xvals);
     end
 
 elseif ~multiscale && multiChan
@@ -317,6 +317,12 @@ elseif ~multiscale && multiChan
         c.Label.String='Entropy'; c.Label.FontSize=fs+2; c.Label.FontWeight='bold';
     end
     set(findall(hFig3,'type','axes'),'FontSize',fs+1,'FontWeight','bold');
+
+    % Equivalent dipoles colored by the measure (ICA + dipfit only)
+    if isICA && ~isempty(dipfit)
+        ascent_plot_dipoles(entropyData(:), ascent_ic_info(nChan, iclabel, dipfit, chanlocs, [], icawinv), ...
+            dipfit, entropyType, fs);
+    end
 
 elseif multiscale && ~multiChan
     % Single channel/IC curve
@@ -473,242 +479,6 @@ for k = 1:nFound
     centroids(k,:) = [max(1,min(nChan,pc)), max(1,min(nScale,ps))];
 end
 nClusters = nFound;
-end
-
-
-%% Dipole sources + region entropy (ICA + dipfit)
-function plot_regions(ent, scales, icinfo, dipfit, entropyType, fs, rv_thresh)
-% Dipolar ICs (RV < rv_thresh) inside the brain, from ascent_ic_info: an MRI
-% panel with the dipoles (colour: mean entropy across scales; size: fit
-% quality, 1 - RV; circle: ICLabel brain, square: other ICLabel classes) and,
-% below, entropy by AAL lobe for lobes with at least 3 ICs. Dipoles outside the
-% brain are artifact ICs (eyes, muscle) and are left out.
-if nargin < 7, rv_thresh = 0.15; end
-lw = max(1, fs/9);
-n_ics = size(ent, 1);
-if isempty(icinfo), return; end
-sel = icinfo([icinfo.dipolar] & [icinfo.inbrain] & [icinfo.ic] <= n_ics);
-if isempty(sel)
-    warning('ascent_plot: no dipolar IC (RV < %.0f%%) inside the brain; no dipole figure.', rv_thresh*100);
-    return
-end
-ent_sel   = ent([sel.ic],:);
-mean_ent  = mean(ent_sel, 2, 'omitnan');
-hasICL    = ~all(cellfun(@isempty, {sel.iclabel}));
-isBrainIC = strcmp({sel.iclabel}, 'Brain');
-
-% Table in the command window
-fprintf('Dipolar ICs inside the brain (RV < %.0f%%): %d\n', rv_thresh*100, numel(sel));
-fprintf('   IC     RV   MNI x, y, z (mm)   AAL region (lobe)                      ICLabel (p)          Mean %s\n', entropyType);
-for i = 1:numel(sel)
-    s = sel(i);
-    if isempty(s.aal), reg = 'unlabeled'; else, reg = sprintf('%s (%s)', s.aal, s.lobe); end
-    if isempty(s.iclabel), icl = '-'; else, icl = sprintf('%s (%.2f)', s.iclabel, s.p_iclabel); end
-    fprintf('  %3d  %4.1f%%  %5.0f %5.0f %5.0f    %-38s %-20s %.3f\n', s.ic, 100*s.rv, s.mni, reg, icl, mean_ent(i));
-end
-
-% Lobes with at least min_n ICs
-lobe_names = {'Frontal','Central','Parietal','Temporal','Occipital','Cingulate','Insula','Subcortical','Cerebellum'};
-lobe_clrs  = {[0.00 0.45 0.74],[0.90 0.55 0.00],[0.85 0.20 0.55],[0.45 0.30 0.85],[0.45 0.45 0.45], ...
-              [0.15 0.15 0.55],[0.30 0.75 0.93],[0.00 0.00 0.00],[0.60 0.40 0.20]};
-min_n = 3;
-ic_lobes = {sel.lobe};
-has_reg  = any(cellfun(@(r) sum(strcmp(ic_lobes, r)) >= min_n, lobe_names));
-
-% ---- Run dipplot into temp figure, capture as image --------------------
-dip_img = [];
-vals = mean_ent';
-cmap = plasma_map(256);   % purple to yellow, no green, readable on the grey MRI
-cl = [min(vals) max(vals)]; if ~(cl(2) > cl(1)), cl = cl + [-1 1]*eps(cl(1)+1); end
-if isfield(dipfit,'mrifile')
-    try
-        % Cluster membership is not marked: few high-entropy ICs are dipolar,
-        % and a dipole position only means something for those that are.
-        sources = struct('posxyz', {sel.mni}, 'momxyz', [0 0 0], 'rv', {sel.rv});
-        ci = 1 + round((vals - cl(1)) / (cl(2) - cl(1)) * 255);
-        colors = arrayfun(@(i) cmap(i,:), ci, 'UniformOutput', false);
-        msz = 5 + 7 * (1 - min([sel.rv], rv_thresh) / rv_thresh);   % RV 0: 12 pt; RV at threshold: 5 pt
-        mrk = repmat({'o'}, 1, numel(sel));
-        if hasICL, mrk(~isBrainIC) = {'s'}; end
-        pre_figs = findall(0,'Type','figure');
-        dipplot(sources,'mri',template_mri_without_slab(dipfit),'coordformat','MNI','color',colors,...
-            'summary','3d','dipolesize',15,'dipolelength',0,'gui','off','mesh','off');
-        drawnow; pause(0.3);
-        new_figs = setdiff(findall(0,'Type','figure'),pre_figs);
-        if ~isempty(new_figs)
-            tmp_fig = new_figs(end);
-            hide_edge_on_slices(tmp_fig);
-            outline_dipoles(tmp_fig, msz, mrk);
-            set(tmp_fig,'Color','k','InvertHardcopy','off');
-            try
-                dip_img = print(tmp_fig,'-RGBImage','-r300');  % sharper than getframe
-            catch
-                dip_img = getframe(tmp_fig).cdata;
-            end
-            close(tmp_fig);
-        end
-    catch ME
-        warning('ascent_plot: dipplot capture failed - %s', ME.message);
-    end
-end
-has_dip = ~isempty(dip_img);
-if ~has_dip && ~has_reg, return; end
-
-% ---- Combined figure layout --------------------------------------------
-fig = figure('Color','w','InvertHardCopy','off','NumberTitle','off',...
-             'Name','Dipole sources + entropy by region');
-try icadefs; set(fig,'color',BACKCOLOR); catch; end %#ok<NODEF>
-set(fig,'Units','pixels'); p0 = get(fig,'Position');
-if has_dip && has_reg
-    sz = [1000 720]; rowH = 0.50; dipPos = [0.01 0.52 0.88 0.38];
-elseif has_dip
-    sz = [1000 380]; dipPos = [0.01 0.03 0.88 0.72];
-else
-    sz = [1000 420]; rowH = 1;
-end
-set(fig,'Position',[p0(1) max(40, p0(2)+p0(4)-sz(2)) sz]);
-if has_dip
-    ax_dip = axes(fig,'Position',dipPos);   % room on the right for the colour bar and its label
-    image(ax_dip, dip_img); axis(ax_dip,'image','off');
-    colormap(ax_dip, cmap); clim(ax_dip, cl);
-    cb = colorbar(ax_dip, 'eastoutside'); cb.FontSize = fs; cb.FontWeight = 'bold';
-    cb.Label.String = ['Mean ' entropyType]; cb.Label.FontSize = fs; cb.Label.FontWeight = 'bold';
-    t2 = 'Size: fit quality (1 - RV)';
-    if hasICL
-        t2 = sprintf('%s; circles: ICLabel brain (%d), squares: other classes (%d)', t2, ...
-                     sum(isBrainIC), sum(~isBrainIC));
-    end
-    title(ax_dip, {sprintf('Equivalent dipoles inside the brain (RV < %.0f%%, %d ICs), color: mean %s', ...
-          rv_thresh*100, numel(sel), entropyType), t2}, 'FontSize',fs,'FontWeight','bold','Interpreter','none');
-end
-if ~has_reg
-    fprintf('No AAL lobe has %d or more dipolar ICs: no region plot.\n', min_n);
-    return
-end
-% OuterPosition: MATLAB fits the tick labels, axis labels and titles inside
-ax1 = axes(fig,'OuterPosition',[0    0 0.64 rowH]);
-ax2 = axes(fig,'OuterPosition',[0.64 0 0.36 rowH]);
-hold(ax1,'on'); box(ax1,'on');
-hold(ax2,'on'); box(ax2,'on');
-
-xpos=0; xt_pos=[]; xt_lbl={}; leg_h=gobjects(0); allv=[];
-for rr = 1:numel(lobe_names)
-    rname = lobe_names{rr};
-    idx   = strcmp(ic_lobes, rname);
-    n_r   = sum(idx);
-    if n_r < min_n, continue; end
-    clr = lobe_clrs{rr};
-
-    mu  = mean(ent_sel(idx,:),1,'omitnan');
-    sem = std( ent_sel(idx,:),0,1,'omitnan') / sqrt(n_r);
-    fill(ax1,[scales fliplr(scales)],[mu+sem fliplr(mu-sem)],...
-         clr,'FaceAlpha',0.15,'EdgeColor','none');
-    leg_h(end+1) = plot(ax1,scales,mu,'Color',clr,'LineWidth',2.2*lw,...
-        'DisplayName',sprintf('%s (n=%d)',rname,n_r)); %#ok<AGROW>
-
-    xpos = xpos+1;
-    v = mean_ent(idx); allv = [allv; v]; %#ok<AGROW>
-    scatter(ax2,xpos+(rand(n_r,1)-0.5)*0.3,v,30*lw^2,clr,...
-            'filled','MarkerFaceAlpha',0.55,'MarkerEdgeColor','none');
-    plot(ax2,xpos+[-0.3 0.3],repmat(mean(v,'omitnan'),1,2),...
-         '-','Color',clr*0.6,'LineWidth',2.5*lw);
-    xt_pos(end+1)=xpos; xt_lbl{end+1}=rname; %#ok<AGROW> (n is in the legend)
-end
-
-xlim(ax1,[scales(1) scales(end)]);
-xlabel(ax1,'Scale'); ylabel(ax1,entropyType,'Interpreter','none');
-title(ax1,'Scale-resolved entropy by AAL lobe  (mean \pm SEM)');
-set(ax1,'TickDir','out');
-
-xlim(ax2,[0 xpos+1]);
-allv = allv(isfinite(allv));
-if numel(allv) > 1 && max(allv) > min(allv)   % pad so no point sits on the frame
-    pad = 0.08*(max(allv)-min(allv)); ylim(ax2,[min(allv)-pad max(allv)+pad]);
-end
-set(ax2,'XTick',xt_pos,'XTickLabel',xt_lbl,'TickDir','out','XTickLabelRotation',30);
-ylabel(ax2,['Mean ' entropyType],'Interpreter','none');
-title(ax2,'Mean entropy by AAL lobe');
-set([ax1 ax2],'FontSize',fs,'FontWeight','bold', ...
-    'TitleFontSizeMultiplier',1,'LabelFontSizeMultiplier',1);
-legend(ax1,leg_h,'Location','best','Box','off','FontSize',max(fs-1,8));
-end
-
-
-%% Purple-to-yellow colour map (anchors of matplotlib's plasma)
-function c = plasma_map(n)
-a = [0.050 0.030 0.528; 0.417 0.000 0.658; 0.692 0.165 0.565; 0.881 0.393 0.383; ...
-     0.988 0.652 0.211; 0.940 0.975 0.131];
-c = interp1(linspace(0,1,size(a,1)), a, linspace(0,1,n));
-end
-
-
-%% Dipole markers with a black edge (dots vanish on the grey MRI)
-function outline_dipoles(fig, msz, mrk)
-% Size and shape per dipole; dipplot tags each marker 'dipole<index>'
-for h = findall(fig, 'Type', 'line', 'Marker', '.')'
-    t = get(h,'Tag');
-    if ~strncmp(t, 'dipole', 6), continue; end
-    i = str2double(t(7:end));
-    if isnan(i) || i > numel(msz), continue; end
-    c = get(h, 'Color');
-    set(h, 'Marker', mrk{i}, 'MarkerSize', msz(i) * ifelse(strcmp(mrk{i},'s'), 0.9, 1), ...
-        'MarkerFaceColor', c, 'MarkerEdgeColor', [0 0 0], 'LineWidth', 1);
-end
-end
-
-
-%% dipplot '3d' summary: show only the slice each view faces
-function hide_edge_on_slices(fig)
-% Each of the three views shows one MRI slice face-on; hide the two seen
-% edge-on and use exact axis views with an orthographic projection. (The bar
-% above the coronal view was not one of these: see template_mri_without_slab.)
-for ax = findall(fig,'Type','axes')'
-    hs = findall(ax,'Type','surface','Tag','img');
-    if isempty(hs), continue; end
-    v = get(ax,'CameraPosition') - get(ax,'CameraTarget');
-    [~, d] = max(abs(v));                        % coordinate the view looks along
-    e = zeros(1,3); e(d) = sign(v(d)); view(ax, e);
-    set(ax,'Projection','orthographic');
-    w = zeros(numel(hs),1);
-    for i = 1:numel(hs)
-        c = get(hs(i), {'XData','YData','ZData'}); c = c{d};
-        w(i) = max(c(:)) - min(c(:));             % slice extent along the view
-    end
-    [~, keep] = min(w);
-    set(hs(setdiff(1:numel(hs), keep)), 'Visible','off');
-end
-end
-
-
-%% EEGLAB template MRI without the stray tissue above the scalp
-function mri = template_mri_without_slab(dipfit)
-% The top slices of EEGLAB's template MRI (dipfit standard_mri.mat) hold stray
-% tissue 5-8 mm above the scalp, which dipplot draws as a bar over the coronal
-% view and blobs over the sagittal one. Blank every voxel above 60 mm that lies
-% more than 4 mm above the scalp of the BEM head model. Any other case (other
-% MRI or head model, rotated voxel grid, read error) returns the file name, so
-% dipplot shows the MRI as before.
-mri = dipfit.mrifile;
-try
-    M = load('-mat', dipfit.mrifile);  A = M.mri.anatomy;  T = M.mri.transform;
-    if any(any(abs(T(1:3,1:3) - diag(diag(T(1:3,1:3)))) > 1e-9)), return; end
-    H = load('-mat', dipfit.hdmfile);  P = [];
-    for b = H.vol.bnd(:)'                      % scalp: the outermost surface
-        if isfield(b,'pos'), q = b.pos; else, q = b.pnt; end
-        if isempty(P) || max(q(:,3)) > max(P(:,3)), P = q; end
-    end
-    x = T(1,1)*(1:size(A,1)) + T(1,4);         % voxel centres in mm (1-based)
-    y = T(2,2)*(1:size(A,2)) + T(2,4);
-    z = T(3,3)*(1:size(A,3)) + T(3,4);
-    Q = sortrows(P(P(:,3) > 0, :), -3);       % upper half; highest point first
-    [~, iu] = unique(Q(:,1:2), 'rows', 'stable');  Q = Q(iu,:);   % one point per column
-    [X, Y] = ndgrid(x, y);
-    ztop = griddata(Q(:,1), Q(:,2), Q(:,3), X, Y, 'linear');   % scalp height per column
-    ztop(isnan(ztop)) = -Inf;                  % outside the scalp footprint
-    A(bsxfun(@gt, reshape(z,1,1,[]), max(ztop + 4, 60))) = 0;
-    mri = M.mri;  mri.anatomy = A;
-catch
-end
 end
 
 

@@ -249,6 +249,14 @@ if ~isempty(rowAx)
         lgd.Position = [rowLeft+rowWidth+0.015, pp(2)+pp(4)/2-lp(4)/2, lp(3), lp(4)];
     end
 end
+
+% Equivalent dipoles colored by the exponent (ICA + dipfit only)
+if isICA && isfield(opt,'dipfit') && ~isempty(opt.dipfit)
+    icl = []; if isfield(opt,'iclabel'), icl = opt.iclabel; end
+    fsD = 9;  if isfield(opt,'fontSize') && ~isempty(opt.fontSize), fsD = opt.fontSize; end
+    ascent_plot_dipoles(exponent_in, ascent_ic_info(numel(exponent_in), icl, opt.dipfit, chanlocs, [], icawinv), ...
+        opt.dipfit, 'Aperiodic exponent', fsD);
+end
 end
 
 

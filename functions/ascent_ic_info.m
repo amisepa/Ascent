@@ -1,8 +1,8 @@
-function info = ascent_ic_info(nIC, iclabel, dipfit, chanlocs, rv_thresh)
+function info = ascent_ic_info(nIC, iclabel, dipfit, chanlocs, rv_thresh, icawinv)
 % ascent_ic_info - ICLabel class and equivalent dipole of each IC, in one table.
 %
 %   info = ascent_ic_info(size(EEG.icaweights,1), EEG.etc.ic_classification.ICLabel, EEG.dipfit)
-%   info = ascent_ic_info(nIC, iclabel, dipfit, EEG.chanlocs(EEG.icachansind), 0.15)
+%   info = ascent_ic_info(nIC, iclabel, dipfit, EEG.chanlocs(EEG.icachansind), 0.15, EEG.icawinv)
 %
 % iclabel is EEG.etc.ic_classification.ICLabel (or its [nIC x 7] classifications
 % matrix, classes in ICLabel's order); dipfit is EEG.dipfit. Either may be empty.
@@ -15,11 +15,14 @@ function info = ascent_ic_info(nIC, iclabel, dipfit, chanlocs, rv_thresh)
 %               the share of the IC map one dipole does not explain. It
 %               measures how dipolar the map is, not how accurate the position is.
 %   dipolar   - rv < rv_thresh (default 0.15, the EEGLAB convention)
-%   mni       - dipole position (mm, MNI)
-%   inbrain   - inside the innermost surface of the head model (BEM)
+%   mni       - dipole position (mm; MNI when dipfit.coordformat is 'MNI').
+%               Two-dipole fits: the first dipole.
+%   inbrain   - inside the innermost surface of the head model (BEM); false for
+%               fits not in MNI coordinates, true for all when the head model
+%               file cannot be read (a warning says so)
 %   aal       - AAL region containing the dipole; when the position is not
 %               labeled (e.g., white matter), the nearest labeled region within
-%               10 mm, prefixed by 'near '; '' otherwise
+%               10 mm, prefixed by 'near '; '' otherwise and for non-MNI fits
 %   lobe      - Frontal, Central, Parietal, Temporal (incl. hippocampus,
 %               amygdala), Occipital, Cingulate, Insula, Subcortical or
 %               Cerebellum (from the AAL region); '' when unlabeled
@@ -27,10 +30,12 @@ function info = ascent_ic_info(nIC, iclabel, dipfit, chanlocs, rv_thresh)
 % Labels use the AAL atlas (Tzourio-Mazoyer et al., 2002) shipped with
 % FieldTrip in EEGLAB, by containment rather than by distance to a centroid
 % (centroid rules mislabel midline and deep dipoles). With chanlocs, it also
-% warns when DIPFIT used an identity coord_transform with channel locations in
-% EEGLAB's convention (nose along +X): the montage is then rotated by 90 deg
-% relative to the MNI head model and the dipoles must be refit (for positions
-% from standard_1005: coord_transform [0 0 0 0 0 -pi/2 1 1 1]).
+% warns when the channel locations, moved by DIPFIT's coord_transform, do not
+% have the nose along +Y as the MNI head model does: an identity transform on
+% EEGLAB coordinates (nose along +X) rotates the montage by 90 deg, and the
+% dipoles must be refit (for positions from standard_1005: coord_transform
+% [0 0 0 0 0 -pi/2 1 1 1]). With icawinv, dipole models that no longer match the
+% IC maps (e.g., after ICA was rerun) are ignored, with a warning.
 %
 % ICLabel was trained on average-referenced data decomposed with Infomax;
 % treat its classes as a guide when the pipeline differs.
@@ -41,6 +46,7 @@ if nargin < 2, iclabel = []; end
 if nargin < 3, dipfit = []; end
 if nargin < 4, chanlocs = []; end
 if nargin < 5 || isempty(rv_thresh), rv_thresh = 0.15; end
+if nargin < 6, icawinv = []; end
 
 % ICLabel
 P = []; classes = {'Brain','Muscle','Eye','Heart','Line Noise','Channel Noise','Other'};
@@ -51,40 +57,72 @@ elseif isnumeric(iclabel)
     P = iclabel;
 end
 if ~isempty(P) && size(P,1) ~= nIC
-    warning('ascent: ICLabel has %d ICs, the data %d; ICLabel ignored.', size(P,1), nIC); P = [];
+    warn_once(sprintf('ascent: ICLabel has %d ICs, the data %d; ICLabel ignored.', size(P,1), nIC)); P = [];
 end
 iBrain = find(strcmpi(classes, 'Brain'), 1);
 
 hasDip = isstruct(dipfit) && isfield(dipfit, 'model') && ~isempty(dipfit.model);
-if hasDip
+isMNI  = hasDip && isfield(dipfit, 'coordformat') && strcmpi(dipfit.coordformat, 'MNI');
+if hasDip && ~isMNI
+    warn_once(sprintf(['ascent: the dipoles are not in MNI coordinates (coordformat ''%s''): ' ...
+        'no atlas labels, inside-brain test or dipole figure.'], char(string(dipfit.coordformat))));
+end
+if isMNI
     if ~isempty(chanlocs), check_frame(dipfit, chanlocs); end
     inBrain = brain_test(dipfit);
     [A, names] = load_aal();
 end
+stale = false(1, nIC);
+if hasDip && ~isempty(icawinv), stale = stale_models(dipfit, icawinv, nIC); end
 
 info = struct('ic', num2cell(1:nIC), 'iclabel', '', 'p_iclabel', NaN, 'p_brain', NaN, ...
     'rv', NaN, 'dipolar', false, 'mni', [NaN NaN NaN], 'inbrain', false, 'aal', '', 'lobe', '');
 for k = 1:nIC
-    if ~isempty(P)
+    if ~isempty(P) && any(isfinite(P(k,:)))
         [pk, c] = max(P(k,:));
         info(k).iclabel = classes{c}; info(k).p_iclabel = pk;
         if ~isempty(iBrain), info(k).p_brain = P(k, iBrain); end
     end
-    if ~hasDip || k > numel(dipfit.model), continue; end
+    if ~hasDip || k > numel(dipfit.model) || stale(k), continue; end
     m = dipfit.model(k);
     if isempty(m.posxyz) || isempty(m.rv), continue; end
     p = m.posxyz(1,:);
-    [info(k).aal, info(k).lobe] = aal_label(p, A, names);
-    info(k).rv = m.rv; info(k).dipolar = m.rv < rv_thresh;
-    info(k).mni = p; info(k).inbrain = inBrain(p);
+    info(k).rv = m.rv; info(k).dipolar = m.rv < rv_thresh; info(k).mni = p;
+    if isMNI
+        [info(k).aal, info(k).lobe] = aal_label(p, A, names);
+        info(k).inbrain = inBrain(p);
+    end
+end
+end
+
+%% Dipole models that no longer match the IC maps (fit before ICA was rerun)
+function stale = stale_models(dipfit, icawinv, nIC)
+stale = false(1, nIC);
+if ~isfield(dipfit.model, 'datapot'), return; end
+rows = 1:size(icawinv, 1);
+if isfield(dipfit, 'chansel') && ~isempty(dipfit.chansel) && max(dipfit.chansel) <= size(icawinv, 1)
+    rows = dipfit.chansel;
+end
+for k = 1:min([nIC, numel(dipfit.model), size(icawinv, 2)])
+    d = dipfit.model(k).datapot;
+    if isempty(d) || isempty(dipfit.model(k).posxyz), continue; end
+    w = icawinv(rows, k);
+    if numel(d) ~= numel(w), continue; end      % other channel selection: cannot check
+    r = corrcoef(double(d(:)), double(w(:)));
+    stale(k) = ~(abs(r(1,2)) > 0.99);
+end
+if any(stale)
+    warn_once(sprintf(['ascent: the DIPFIT models of %d ICs do not match their current IC maps ' ...
+        '(was ICA rerun after DIPFIT?); their dipoles are ignored. Refit the dipoles.'], sum(stale)));
 end
 end
 
 %% Inside the innermost BEM surface
 function f = brain_test(dipfit)
 f = @(p) true;
+hdm = resolve_file(dipfit, 'hdmfile');
 try
-    H = load('-mat', dipfit.hdmfile);
+    H = load('-mat', hdm);
     B = H.vol.bnd(:); ext = zeros(numel(B),1); P = cell(numel(B),1);
     for i = 1:numel(B)
         if isfield(B(i),'pos'), P{i} = B(i).pos; else, P{i} = B(i).pnt; end
@@ -94,6 +132,22 @@ try
     DT = delaunayTriangulation(P{k});
     f = @(p) ~isnan(pointLocation(DT, p(:)'));
 catch
+    warn_once(['ascent: could not read the head model (dipfit.hdmfile), so dipoles were not ' ...
+        'tested for being inside the brain: dipoles of artifact ICs (eyes, muscle) may be shown.']);
+end
+end
+
+%% DIPFIT file: as stored, else the file of that name in the dipfit plugin
+function f = resolve_file(dipfit, field)
+f = '';
+if ~isfield(dipfit, field) || isempty(dipfit.(field)), return; end
+f = dipfit.(field);
+if exist(f, 'file') == 2, return; end
+[~, n, e] = fileparts(f);
+d = fileparts(which('dipfitdefs'));
+for sub = {'standard_BEM', 'standard_BESA', ''}
+    c = fullfile(d, sub{1}, [n e]);
+    if ~isempty(d) && exist(c, 'file') == 2, f = c; return; end
 end
 end
 
@@ -109,7 +163,6 @@ if isempty(f) || ~exist(f, 'file')   % FieldTrip-lite not on the path: look in E
     d = dir(fullfile(fileparts(which('eeglab')), 'plugins', 'Fieldtrip*', 'template', 'atlas', 'aal', 'ROI_MNI_V4.nii'));
     if ~isempty(d), f = fullfile(d(1).folder, d(1).name); end
 end
-if isempty(f) || ~exist(f, 'file'), return; end
 try
     fid = fopen(f, 'r', 'ieee-be');
     if fread(fid, 1, 'int32') ~= 348, fclose(fid); fid = fopen(f, 'r', 'ieee-le'); fread(fid, 1, 'int32'); end
@@ -117,16 +170,19 @@ try
     fseek(fid, 70, 'bof'); dtype = fread(fid, 1, 'int16');
     fseek(fid, 108, 'bof'); off = fread(fid, 1, 'float32');
     fseek(fid, 280, 'bof'); S = reshape(fread(fid, 12, 'float32'), 4, 3)';
-    if dtype ~= 4, fclose(fid); return; end            % int16 expected
+    if dtype ~= 4, fclose(fid); error('int16 expected'); end
     fseek(fid, round(off), 'bof');
     V = reshape(fread(fid, prod(dim(2:4)), 'int16=>double'), dim(2:4));
     fclose(fid);
+    fid = fopen(strrep(f, '.nii', '.txt'), 'r');          % abbreviation, name, code (tab-separated)
+    T = textscan(fid, '%s %s %f', 'Delimiter', '\t'); fclose(fid);
+    for i = 1:numel(T{3}), names(T{3}(i)) = T{2}{i}; end
     A = struct('V', V, 'S', [S; 0 0 0 1]);
-    T = readcell(strrep(f, '.nii', '.txt'), 'Delimiter', '\t', 'FileType', 'text');
-    for i = 1:size(T,1), names(double(T{i,3})) = T{i,2}; end
     cache = struct('A', A, 'names', names);
 catch
     A = [];
+    warn_once(['ascent: AAL atlas not found or not readable (FieldTrip-lite in EEGLAB''s plugins ' ...
+        'folder, template/atlas/aal); dipoles are shown without region labels.']);
 end
 end
 
@@ -169,21 +225,35 @@ else, lobe = 'Other';
 end
 end
 
-%% Warn when the montage is rotated relative to the MNI head model
+%% Warn when the montage, as DIPFIT moved it, does not face +Y like the MNI head model
 function check_frame(dipfit, chanlocs)
 try
-    if ~isfield(dipfit, 'coordformat') || ~strcmpi(dipfit.coordformat, 'MNI'), return; end
     t = dipfit.coord_transform;
-    if isempty(t) || numel(t) < 6 || any(abs(t(4:6)) > 1e-6), return; end   % some rotation set
+    if isempty(t), t = [0 0 0 0 0 0 1 1 1]; end
+    if isequal(size(t), [4 4]), T = t; else, T = traditionaldipfit(t(:)'); end
     lab = lower({chanlocs.labels});
-    i = find(ismember(lab, {'fpz', 'fz', 'nz', 'afz'}), 1);
-    if isempty(i), return; end
-    if abs(chanlocs(i).X) > 2 * abs(chanlocs(i).Y) && chanlocs(i).X > 0
-        warning(['ascent: DIPFIT used an identity coord_transform, but the channel locations ' ...
-            'have the nose along +X (EEGLAB convention) while the MNI head model has it along +Y. ' ...
-            'The dipoles were fit with the montage rotated by 90 deg: refit them (for positions ' ...
-            'from standard_1005, coord_transform [0 0 0 0 0 -pi/2 1 1 1]).']);
+    front = find(ismember(lab, {'fpz', 'nz', 'afz', 'fz'}), 1);    % a frontal midline site
+    if isempty(front), front = find(ismember(lab, {'fp1', 'fp2'})); end
+    if isempty(front), return; end                                  % labels give no front: no check
+    xyz = [[chanlocs(front).X]' [chanlocs(front).Y]' [chanlocs(front).Z]'];
+    if any(~isfinite(xyz(:))), return; end
+    q = T * [mean(xyz, 1) 1]';                                       % front of the montage, model frame
+    if q(2) < abs(q(1))                                              % not toward +Y (the nose in MNI)
+        warn_once(['ascent: after DIPFIT''s coord_transform the front of the montage points along ' ...
+            sprintf('[%.0f %.0f %.0f] mm, not toward the nose of the MNI head model (+Y). ', q(1:3)) ...
+            'The dipoles were fit with a rotated montage: refit them with a corrected coord_transform ' ...
+            '(for EEGLAB coordinates from standard_1005: [0 0 0 0 0 -pi/2 1 1 1]).']);
     end
 catch
 end
+end
+
+%% The same warning only once a minute (ExSEnt plots three outputs, each with this table)
+function warn_once(msg)
+persistent last
+if isempty(last), last = containers.Map('KeyType','char','ValueType','double'); end
+t = posixtime(datetime('now'));
+if isKey(last, msg) && t - last(msg) < 60, return; end
+last(msg) = t;
+warning('ascent:icinfo', '%s', msg);
 end

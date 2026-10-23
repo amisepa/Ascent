@@ -353,7 +353,7 @@ switch lower(measure)
         % Higuchi Fractal Dimension - Higuchi (1988)
         [entropy, SD, info] = compute_HigFracDim(data, ...
             'Kmax', 16, 'RobustFit', 'theilsen', 'MinScales', 4, ...
-            'Parallel', true, 'Progress', true);
+            'Parallel', parallel, 'Progress', progress);
 
     case 'aperiodic'
         % Aperiodic (1/f) exponent and offset - Donoghue et al. (2020)
@@ -536,7 +536,7 @@ if isICA
     dip = [];
     if isfield(EEG,'dipfit') && ~isempty(EEG.dipfit), dip = EEG.dipfit; end
     if ~isempty(icl) || ~isempty(dip)
-        EEG.ascent.(measure).ic_info = ascent_ic_info(size(icawinv,2), icl, dip, chanlocs);
+        EEG.ascent.(measure).ic_info = ascent_ic_info(size(icawinv,2), icl, dip, chanlocs, [], icawinv);
     end
 end
 if contains(lower(measure), {'mse','mmse','mfe','rcmfe','rcmvmfe'})
@@ -550,6 +550,7 @@ end
 % VISUALIZATIONS | PLOTS
 % ----------------------------
 if vis
+  try   % a plotting error must not lose the results computed above
     if nChan > 1
         % Remove scale 1 for std and var coarse-graining
         if ~isempty(coarsing) && contains(coarsing, {'std' 'sd' 'standard deviation' 'var' 'variance'})
@@ -597,6 +598,9 @@ if vis
     else
         disp("Ascent's visualizations require more than 1 signal.");
     end
+  catch ME
+    warning('ascent_compute: plotting failed (%s); the results are kept.', ME.message);
+  end
 end
 
 

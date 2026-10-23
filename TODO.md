@@ -20,7 +20,10 @@ in manuscript/ (no PDFs), with all figures current; next is the final read and s
     excerpt of the sample).
 - DONE 2026-10-23: IC outputs with ICLabel classes, AAL labels (ascent_ic_info), dipole fit
   quality and coregistration check; Fig 3, v16 and README regenerated; reference 46 (AAL)
-  added to the manuscript. Release zip rebuilt.
+  added to the manuscript. Release zip rebuilt. Dipole figure for every IC measure except the
+  multivariate ones (ascent_plot_dipoles); guards for non-MNI fits, unreadable head models,
+  DIPFIT models that no longer match the ICs, and plotting errors (results are kept).
+- NEXT (user): final read of v16 + letter v6, then submit; EEGLAB plugin form upload later.
 - PLANNED v2.2: brain-only option (ICLabel) for the IC figures and cluster detection.
 - PLANNED v2.2: source-space entropy through ROIconnect (LCMV/eLORETA ROI time series), the
   route for any claim about where entropy differs.
