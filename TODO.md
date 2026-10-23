@@ -18,6 +18,9 @@ in manuscript/ (no PDFs), with all figures current; next is the final read and s
   - Optional: ask GitHub Support to purge unreferenced objects after the history rewrite.
   - Optional: GitHub Actions smoke test (matlab-actions + EEGLAB, README commands on a 20-s
     excerpt of the sample).
+- PLANNED v2.2 (after the paper; not in the paper): eLORETA option for IC maps (template BEM
+  leadfield, ft_inverse_eloreta as in the MMAGIC-validation code), shown next to the dipoles;
+  report a lobe-level label, keep the RV < 15% dipole view as the default.
 - PLANNED v2.2 (after the paper; not in the paper): attractor measure
   - 3-D time-delay embedding of 20-s windows, x(t), x(t+tau), x(t+2*tau), tau about 4-5 ms
     (1 sample at 250 Hz), data 1-50 Hz; minimum-volume enclosing ellipsoid (Khachiyan
