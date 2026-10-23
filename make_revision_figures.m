@@ -85,6 +85,7 @@ for k = 1:size(runs, 1)
         locs = EEG.chanlocs(ici);
         args = {'ICA', true, 'icawinv', EEG.icawinv};
         if isfield(EEG, 'dipfit') && ~isempty(EEG.dipfit), args = [args, {'dipfit', EEG.dipfit}]; end %#ok<AGROW>
+        if isfield(EEG.etc, 'ic_classification'), args = [args, {'iclabel', EEG.etc.ic_classification.ICLabel}]; end %#ok<AGROW>
         names = arrayfun(@(i) sprintf('IC%d', i), 1:size(R,1), 'UniformOutput', false);
     else
         locs = EEG.chanlocs; args = {}; names = {EEG.chanlocs.labels};

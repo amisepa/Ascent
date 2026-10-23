@@ -215,9 +215,15 @@ EEG = pop_dipfit_settings(EEG, 'hdmfile', fullfile(dipfitPath,'standard_BEM','st
 EEG = pop_multifit(EEG, 1:size(EEG.icaweights,1), 'threshold',100, 'dipplot','off'); % include all ICs (the plot does the classic selection with RV<15)
 EEG = pop_saveset(EEG, 'filepath', EEG.filepath, 'filename', EEG.filename);
 
-% Same call as above; the dipole/region figure is added now that EEG.dipfit exists
+% Same call as above; the dipole/region figure is added now that EEG.dipfit exists.
+% Dipoles are colored by mean entropy and sized by fit quality (1 - RV); with ICLabel
+% (EEG = pop_iclabel(EEG, 'default'), already run on the sample), brain ICs are circles
+% and the others squares. A table of AAL regions, RV and ICLabel classes is printed.
 EEG = ascent_compute(EEG, 'measure', 'RCMFE', 'domain', 'ica', ...
     'coarsing', 'sd', 'num_scales', 50);
+
+% Per-IC table: ICLabel class, dipole RV, MNI position, inside brain, AAL region and lobe
+% struct2table(EEG.ascent.RCMFE.ic_info)
 
 
 %% Aperiodic parameterization on independent components (ICs) instead of

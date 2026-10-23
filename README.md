@@ -126,7 +126,7 @@ The cluster threshold can be changed when plotting again, e.g. `ascent_plot(EEG.
 
 ### Independent components and dipoles
 
-Any measure can be computed on the independent components (ICs) instead of the scalp channels with `'domain', 'ica'`. IC results are back-projected to the scalp for the topographies, and when the dataset has dipole fits (DIPFIT), a second figure shows the equivalent dipoles of the ICs on the MNI template and the entropy by brain region.
+Any measure can be computed on the independent components (ICs) instead of the scalp channels with `'domain', 'ica'`. IC results are back-projected to the scalp for the topographies. When the dataset has ICLabel classifications, the ICs classified as brain are marked with a dot. When it has dipole fits (DIPFIT), a second figure shows the equivalent dipoles of the dipolar ICs (residual variance < 15%) located inside the brain on the MNI template: color shows the mean entropy of each IC, size the goodness of fit, and shape the ICLabel class (circles: brain; squares: other classes). Each dipole is labeled with its region in the AAL atlas, and the table of ICLabel classes, residual variances and regions is printed and saved in `EEG.ascent.<measure>.ic_info`. ASCENT also warns when the channel locations are not coregistered with the MNI head model (e.g., EEGLAB coordinates used with an identity transform).
 
 ```matlab
 EEG = ascent_compute(EEG, 'measure', 'RCMFE', 'domain', 'ica', 'coarsing', 'std', 'num_scales', 30);

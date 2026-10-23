@@ -24,6 +24,8 @@ function ascent_plot(entropyData, chanlocs, entropyType, scales, varargin)
 %       'icawinv',       EEG.icawinv  [nChans x nICs]
 %       'ClusterThresh', scalar in (0,1)  percentile threshold (default 0.75)
 %       'dipfit',        EEG.dipfit   (ICA only; adds the region/dipole figure)
+%       'iclabel',       EEG.etc.ic_classification.ICLabel (ICA only; marks the
+%                        ICs ICLabel classifies as brain)
 %       'FontSize',      font size in points for the multiscale and region figures
 %                        (default 9). Raise it for figures that will be printed
 %                        small, e.g. 15-18 for a panel 6-12 cm wide.
@@ -46,6 +48,7 @@ opt.isICA         = false;
 opt.icawinv       = [];
 opt.clusterThresh = 0.75;
 opt.dipfit        = [];
+opt.iclabel       = [];
 opt.alphaPower    = [];
 opt.fontSize      = 9;
 rmIdx             = [];
@@ -64,6 +67,9 @@ for vi = 1:(numel(varargin)-1)
             case 'dipfit'
                 opt.dipfit = varargin{vi+1};
                 rmIdx      = [rmIdx vi vi+1]; %#ok<AGROW>
+            case 'iclabel'
+                opt.iclabel = varargin{vi+1};
+                rmIdx       = [rmIdx vi vi+1]; %#ok<AGROW>
             case 'alphapower'
                 opt.alphaPower = varargin{vi+1};
                 rmIdx          = [rmIdx vi vi+1]; %#ok<AGROW>

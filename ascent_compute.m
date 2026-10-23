@@ -73,6 +73,10 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %   EEG.ascent.(measure).electrode_locations- scalp channels (the ones ICs project onto)
 %   EEG.ascent.(measure).icawinv            - mixing matrix        (ICA mode only)
 %   EEG.ascent.(measure).icachansind        - channels ICA ran on  (ICA mode only)
+%   EEG.ascent.(measure).ic_info            - per IC: ICLabel class, dipole RV, MNI
+%                                             position, inside brain, AAL region and
+%                                             lobe (ICA mode, with ICLabel or DIPFIT;
+%                                             see ascent_ic_info)
 %   EEG.ascent.(measure).scales             - scale vector (multiscale only)
 %   EEG.ascent.Aperiodic.data.exponent      - aperiodic exponent [signals x 1]
 %   EEG.ascent.Aperiodic.data.offset        - aperiodic offset [signals x 1]
@@ -523,6 +527,17 @@ if isICA
     % Saved so the back-projected figures can be reproduced from the .set alone
     EEG.ascent.(measure).icawinv     = icawinv;
     EEG.ascent.(measure).icachansind = icachansind;
+    % ICLabel class and equivalent dipole of each IC, when the dataset has them
+    icl = [];
+    if isfield(EEG,'etc') && isstruct(EEG.etc) && isfield(EEG.etc,'ic_classification') ...
+            && isfield(EEG.etc.ic_classification,'ICLabel')
+        icl = EEG.etc.ic_classification.ICLabel;
+    end
+    dip = [];
+    if isfield(EEG,'dipfit') && ~isempty(EEG.dipfit), dip = EEG.dipfit; end
+    if ~isempty(icl) || ~isempty(dip)
+        EEG.ascent.(measure).ic_info = ascent_ic_info(size(icawinv,2), icl, dip, chanlocs);
+    end
 end
 if contains(lower(measure), {'mse','mmse','mfe','rcmfe','rcmvmfe'})
     EEG.ascent.(measure).scales = scales;
@@ -550,6 +565,7 @@ if vis
             if isfield(EEG,'dipfit') && ~isempty(EEG.dipfit)
                 icaArgs = [icaArgs, {'dipfit', EEG.dipfit}];
             end
+            if ~isempty(icl), icaArgs = [icaArgs, {'iclabel', icl}]; end
         end
 
         switch lower(measure)
