@@ -23,7 +23,8 @@ in manuscript/ (no PDFs), with all figures current; next is the final read and s
   added to the manuscript. Release zip rebuilt. Dipole figure for every IC measure except the
   multivariate ones (ascent_plot_dipoles); guards for non-MNI fits, unreadable head models,
   DIPFIT models that no longer match the ICs, and plotting errors (results are kept).
-- NEXT (user): final read of v16 + letter v6, then submit; EEGLAB plugin form upload later.
+- DONE 2026-10-23: Revision 1 submitted to Entropy (v16, letter v6, Figure S1, cover letter).
+- NEXT: wait for the editor's decision; EEGLAB plugin form upload when their server is fixed.
 - PLANNED v2.2: brain-only option (ICLabel) for the IC figures and cluster detection.
 - PLANNED v2.2: source-space entropy through ROIconnect (LCMV/eLORETA ROI time series), the
   route for any claim about where entropy differs.

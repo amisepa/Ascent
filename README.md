@@ -148,7 +148,7 @@ EEG = ascent_compute(EEG, 'measure', 'RCmvMFE',  'chanlist', {'Fz' 'Cz' 'Pz' 'Oz
 
 ## Please cite
 
-Cannard, C., & Delorme, A. Introducing the ASCENT EEGLAB plugin: Aperiodic Signal Complexity Estimation for Neurophysiological Time series. Under review. Preprint of an earlier version: https://psyarxiv.com/xwmyk/
+Cannard, C., & Delorme, A. (2026). Introducing the "ASCENT" EEGLAB Plugin: Aperiodic Signal Complexity Estimation for Neurophysiological Time Series. *PsyArXiv*. https://doi.org/10.31234/osf.io/xwmyk_v2 (under review at *Entropy*)
 
 Please also cite the papers of the methods you use (see References below).
 
