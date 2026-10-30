@@ -1,4 +1,4 @@
-function r_s = scale_tolerance(sig, s, coarseType, r, zNorm, minBinsHard, m)
+function r_s = scale_tolerance(sig, s, coarseType, r, zNorm, minBinsHard, m, n)
 % scale_tolerance  One tolerance per scale, shared across offsets, for the
 %   composite multiscale fuzzy entropy measures (CMFE, RCMFE). The rescaling
 %   factor is taken from the unshifted (offset-1) coarse-grained series so that
@@ -13,7 +13,7 @@ end
 L = floor(numel(sig)/s) * s;
 if L/s >= max(minBinsHard, m+1)
     cg_ref = coarsegrain(reshape(sig(1:L), s, []), coarseType);
-    f = zNorm_scale(cg_ref, zNorm);
+    f = zNorm_scale(cg_ref, zNorm, n);   % n: fuzzy power, see zNorm_scale
     if isfinite(f) && f > 0
         r_s = r * f;
     else

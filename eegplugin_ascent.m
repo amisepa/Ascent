@@ -20,7 +20,7 @@
 function vers = eegplugin_ascent(fig,try_strings,catch_strings)
 
 % Plugin version
-vers = '2.1';
+vers = '2.2';
 if nargin < 3, return; end
 
 % Add paths to subfolders

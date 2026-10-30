@@ -1,6 +1,6 @@
 % ascent_group_analysis - Group-level statistical analysis script for the ASCENT EEGLAB plugin.
 %
-% This script preprocesses 64-channel EEG data (Biosemi) for two conditions 
+% This script documents the preprocessing (commented out) of 64-channel EEG data (Biosemi) for two conditions 
 %(eyes-closed and eyes-open), computes a broad range of entropy, complexity, 
 % and aperiodic measures using the ASCENT plugin, and performs nonparametric 
 % group-level statistical comparisons with multiple comparison correction (MCC). 
@@ -22,10 +22,9 @@
 % KEY PARAMETERS (set at top of script):
 %   num_scales  - number of scale factors for multiscale measures (default: 30)
 %   num_chan    - number of EEG channels (default: 64)
-%   coarsing    - coarse-graining operator: 'sd' (standard deviation, default),
-%                 'mean', 'median', 'var' (see ASCENT documentation)
-%   nPerm       - number of permutations for null distribution (default: 5000)
-%   alpha       - significance threshold (default: 0.01)
+%   coarsing    - coarse-graining operator: 'sd' and 'mean' were run for the paper
+%   nPerm       - number of permutations for null distribution (2000)
+%   alpha       - significance threshold (0.05)
 %   ct          - central tendency for test statistic: 'mean' (standard
 %                 paired t-test) or 'trimmed mean' (Yuen t-test)
 %   grp_type    - 'dpt' (dependent/paired) or 'idpt' (independent)
@@ -39,36 +38,37 @@
 %    reduce computation time and they are not directly comparable to the other measures)
 %
 % REQUIREMENTS:
-%   - MATLAB R2019b or later (for tiledlayout, arguments blocks, pyenv)
+%   - MATLAB R2024a or later (functions defined inside the script)
 %   - EEGLAB (Delorme & Makeig, 2004): https://sccn.ucsd.edu/eeglab
 %       Plugins required: clean_rawdata, ICLabel, Picard (for preprocessing)
-%   - ASCENT EEGLAB plugin (Cannard & Delorme, 2025): https://github.com/amisepa/ascent
-%       Provides: ascent_compute, ascent_plot, run_stats_permutation,
-%                 compute_mcc, pull_clusters, plot_results, plot_clusters
+%   - ASCENT EEGLAB plugin: https://github.com/amisepa/ascent
 %   - EEG Robust Statistics toolbox (Cannard, 2025): https://github.com/amisepa/eeg_robust_statistics
 %       Provides: run_stats_permutation, compute_mcc, pull_clusters,
 %                 plot_results, plot_clusters, progressbar
-%   - No additional MATLAB toolboxes required (Parallel Computing Toolbox
-%     optional for faster entropy computation via ascent_compute)
+%   - Signal Processing, Statistics and Machine Learning, Image Processing and
+%     Parallel Computing Toolboxes (the last two for the statistics)
 %
 % OUTPUTS:
-%   ascent_outputs_EC_<coarsing>_new.mat  - EC condition measures (all subjects)
-%   ascent_outputs_EO_<coarsing>_new.mat  - EO condition measures (all subjects)
-%   figures_new2/group_results/           - figures (.fig, .png) and cluster
+%   ascent_outputs_EC_<coarsing>_<outputs_tag>.mat - EC measures (all subjects)
+%   ascent_outputs_EO_<coarsing>_<outputs_tag>.mat - EO measures (all subjects)
+%   figures/group_results/                - figures (.fig, .png) and cluster
 %                                           summary tables (.csv) per measure
 %
 % NOTES:
-%   - Scale s=1 is excluded from all multiscale outputs (MSE, mMSE, MFE);
-%     RCMFE(:,1,:) is additionally removed before statistics to align scales.
-%   - mMSE scale labels reflect bandpass frequency bounds (Hz) derived from
-%     the filt-skip scheme (Kosciessa et al., 2020).
+%   - Scale s=1 is excluded from MSE, mMSE and MFE, and from RCMFE with SD
+%     coarse-graining; RCMFE with mean coarse-graining keeps it.
+%   - MSE and MFE use a scale-wise tolerance ('zNorm', 1); RCMFE a fixed one.
+%   - mMSE is computed with low-pass filt-skip (the plugin default), and with
+%     band-pass filt-skip as a check (Kosciessa et al., 2020); coarse-graining
+%     does not apply to it. Scale labels give the frequencies kept (Hz).
+%   - Results are written to the .mat files below; the preprocessed .set files
+%     are not overwritten ('save', 'never').
 %   - PSD statistics are run on dB values (10*log10).
 %   - The aperiodic fit is run in fixed mode.
 %
 % REFERENCES:
-%   Cannard, C., & Delorme, A. (2025). Introducing the ASCENT EEGLAB plugin:
+%   Cannard, C., & Delorme, A. (2026). Introducing the ASCENT EEGLAB plugin:
 %     Aperiodic Signal Complexity Estimation for Neurophysiological Time series.
-%     Entropy.
 %
 %   Delorme, A., & Makeig, S. (2004). EEGLAB: An open source toolbox for
 %     analysis of single-trial EEG dynamics including independent component
@@ -95,6 +95,7 @@
 
 clear; close all; clc
 data_path = 'C:\Users\ccann\Documents\biosemi_data';
+outputs_tag = 'v22';   % output file names. 'new' = the cached outputs behind the published figures
 pluginPath = 'C:\Users\ccann\Documents\MATLAB\Ascent';
 addpath(fullfile(pluginPath, 'functions'))
 cd(pluginPath)
@@ -108,6 +109,7 @@ coarsing 	= 'sd'; 	% 'mean' and 'sd' were run for the paper
 %------ PARAMETERS -------------------------
 num_scales 	= 30; 		% 30 scales were run for the paper
 num_chan 	= 64;
+opts 		= {'vis', false, 'save', 'never', 'spectralcovariates', false};
 % ------------------------------------------
 
 cd(fullfile(data_path, 'eyes_closed'))
@@ -127,7 +129,10 @@ PSD_corr = [];   % size set by the PSD settings
 MSE = nan(num_chan, num_scales-1, num_files);
 mMSE = nan(num_chan, num_scales-1, num_files);
 MFE = nan(num_chan, num_scales-1, num_files);
-RCMFE = nan(num_chan, num_scales, num_files);
+mMSE_bp = nan(num_chan, num_scales-1, num_files);
+AlphaRaw = nan(num_chan, num_files);
+AlphaOsc = nan(num_chan, num_files);
+RCMFE = nan(num_chan, num_scales - ~strcmp(coarsing, 'mean'), num_files);   % scale 1 with mean only
 % RCmvMFE = nan(num_chan, num_scales, num_files);
 progressbar('Prosessing and computing measures for eyes-closed condition')
 for iFile = 1:num_files
@@ -169,16 +174,23 @@ for iFile = 1:num_files
     EEG = pop_loadset('filepath', fullfile(data_path, 'eyes_closed'), 'filename', sprintf('%s.set', filenames{iFile}(1:end-4)));
 
     % Compute complexity measures
-    EEG = ascent_compute(EEG, 'measure', 'SampEn', 'vis', false);
-    EEG = ascent_compute(EEG, 'measure', 'ExSEnt', 'vis', false);
-    EEG = ascent_compute(EEG, 'measure', 'FuzzEn', 'vis', false);
-    EEG = ascent_compute(EEG, 'measure', 'HigFracDim', 'vis', false);
-    EEG = ascent_compute(EEG, 'measure', 'Aperiodic', 'vis', false);
-    EEG = ascent_compute(EEG, 'measure', 'MSE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
-    EEG = ascent_compute(EEG, 'measure', 'mMSE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
-    EEG = ascent_compute(EEG, 'measure', 'MFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'SampEn', opts{:});
+    EEG = ascent_compute(EEG, 'measure', 'ExSEnt', opts{:});
+    EEG = ascent_compute(EEG, 'measure', 'FuzzEn', opts{:});
+    EEG = ascent_compute(EEG, 'measure', 'HigFracDim', opts{:});
+    EEG = ascent_compute(EEG, 'measure', 'Aperiodic', opts{:});
+    EEG = ascent_compute(EEG, 'measure', 'MSE', 'num_scales', num_scales, 'coarsing', coarsing, 'zNorm', 1, opts{:});
+    EEG = ascent_compute(EEG, 'measure', 'mMSE', 'num_scales', num_scales, opts{:});   % low-pass
+    mMSE(:,:,iFile) = EEG.ascent.mMSE.data;
+    scales_bounds = EEG.ascent.mMSE.scales;
+    EEG = ascent_compute(EEG, 'measure', 'mMSE', 'num_scales', num_scales, ...
+        'filter_mode', 'narrowband', 'StartPoints', 'average', opts{:});   % check, as in the paper
+    mMSE_bp(:,:,iFile) = EEG.ascent.mMSE.data;
+    scales_bounds_bp = EEG.ascent.mMSE.scales;
+    EEG = ascent_compute(EEG, 'measure', 'MFE', 'num_scales', num_scales, 'coarsing', coarsing, 'zNorm', 1, opts{:});
     % EEG = ascent_compute(EEG, 'measure', 'CMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
-    EEG = ascent_compute(EEG, 'measure', 'RCMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'RCMFE', 'num_scales', num_scales, 'coarsing', coarsing, ...
+        'IncludeScale1', strcmp(coarsing, 'mean'), opts{:});
     % EEG = ascent_compute(EEG, 'measure', 'RCmvMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
 
     % ascent_plot(EEG.ascent.MSE.data, EEG.chanlocs, 'mse', EEG.ascent.MSE.scales);
@@ -197,11 +209,12 @@ for iFile = 1:num_files
     FracDim(:,iFile) = EEG.ascent.HigFracDim.data;
     Exponent(:,iFile) = EEG.ascent.Aperiodic.data.exponent;
     Offset(:,iFile) = EEG.ascent.Aperiodic.data.offset;
+    AlphaRaw(:,iFile) = EEG.ascent.Aperiodic.data.alpha_raw;
+    AlphaOsc(:,iFile) = EEG.ascent.Aperiodic.data.alpha_osc;
     PSD(:,:,iFile) = EEG.ascent.Aperiodic.data.psd;
     PSD_corr(:,:,iFile) = EEG.ascent.Aperiodic.data.psd_corrected;
     freqs = EEG.ascent.Aperiodic.data.freqs;
     MSE(:,:,iFile) = EEG.ascent.MSE.data;
-    mMSE(:,:,iFile) = EEG.ascent.mMSE.data;
     MFE(:,:,iFile) = EEG.ascent.MFE.data;
     % CMFE(:,:,iFile) = EEG.ascent.CMFE.data;
     RCMFE(:,:,iFile) = EEG.ascent.RCMFE.data;
@@ -209,13 +222,12 @@ for iFile = 1:num_files
 
     chanlocs = EEG.chanlocs;
     scales = EEG.ascent.MSE.scales;
-    scales_bounds = EEG.ascent.mMSE.scales;
 
-    save(fullfile(data_path, sprintf('ascent_outputs_EC_%s_new.mat', coarsing)), ...
+    save(fullfile(data_path, sprintf('ascent_outputs_EC_%s_%s.mat', coarsing, outputs_tag)), ...
         "SampEn", "ExSEnt1", "ExSEnt2", "ExSEnt3", "FuzzEn", "FracDim", ...
-        "Exponent", "Offset", "PSD", "PSD_corr", "freqs", ...
-        "MSE", "MFE", "mMSE", "RCMFE", ...
-        'chanlocs', 'scales', 'scales_bounds')
+        "Exponent", "Offset", "AlphaRaw", "AlphaOsc", "PSD", "PSD_corr", "freqs", ...
+        "MSE", "MFE", "mMSE", "mMSE_bp", "RCMFE", ...
+        'chanlocs', 'scales', 'scales_bounds', 'scales_bounds_bp')
 
 end
 disp("Done computing on the whole group for eyes-closed condition!")
@@ -247,7 +259,10 @@ MSE = nan(num_chan, num_scales-1, num_files);
 mMSE = nan(num_chan, num_scales-1, num_files);
 MFE = nan(num_chan, num_scales-1, num_files);
 % CMFE = nan(num_chan, num_scales, num_files);
-RCMFE = nan(num_chan, num_scales, num_files);
+mMSE_bp = nan(num_chan, num_scales-1, num_files);
+AlphaRaw = nan(num_chan, num_files);
+AlphaOsc = nan(num_chan, num_files);
+RCMFE = nan(num_chan, num_scales - ~strcmp(coarsing, 'mean'), num_files);   % scale 1 with mean only
 % RCmvMFE = nan(num_chan, num_scales, num_files);
 progressbar('Prosessing and computing measures for eyes-open condition')
 for iFile = 1:num_files
@@ -266,8 +281,8 @@ for iFile = 1:num_files
     % EEG = reorder_channels(EEG);
     % EEG = ref_infinity(EEG);
     % EEG = pop_eegfiltnew(EEG, 'locutoff',1);
-    % EEG = pop_eegfiltnew(EEG, 'locutoff',59,'hicutoff',61,'revfilt',1);
-    % % EEG = pop_eegfiltnew(EEG,'hicutoff',50);
+    % % EEG = pop_eegfiltnew(EEG, 'locutoff',59,'hicutoff',61,'revfilt',1);
+    % EEG = pop_eegfiltnew(EEG,'hicutoff',50);
     % oriEEG = EEG;
     % EEG = pop_clean_rawdata(EEG, 'FlatlineCriterion',5,'ChannelCriterion',0.75, ...
     %     'LineNoiseCriterion',5,'Highpass','off','BurstCriterion',40, ...
@@ -287,16 +302,23 @@ for iFile = 1:num_files
     EEG = pop_loadset('filepath', fullfile(data_path, 'eyes_open'), 'filename', sprintf('%s.set', filenames{iFile}(1:end-4)));
 
     % Compute complexity measures
-    EEG = ascent_compute(EEG, 'measure', 'SampEn', 'vis', false);
-    EEG = ascent_compute(EEG, 'measure', 'ExSEnt', 'vis', false);
-    EEG = ascent_compute(EEG, 'measure', 'FuzzEn', 'vis', false);
-    EEG = ascent_compute(EEG, 'measure', 'HigFracDim', 'vis', false);
-    EEG = ascent_compute(EEG, 'measure', 'Aperiodic', 'vis', false);
-    EEG = ascent_compute(EEG, 'measure', 'MSE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
-    EEG = ascent_compute(EEG, 'measure', 'mMSE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
-    EEG = ascent_compute(EEG, 'measure', 'MFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'SampEn', opts{:});
+    EEG = ascent_compute(EEG, 'measure', 'ExSEnt', opts{:});
+    EEG = ascent_compute(EEG, 'measure', 'FuzzEn', opts{:});
+    EEG = ascent_compute(EEG, 'measure', 'HigFracDim', opts{:});
+    EEG = ascent_compute(EEG, 'measure', 'Aperiodic', opts{:});
+    EEG = ascent_compute(EEG, 'measure', 'MSE', 'num_scales', num_scales, 'coarsing', coarsing, 'zNorm', 1, opts{:});
+    EEG = ascent_compute(EEG, 'measure', 'mMSE', 'num_scales', num_scales, opts{:});   % low-pass
+    mMSE(:,:,iFile) = EEG.ascent.mMSE.data;
+    scales_bounds = EEG.ascent.mMSE.scales;
+    EEG = ascent_compute(EEG, 'measure', 'mMSE', 'num_scales', num_scales, ...
+        'filter_mode', 'narrowband', 'StartPoints', 'average', opts{:});   % check, as in the paper
+    mMSE_bp(:,:,iFile) = EEG.ascent.mMSE.data;
+    scales_bounds_bp = EEG.ascent.mMSE.scales;
+    EEG = ascent_compute(EEG, 'measure', 'MFE', 'num_scales', num_scales, 'coarsing', coarsing, 'zNorm', 1, opts{:});
     % EEG = ascent_compute(EEG, 'measure', 'CMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
-    EEG = ascent_compute(EEG, 'measure', 'RCMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
+    EEG = ascent_compute(EEG, 'measure', 'RCMFE', 'num_scales', num_scales, 'coarsing', coarsing, ...
+        'IncludeScale1', strcmp(coarsing, 'mean'), opts{:});
     % EEG = ascent_compute(EEG, 'measure', 'RCmvMFE', 'num_scales', num_scales, 'coarsing', coarsing, 'vis', false);
     % 
     % % Save for running entropy on ICA time series later
@@ -310,11 +332,12 @@ for iFile = 1:num_files
     FracDim(:,iFile) = EEG.ascent.HigFracDim.data;
     Exponent(:,iFile) = EEG.ascent.Aperiodic.data.exponent;
     Offset(:,iFile) = EEG.ascent.Aperiodic.data.offset;
+    AlphaRaw(:,iFile) = EEG.ascent.Aperiodic.data.alpha_raw;
+    AlphaOsc(:,iFile) = EEG.ascent.Aperiodic.data.alpha_osc;
     PSD(:,:,iFile) = EEG.ascent.Aperiodic.data.psd;
     PSD_corr(:,:,iFile) = EEG.ascent.Aperiodic.data.psd_corrected;
     freqs = EEG.ascent.Aperiodic.data.freqs;
     MSE(:,:,iFile) = EEG.ascent.MSE.data;
-    mMSE(:,:,iFile) = EEG.ascent.mMSE.data;
     MFE(:,:,iFile) = EEG.ascent.MFE.data;
     % CMFE(:,:,iFile) = EEG.ascent.CMFE.data;
     RCMFE(:,:,iFile) = EEG.ascent.RCMFE.data;
@@ -322,13 +345,12 @@ for iFile = 1:num_files
 
     chanlocs = EEG.chanlocs;
     scales = EEG.ascent.MSE.scales;
-    scales_bounds = EEG.ascent.mMSE.scales;
 
-    save(fullfile(data_path, sprintf('ascent_outputs_EO_%s_new.mat', coarsing)), ...
+    save(fullfile(data_path, sprintf('ascent_outputs_EO_%s_%s.mat', coarsing, outputs_tag)), ...
         "SampEn", "ExSEnt1", "ExSEnt2", "ExSEnt3", "FuzzEn", "FracDim", ...
-        "Exponent", "Offset", "PSD", "PSD_corr", "freqs", ...
-        "MSE", "MFE", "mMSE", "RCMFE", ...
-        'chanlocs', 'scales', 'scales_bounds')
+        "Exponent", "Offset", "AlphaRaw", "AlphaOsc", "PSD", "PSD_corr", "freqs", ...
+        "MSE", "MFE", "mMSE", "mMSE_bp", "RCMFE", ...
+        'chanlocs', 'scales', 'scales_bounds', 'scales_bounds_bp')
 
 end
 disp("Done computing on the whole group for eyes-open condition!")
@@ -344,10 +366,10 @@ gong
 
 %% Load, separate the data by condition, & reorganize electrodes
 
-coarsing = 'sd';
+if ~exist('coarsing', 'var'), coarsing = 'sd'; end   % as set at the top
 
 % Load chanlocs only
-load(fullfile(data_path, sprintf('ascent_outputs_EC_%s_new.mat', coarsing)), 'chanlocs')
+load(fullfile(data_path, sprintf('ascent_outputs_EC_%s_%s.mat', coarsing, outputs_tag)), 'chanlocs')
 cd(data_path)
 
 % Front-to-back target order
@@ -381,10 +403,9 @@ chanlocs = chanlocs(order_idx);
 disp({chanlocs.labels}')
 
 % Load EC metrics and reorder
-load(fullfile(data_path, sprintf('ascent_outputs_EC_%s_new.mat', coarsing)), ...
+load(fullfile(data_path, sprintf('ascent_outputs_EC_%s_%s.mat', coarsing, outputs_tag)), ...
     'SampEn','FuzzEn','ExSEnt1','ExSEnt2','ExSEnt3','FracDim','Exponent', ...
     'Offset','PSD','PSD_corr','MSE','MFE','mMSE','RCMFE','scales','scales_bounds')  % don't reload chanlocs here!!
-load(fullfile(data_path, sprintf('ascent_outputs_EC_%s_new.mat', coarsing)))
 SampEn1  = SampEn(order_idx, :);
 FuzzEn1  = FuzzEn(order_idx, :);
 ExSEnt1_1  = ExSEnt1(order_idx, :);
@@ -402,10 +423,9 @@ RCMFE1   = RCMFE(order_idx, :, :);
 % RCmvMFE1   = RCmvMFE(order_idx, :, :);
 
 % Load EO metrics and reorder
-load(fullfile(data_path, sprintf('ascent_outputs_EO_%s_new.mat', coarsing)), ...
+load(fullfile(data_path, sprintf('ascent_outputs_EO_%s_%s.mat', coarsing, outputs_tag)), ...
     'SampEn','FuzzEn','ExSEnt1','ExSEnt2','ExSEnt3','FracDim','Exponent', ...
     'Offset','PSD','PSD_corr','freqs','MSE','MFE','mMSE','RCMFE','scales', 'scales_bounds') % don't reload chanlocs here!!
-% load(fullfile(data_path, sprintf('ascent_outputs_EO_%s_new.mat', coarsing)))
 SampEn2  = SampEn(order_idx, :);
 FuzzEn2  = FuzzEn(order_idx, :);
 ExSEnt2_1  = ExSEnt1(order_idx, :);
@@ -438,7 +458,9 @@ rdbu_cmap   = interp1([1;128;256],[0.698 0.094 0.168;1 1 1;0.129 0.400 0.675],(1
 dmap        = flipud(max(0,min(1,rdbu_cmap)));
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% num_scales = 1:scales(end);
+% [chan x 1 x subj]: as [chan x subj] the statistics code takes the channel list
+% for a time axis and clusters consecutive list entries instead of scalp neighbours
+uni = @(x) reshape(x, size(x,1), 1, []);
 
 %% --------- UNISCALES ---------------------------------------
 
@@ -460,7 +482,7 @@ subplot(2,4,1)
 % set(findall(gcf,'type','axes'),'fontSize',10,'fontweight','bold');
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(SampEn1, SampEn2, nPerm, ct, grp_type);
 rng(1);  % fixed seed per test (same as make_revision_figures.m)
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(SampEn1, SampEn2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(uni(SampEn1), uni(SampEn2), nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
@@ -483,7 +505,7 @@ disp("         MEASURE: FuzzEn")
 subplot(2,4,2)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(FuzzEn1, FuzzEn2, nPerm, ct, grp_type);
 rng(1);  % fixed seed per test (same as make_revision_figures.m)
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(FuzzEn1, FuzzEn2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(uni(FuzzEn1), uni(FuzzEn2), nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
@@ -505,7 +527,7 @@ disp("         MEASURE: ExSent (Duration)")
 subplot(2,4,3)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(ExSEnt1_1, ExSEnt2_1, nPerm, ct, grp_type);
 rng(1);  % fixed seed per test (same as make_revision_figures.m)
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(ExSEnt1_1, ExSEnt2_1, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(uni(ExSEnt1_1), uni(ExSEnt2_1), nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
@@ -527,7 +549,7 @@ disp("         MEASURE: ExSEnt (Amplitude)")
 subplot(2,4,4)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(ExSEnt1_2, ExSEnt2_2, nPerm, ct, grp_type);
 rng(1);  % fixed seed per test (same as make_revision_figures.m)
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(ExSEnt1_2, ExSEnt2_2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(uni(ExSEnt1_2), uni(ExSEnt2_2), nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
@@ -549,7 +571,7 @@ disp("         MEASURE: ExSEnt (Duration + Amplitude)")
 subplot(2,4,5)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(ExSEnt1_3, ExSEnt2_3, nPerm, ct, grp_type);
 rng(1);  % fixed seed per test (same as make_revision_figures.m)
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(ExSEnt1_3, ExSEnt2_3, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(uni(ExSEnt1_3), uni(ExSEnt2_3), nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
@@ -571,7 +593,7 @@ disp("         MEASURE: Higuchi Fractal Dimension")
 subplot(2,4,6)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(FracDim1, FracDim2, nPerm, ct, grp_type);
 rng(1);  % fixed seed per test (same as make_revision_figures.m)
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(FracDim1, FracDim2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(uni(FracDim1), uni(FracDim2), nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
@@ -593,7 +615,7 @@ disp("         MEASURE: Aperiodic Exponent")
 subplot(2,4,7)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(Exponent1, Exponent2, nPerm, ct, grp_type);
 rng(1);  % fixed seed per test (same as make_revision_figures.m)
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(Exponent1, Exponent2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(uni(Exponent1), uni(Exponent2), nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
@@ -615,7 +637,7 @@ disp("         MEASURE: Aperiodic Offset")
 subplot(2,4,8)
 % [tvals,pvals,tvals_H0,pvals_H0] = run_stats_bootstrap(Offset1, Offset2, nPerm, ct, grp_type);
 rng(1);  % fixed seed per test (same as make_revision_figures.m)
-[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(Offset1, Offset2, nPerm, ct, grp_type);
+[tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(uni(Offset1), uni(Offset2), nPerm, ct, grp_type);
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
@@ -701,7 +723,7 @@ EO_data = {SampEn2, FuzzEn2, ExSEnt2_1, ExSEnt2_2, ExSEnt2_3, FracDim2, Exponent
 
 tvals_all = zeros(nChans, nMeasures);
 for m = 1:nMeasures
-    [tvals_all(:,m), ~, ~, ~] = run_stats_permutation(EC_data{m}, EO_data{m}, nPerm, ct, grp_type);
+    [tvals_all(:,m), ~, ~, ~] = run_stats_permutation(uni(EC_data{m}), uni(EO_data{m}), nPerm, ct, grp_type);
 end
 
 % Compute spatial correlation (across channels) for each pair
@@ -897,13 +919,12 @@ rng(1);  % fixed seed per test (same as make_revision_figures.m)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 if any(mask, 'all')
     [mask_clusters, summary_tbl] = pull_clusters_by_sign(mask, tvals, scales, chanlocs, ...
-        'nonlinear', grp_type, {size(mMSE1,3) size(mMSE2,3)}, 2);
+        'nonlinear', grp_type, {size(mMSE1,3) size(mMSE2,3)}, []);
     plot_results('nonlinear', 'scalp', scales, tvals, mask_clusters, chanlocs, 'main', summary_tbl);
     title("mMSE"); set(findall(gcf, 'type', 'axes'), 'FontSize', 16, 'FontWeight', 'bold'); 
-    ax = findobj(hs.curve{i}, 'Type', 'axes');
-    xlim([1 scales(end)]);
-    tick_idx = 1:2:scales(end);
-    xticks(tick_idx);
+    xlim([scales(1) scales(end)]);
+    tick_idx = 1:2:numel(scales);
+    xticks(scales(tick_idx));
     fmt_labels = cellfun(@(s) format_scale_label(s), scales_bounds(tick_idx), 'UniformOutput', false);
     xticklabels(fmt_labels);
     xtickangle(45);
@@ -918,9 +939,9 @@ if any(mask, 'all')
         saveas(hs.topo{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_cluster-%g_topo_uncorrected.fig', coarsing, i)));
         print(hs.topo{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_cluster-%g_topo_uncorrected.png', coarsing, i)),'-dpng','-r300');
         ax = findobj(hs.curve{i}, 'Type', 'axes');
-        xlim(ax, [1 scales(end)]);
-        tick_idx = 1:2:scales(end);
-        xticks(ax, tick_idx);
+        xlim(ax, [scales(1) scales(end)]);
+        tick_idx = 1:2:numel(scales);
+        xticks(ax, scales(tick_idx));
         fmt_labels = cellfun(@(s) format_scale_label(s), scales_bounds(tick_idx), 'UniformOutput', false);
         xticklabels(ax, fmt_labels);
         xtickangle(ax, 45);
@@ -929,6 +950,25 @@ if any(mask, 'all')
         print(hs.curve{i}, fullfile(outputs_path, sprintf('mMSE_%s_perm_cluster-%g_curve_uncorrected.png', coarsing, i)),'-dpng','-r300');
     end
     % close([hs.topo{:} hs.curve{:}]) % to close figures
+end
+
+%% mMSE, band-pass check (outputs of this script only: older files do not have it)
+
+vars_bp = who('-file', fullfile(data_path, sprintf('ascent_outputs_EC_%s_%s.mat', coarsing, outputs_tag)));
+if ismember('mMSE_bp', vars_bp)
+    bp1 = load(fullfile(data_path, sprintf('ascent_outputs_EC_%s_%s.mat', coarsing, outputs_tag)), 'mMSE_bp');
+    bp2 = load(fullfile(data_path, sprintf('ascent_outputs_EO_%s_%s.mat', coarsing, outputs_tag)), 'mMSE_bp');
+    bp1 = bp1.mMSE_bp(order_idx,:,:);
+    bp2 = bp2.mMSE_bp(order_idx,:,:);
+    rng(1);
+    [tvals,pvals,tvals_H0,pvals_H0] = run_stats_permutation(bp1, bp2, nPerm, ct, grp_type);
+    mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
+    fprintf('mMSE band-pass: %d significant cells of %d\n', nnz(mask), numel(mask));
+    if any(mask, 'all')
+        [~, summary_tbl] = pull_clusters_by_sign(mask, tvals, scales, chanlocs, ...
+            'nonlinear', grp_type, {size(bp1,3) size(bp2,3)}, []);
+        writetable(summary_tbl, fullfile(outputs_path, sprintf('mMSE_bandpass_%s_perm_summary.csv', coarsing)));
+    end
 end
 
 %% MFE
@@ -965,8 +1005,10 @@ if contains(coarsing, {'mean', 'median', 'trimmed mean'})
     num_scales = length(scales);
     xlims_curve_plot = [1 scales(end)];
 else
-    RCMFE1(:,1,:) = [];
-    RCMFE2(:,1,:) = [];
+    if size(RCMFE1,2) > numel(scales)   % older outputs stored an empty scale 1
+        RCMFE1(:,1,:) = [];
+        RCMFE2(:,1,:) = [];
+    end
     xlims_curve_plot = [2 scales(end)];
 end
 
@@ -1151,7 +1193,9 @@ end
 
 function lbl = format_scale_label(s)
     nums = regexp(s, '[\d.]+', 'match');
-    if numel(nums) == 2
+    if numel(nums) == 2 && str2double(nums{1}) == 0   % low-pass
+        lbl = sprintf('<%.2f Hz', str2double(nums{2}));
+    elseif numel(nums) == 2
         lbl = sprintf('%.2f-%.2f Hz', str2double(nums{2}), str2double(nums{1}));  % flipped
     else
         lbl = sprintf('HP>%.2f Hz', str2double(nums{1}));

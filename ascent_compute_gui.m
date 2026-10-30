@@ -129,7 +129,10 @@ else
 end
 
 if ~isempty(param{3})
-    chanlist = cellstr(split(string(param{3})));
+    % Labels separated by spaces or commas; quoted when picked from the list
+    % (so that a label can contain spaces)
+    tok = regexp(char(param{3}), '''([^'']+)''|([^,\s]+)', 'tokens');
+    chanlist = cellfun(@(t) strjoin(t, ''), tok, 'UniformOutput', false)';
 else
     chanlist = {EEG.chanlocs.labels}';
 end

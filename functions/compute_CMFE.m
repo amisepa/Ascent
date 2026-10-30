@@ -18,7 +18,8 @@ function [CMFE, scales] = compute_CMFE(data, varargin)
 %   'num_scales'      : requested number of scales (default = 30)
 %   'zNorm'           : varying-tolerance rescaling, integer 0-4 (default 0 = OFF)
 %                       0  fixed tolerance across scales (classic)
-%                       1  r*std / 2  r*var / 3  r*mad(mean) / 4  r*mad(median)
+%                       1  r*std^n (same as z-scoring each series) / 2  r*var
+%                       3  r*mad(mean)^n / 4  r*mad(median)^n
 %                       A SINGLE tolerance is computed per scale (from the
 %                       unshifted coarse-grained series) and shared across all
 %                       offsets, so the composite average stays coherent.
@@ -120,7 +121,7 @@ CMFE = nan(nch, numel(scales));
 if showProg
     state = ternary(parallelMode && ~isempty(ver('parallel')), 'on', 'off');
     fprintf('CMFE: %d ch | m=%g, tau=%g, r=%g, n=%g | coarse=%s | mode=%s | zNorm=%d | scales=%d:%d | parallel=%s\n', ...
-        nch, m, tau, r, n_exp, upperLabel(coarseType), upper(modeType), zNorm, scales(1), scales(end), state);
+        nch, m, tau, r, n_exp, coarse_label(coarseType), upper(modeType), zNorm, scales(1), scales(end), state);
 end
 
 useWB = ~parallelMode && usejava('desktop') && showProg;
@@ -145,7 +146,7 @@ if parallelMode && ~isempty(ver('parallel'))
 
         for ii = 1:numel(scales)
             s   = scales(ii);
-            r_s = scale_tolerance(sig, s, coarseType, r, zNorm, minBinsHard, m);
+            r_s = scale_tolerance(sig, s, coarseType, r, zNorm, minBinsHard, m, n_exp);
 
             fe_vals = nan(1, s);
             for off = 1:s
@@ -176,7 +177,7 @@ else
 
         for ii = 1:numel(scales)
             s   = scales(ii);
-            r_s = scale_tolerance(sig, s, coarseType, r, zNorm, minBinsHard, m);
+            r_s = scale_tolerance(sig, s, coarseType, r, zNorm, minBinsHard, m, n_exp);
 
             fe_vals = nan(1, s);
             for off = 1:s

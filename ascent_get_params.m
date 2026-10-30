@@ -36,7 +36,12 @@ function [p, EEG] = ascent_get_params(EEG, varargin)
 %     p.num_scales       number of scale factors                        (default: 30)
 %     p.zNorm            varying-tolerance rescaling, integer 0-4       (default: 0 = OFF)
 %                        Ignored by mMSE and RCmvMFE (not supported).
-%     p.filter_mode      'none' | 'narrowband' (mMSE only)             (default: 'narrowband' if mMSE)
+%     p.filter_mode      'lowpass' | 'narrowband' | 'none' (mMSE only)  (default: 'lowpass' if mMSE)
+%     p.FilterType       'fir' | 'butter' (mMSE low-pass only)         (default: 'fir')
+%     p.StartPoints      'pooled' | 'average' (mMSE filt-skip)        (default: 'pooled')
+%     p.scaleFreq        label scales with frequencies in the plots    (default: on for mMSE
+%                        low-pass/band-pass, off otherwise; approximate for mean/median
+%                        coarse-graining, unavailable for SD/variance)
 %     p.TimeWin          window length for time-resolved mMSE          (default: [])
 %     p.TimeStep         step size for time-resolved mMSE              (default: [])
 %     p.TimeOnly         compute only time-resolved mMSE               (default: false)
@@ -62,6 +67,11 @@ function [p, EEG] = ascent_get_params(EEG, varargin)
 %     p.alphaBand      [fMin fMax] Hz for saved alpha power   (default: [8 13])
 %     p.timeResolved   sliding-window aperiodic fit           (default: false)
 %
+%   Spectral covariates (every measure except Aperiodic):
+%     p.spectralCovariates  save aperiodic exponent/offset and alpha power of the same
+%                           signals next to the entropy (default: true), using the
+%                           aperiodic settings above
+%
 % Copyright (C) 2021-2026 Cedric Cannard. ASCENT EEGLAB plugin, GNU GPL v3 or later (see LICENSE).
 
 % ----------------------------
@@ -83,6 +93,9 @@ p.num_scales       = [];
 p.IncludeScale1    = [];
 p.zNorm            = [];
 p.filter_mode      = [];
+p.FilterType       = [];
+p.StartPoints      = [];
+p.scaleFreq        = [];
 p.TimeWin          = [];
 p.TimeStep         = [];
 p.TimeOnly         = [];
@@ -111,6 +124,7 @@ p.slidWinSec       = [];
 p.slidOverlap      = [];
 p.slidNAvg         = [];
 p.slidPeakWidthLimits = [];
+p.spectralCovariates = [];
 p.save               = [];
 
 % ----------------------------
@@ -187,6 +201,10 @@ else
             case 'includescale1',    p.IncludeScale1    = logical(val);
             case 'znorm',            p.zNorm            = double(val);
             case 'filter_mode',      p.filter_mode      = val;
+            case 'filtertype',       p.FilterType       = val;
+            case 'startpoints',      p.StartPoints      = val;
+            case 'scalefreq',        p.scaleFreq        = logical(val);
+            case 'spectralcovariates', p.spectralCovariates = logical(val);
             case 'timewin',          p.TimeWin          = double(val);
             case 'timestep',         p.TimeStep         = double(val);
             case 'timeonly',         p.TimeOnly         = logical(val);
@@ -210,7 +228,7 @@ else
             case 'slidwinsec',       p.slidWinSec       = double(val);
             case 'slidoverlap',      p.slidOverlap      = double(val);
             case 'slidnavg',         p.slidNAvg         = double(val);
-            case 'slidPeakWidthLimits', p.slidPeakWidthLimits         = double(val);
+            case 'slidpeakwidthlimits', p.slidPeakWidthLimits = double(val);
             case 'save'
                 % Batch-mode save policy consumed here ('never'|'auto'|'always');
                 % ascent_compute acts on it after computing. Not a GUI parameter.
@@ -290,11 +308,17 @@ if contains(lower(p.measure), {'mse','mmse','mfe','cmfe','rcmfe','rcmvmfe'})
     end
     if isempty(p.filter_mode)
         if strcmpi(p.measure, 'mmse')
-            p.filter_mode = 'narrowband';
-            disp('Scale filtering: narrowband (Kosciessa et al. 2020).');
+            p.filter_mode = 'lowpass';
+            disp('Scale filtering: low-pass filt-skip (Kosciessa et al. 2020).');
         else
             p.filter_mode = 'none';
         end
+    end
+    if isempty(p.FilterType),  p.FilterType  = 'fir';    end
+    if isempty(p.StartPoints), p.StartPoints = 'pooled'; end
+    if isempty(p.scaleFreq)
+        % On where each scale's frequency range is set by a filter
+        p.scaleFreq = strcmpi(p.measure, 'mmse') && ~strcmpi(p.filter_mode, 'none');
     end
     if isempty(p.TimeWin),  p.TimeWin  = []; end
     if isempty(p.TimeStep), p.TimeStep = []; end
@@ -319,10 +343,24 @@ if contains(lower(p.measure), {'fuzzen','mfe','cmfe','rcmfe','rcmvmfe'})
         disp('Fuzzy mode not set: using local (default).');
         p.fuzzy_mode = 'local';
     end
+    % Say so rather than silently ignoring the request
+    if ~strcmpi(p.kernel_meth, 'exponential') && any(strcmpi(p.measure, {'CMFE','RCMFE','RCmvMFE'}))
+        warning('%s has the exponential kernel only.', p.measure);
+        p.kernel_meth = 'exponential';
+    end
+    if ~strcmpi(p.fuzzy_mode, 'local') && ~any(strcmpi(p.measure, {'FuzzEn','MFE','CMFE'}))
+        warning('fuzzy_mode applies to FuzzEn, MFE and CMFE only.');
+        p.fuzzy_mode = 'local';
+    end
 end
 
-% Aperiodic defaults
-if strcmpi(p.measure, 'aperiodic')
+% Spectral covariates: saved next to every measure except Aperiodic itself
+if isempty(p.spectralCovariates)
+    p.spectralCovariates = ~strcmpi(p.measure, 'aperiodic');
+end
+
+% Aperiodic defaults (also used for the spectral covariates)
+if strcmpi(p.measure, 'aperiodic') || p.spectralCovariates
     if isempty(p.freqRange),        p.freqRange        = [1 40];       end
     if isempty(p.winSec),           p.winSec           = 4;            end
     if isempty(p.psdOverlap),       p.psdOverlap       = 0.5;          end

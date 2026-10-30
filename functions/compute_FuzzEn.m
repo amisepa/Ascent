@@ -48,7 +48,7 @@ p.addRequired('data', @(x) isnumeric(x) && ndims(x) == 2);
 p.addParameter('m', 2,                    @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('n', 2,                    @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('tau', 1,                  @(x) isnumeric(x) && isscalar(x) && x >= 1);
-p.addParameter('r', 0.15,                 @(x) isnumeric(x) && isscalar(x) && x > 0 && x < 2);
+p.addParameter('r', 0.15,                 @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('Mode', 'local',           @(s) any(strcmpi(s, {'local','global'})));
 p.addParameter('Kernel', 'exponential',   @(s) any(strcmpi(s, {'exponential','gaussian'})));
 p.addParameter('Normalize', true,         @(x) islogical(x) && isscalar(x));

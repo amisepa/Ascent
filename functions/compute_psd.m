@@ -77,9 +77,11 @@ if freqRes > 0.5
              'to avoid overfitting noise as peaks.'], freqRes, opt.winSec);
 end
 
-fprintf(['PSD settings: window = %s, segLen = %d samples (%.2f s), ' ...
-         'overlap = %.0f%%, nfft = %d, freq_res = %.4f Hz\n'], ...
-        opt.window, segLen, segLen/fs, opt.overlap*100, nfft, freqRes);
+if opt.Progress
+    fprintf(['PSD settings: window = %s, segLen = %d samples (%.2f s), ' ...
+             'overlap = %.0f%%, nfft = %d, freq_res = %.4f Hz\n'], ...
+            opt.window, segLen, segLen/fs, opt.overlap*100, nfft, freqRes);
+end
 
 % --- optionally linear-detrend entire signal before Welch ---
 if opt.detrend
@@ -104,13 +106,14 @@ if opt.Parallel
 
     % parfor: progress tracking via per-channel fprintf (no in-place overwrite,
     % parfor workers write asynchronously so order is not guaranteed)
-    if opt.Progress
+    showProgress = opt.Progress;   % not opt inside parfor: it would send the data to every worker
+    if showProgress
         fprintf('Computing PSD in parallel (%d channels)...\n', nChan);
     end
     parfor iChan = 1:nChan
         pxx = pwelch(data(iChan,:)', win, noverlap, nfft, fs);  %#ok<PFBNS>
         psd(iChan,:) = pxx(fMask)';                             %#ok<PFBNS>
-        if opt.Progress
+        if showProgress
             fprintf('  channel %d/%d done\n', iChan, nChan);
         end
     end
@@ -118,11 +121,10 @@ if opt.Parallel
 
 else
 
-    if opt.Progress, progressbar('Computing PSD'); end
+    if opt.Progress, fprintf('Computing PSD (%d channels)...\n', nChan); end
     for iChan = 1:nChan
         pxx = pwelch(data(iChan,:)', win, noverlap, nfft, fs);
         psd(iChan,:) = pxx(fMask)';
-        if opt.Progress, progressbar(iChan/nChan); end
     end
 
 end

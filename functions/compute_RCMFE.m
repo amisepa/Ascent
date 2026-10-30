@@ -17,7 +17,8 @@ function [RCMFE, scales] = compute_RCMFE(data, varargin)
 %   'num_scales'      : requested number of scales (default = 30)
 %   'zNorm'           : varying-tolerance rescaling, integer 0-4 (default 0 = OFF)
 %                       0  fixed tolerance across scales (classic)
-%                       1  r*std / 2  r*var / 3  r*mad(mean) / 4  r*mad(median)
+%                       1  r*std^n (same as z-scoring each series) / 2  r*var
+%                       3  r*mad(mean)^n / 4  r*mad(median)^n
 %                       A SINGLE tolerance is computed per scale and shared
 %                       across ALL offsets. This is required for RCMFE: phi_m
 %                       and phi_m+1 are pooled across offsets before the
@@ -170,7 +171,7 @@ if parallelMode && ~isempty(ver('parallel'))
 
         for ii = 1:numel(scales)
             s   = scales(ii);
-            r_s = scale_tolerance(sig, s, coarseType, r, zNorm, minBinsHard, m);
+            r_s = scale_tolerance(sig, s, coarseType, r, zNorm, minBinsHard, m, n_exp);
 
             phi_m_all  = nan(1, s);
             phi_m1_all = nan(1, s);
@@ -212,7 +213,7 @@ else
 
         for ii = 1:numel(scales)
             s   = scales(ii);
-            r_s = scale_tolerance(sig, s, coarseType, r, zNorm, minBinsHard, m);
+            r_s = scale_tolerance(sig, s, coarseType, r, zNorm, minBinsHard, m, n_exp);
 
             phi_m_all  = nan(1, s);
             phi_m1_all = nan(1, s);

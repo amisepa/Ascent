@@ -124,7 +124,6 @@ end
 parMinOffsets = 6;
 
 if showProg
-    progressbar('Computing RCmvMFE for each scale factor')
     disp('NOTE: the lower scale factors take much longer than the higher ones.')
 end
 
@@ -159,7 +158,8 @@ for si = 1:numel(scaleVec)
 
         Xs = zeros(nvar, J);
         for ch = 1:nvar
-            Xs(ch, :) = coarsegrain(squeeze(xoff(ch, :, :)), coarseType);
+            % reshape, not squeeze: at scale 1 squeeze turns 1 x 1 x J into J x 1
+            Xs(ch, :) = coarsegrain(reshape(xoff(ch, :, :), iScale, J), coarseType);
         end
         XsCell{offset} = Xs;
     end
@@ -191,7 +191,6 @@ for si = 1:numel(scaleVec)
 
     if showProg
         fprintf('     --> finished scale %d/%d (%.1fs)\n', iScale, num_scales, toc(tScale));
-        progressbar(si / numel(scaleVec))
     end
 end
 end

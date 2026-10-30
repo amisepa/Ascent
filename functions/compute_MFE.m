@@ -30,16 +30,18 @@ function [MFE, scales, CI] = compute_MFE(data, varargin)
 %     'tau'        time delay for embedding           (default 1)
 %     'n'          fuzzy exponent                      (default 2)
 %     'coarsing'   coarse-graining statistic          (default 'mean')
-%                  {'mean','median','std','var','trimmed'}
-%     'num_scales' requested number of scales         (default 15)
+%                  {'mean','median','std','var'}
+%     'num_scales' requested number of scales         (default 30)
 %
 %   Command-line / advanced parameters:
 %     'zNorm'         varying-tolerance rescaling, integer 0-4 (default 0 = OFF)
 %                     0  fixed tolerance across scales (classic)
-%                     1  r*std  of each coarse-grained series
-%                     2  r*var  of each coarse-grained series
-%                     3  r*mad  (mean absolute deviation)
-%                     4  r*mad  (median absolute deviation)
+%                     1  r*std^n of each coarse-grained series (same as
+%                        z-scoring the series: the kernel is exp(-d^n/r);
+%                        with the Gaussian kernel, exp(-d^2/(2r^2)), r*std)
+%                     2  r*var
+%                     3  r*mad^n (mean absolute deviation)
+%                     4  r*mad^n (median absolute deviation)
 %     'IncludeScale1' include scale 1 (= plain FuzzEn)  (default false)
 %     'Mode'          FuzzEn detrending, 'local' | 'global' (default 'local')
 %     'Kernel'        'exponential' | 'gaussian'          (default 'exponential')
@@ -270,7 +272,12 @@ for si = 1:numel(scales)
     if zNorm == 0
         r_s = r;                          % r is a fraction of the (unit) original SD
     else
-        r_s = r * zNorm_scale(cg, zNorm);
+        % r is in units of x^n in the exponential kernel, of x in the Gaussian one
+        nr = n_exp;
+        if strcmpi(kernelType, 'gaussian'), nr = 1; end
+        f = zNorm_scale(cg, zNorm, nr);
+        if ~(isfinite(f) && f > 0), continue, end   % flat series: entropy stays NaN
+        r_s = r * f;
     end
 
     % Fast FuzzEn engine. Normalize=false so the coarse-grained series is used

@@ -94,6 +94,6 @@ ylabel(ax, opt.YLabel, 'FontSize', 12);
 title(ax, opt.Title, 'Interpreter', 'none', 'FontSize', 13, 'FontWeight', 'bold');
 legend(ax, 'Location', 'best', 'Box', 'off', 'FontSize', 9, 'Interpreter', 'none');
 set(ax, 'FontSize', 11, 'FontWeight', 'bold', 'TickDir', 'out', 'LineWidth', 1.0);
-xlim(ax, [time_sec(1) time_sec(end)]);
+if numel(time_sec) > 1, xlim(ax, [time_sec(1) time_sec(end)]); end
 
 end % plot_mMSE_timecourse

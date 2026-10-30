@@ -32,6 +32,10 @@ function ascent_plot(entropyData, chanlocs, entropyType, scales, varargin)
 %       'alphaPower',    struct('raw',[sig x 1],'osc',[sig x 1],'band',[f1 f2])
 %                        Precomputed by ascent_compute. Aperiodic only. When
 %                        omitted it is derived with compute_AperiodicBandPower.
+%       'scaleFreq',     struct('hz', h, 'approx', tf) from ascent_compute: h is
+%                        [scale x 1] upper frequencies (Hz) or [scale x 2] bands.
+%                        Multiscale only: the scale axes then read "scale (Hz)";
+%                        approx = true marks the labels as approximate (~).
 %   Aperiodic positional (entropyType contains 'aperiodic'):
 %       varargin{1} = offset        [sig x 1] or [sig x nTimes]
 %       varargin{2} = freqs         [1 x freq]
@@ -51,6 +55,7 @@ opt.dipfit        = [];
 opt.iclabel       = [];
 opt.alphaPower    = [];
 opt.fontSize      = 9;
+opt.scaleFreq     = [];
 rmIdx             = [];
 for vi = 1:(numel(varargin)-1)
     if ischar(varargin{vi}) || isstring(varargin{vi})
@@ -76,6 +81,9 @@ for vi = 1:(numel(varargin)-1)
             case 'fontsize'
                 opt.fontSize = varargin{vi+1};
                 rmIdx        = [rmIdx vi vi+1]; %#ok<AGROW>
+            case 'scalefreq'
+                opt.scaleFreq = varargin{vi+1};
+                rmIdx         = [rmIdx vi vi+1]; %#ok<AGROW>
         end
     end
 end

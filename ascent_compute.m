@@ -39,7 +39,22 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %                            1 = std, 2 = var, 3 = mad(mean), 4 = mad(median)
 %                          of each coarse-grained series. MSE, MFE, CMFE and
 %                          RCMFE only; ignored by mMSE and RCmvMFE.
-%     'filter_mode'      - Scale filtering: 'none' or 'narrowband' (mMSE only)
+%     'filter_mode'      - Scale filtering (mMSE only, see compute_mMSE):
+%                            'lowpass'    (default) low-pass at Nyquist/s, then
+%                                         filt-skip (Kosciessa et al.'s low-pass version)
+%                            'narrowband' band-pass [Nyquist/(s+1), Nyquist/s]
+%                                         (a parallel tool in their paper: removes
+%                                         slow, high-power activity from fine scales)
+%                            'none'       Costa coarse-graining ('coarsing')
+%     'FilterType'       - mMSE low-pass filter: 'fir' (default) or 'butter'
+%                          (6th-order Butterworth as in Kosciessa et al.)
+%     'StartPoints'      - mMSE filt-skip: 'pooled' (default, match counts summed
+%                          over the s starting points) or 'average'
+%     'scalefreq'        - Label scales with the frequencies they keep in the
+%                          plots (default: true for mMSE low-pass/band-pass,
+%                          false otherwise). With mean/median coarse-graining the
+%                          labels are approximate (see the warning); SD/variance
+%                          coarse-graining has no frequency mapping.
 %     'TimeOnly'         - compute time-resolved mMSE only
 %     'TimeWin'          - Window length for time-resolved mMSE (default: [])
 %     'TimeStep'         - Step between time windows for time-resolved mMSE
@@ -64,6 +79,20 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %                          slidWinSec (2 s) and slidOverlap (.5 for 50%).
 %                          expose via GUI or name-value pairs in a future version.
 %
+%   Spectral covariates (every measure except Aperiodic):
+%     'spectralcovariates' - Also save, for the same signals, the aperiodic
+%                          exponent and offset and the alpha power, using the
+%                          aperiodic settings above, logical (default: true).
+%                          Entropy depends on the power spectrum (slow, high-power
+%                          activity such as alpha and the 1/f slope lowers it), so
+%                          these let a group analysis test entropy with spectral
+%                          power as a covariate (Kosciessa et al. 2020). This adds
+%                          the time of one Aperiodic fit to each call: set it to
+%                          false in batch scripts that also run Aperiodic.
+%                          With 'domain', 'ica', offset and alpha power depend on
+%                          the arbitrary scale of each IC: compare them within an
+%                          IC across conditions only, not across ICs or subjects.
+%
 % OUTPUTS:
 %   Below, "signals" are scalp channels, or ICs when domain = 'ica'.
 %
@@ -78,7 +107,16 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %                                             lobe (ICA mode, with ICLabel or DIPFIT;
 %                                             see ascent_ic_info)
 %   EEG.ascent.(measure).scales             - scale vector (multiscale only)
-%   EEG.ascent.Aperiodic.data.exponent      - aperiodic exponent [signals x 1]
+%   EEG.ascent.(measure).covariates         - spectral covariates of the same signals
+%                                             ('spectralcovariates'), [signals x 1] each:
+%       .exponent, .offset  aperiodic fit (fixed or knee mode)
+%       .alpha_raw          total power in .alphaBand, µV²/Hz (includes the 1/f)
+%       .alpha_osc          alpha power minus the fitted aperiodic power (subtraction),
+%                           µV²/Hz
+%       .alpha_peak_freq    frequency of the largest fitted peak in .alphaBand (Hz;
+%                           NaN when no peak was fitted there)
+%       .r2                 aperiodic fit R² (screen poor fits before using them)
+%   EEG.ascent.Aperiodic.data.exponent     - aperiodic exponent [signals x 1]
 %   EEG.ascent.Aperiodic.data.offset        - aperiodic offset [signals x 1]
 %   EEG.ascent.Aperiodic.data.psd           - raw PSD [signals x freqs]
 %   EEG.ascent.Aperiodic.data.freqs         - frequency vector
@@ -193,6 +231,10 @@ num_scales       = p.num_scales;
 IncludeScale1    = p.IncludeScale1;
 zNorm            = p.zNorm;
 filter_mode      = p.filter_mode;
+FilterType       = p.FilterType;
+StartPoints      = p.StartPoints;
+scaleFreq        = p.scaleFreq;
+spectralCovariates = p.spectralCovariates;
 TimeWin          = p.TimeWin;
 TimeStep         = p.TimeStep;
 TimeOnly         = p.TimeOnly;
@@ -263,16 +305,24 @@ end
 % ----------------------------
 % Parpool management
 % ----------------------------
-pool = gcp('nocreate');   % not 'p': p.save is read at the end
-if parallel
-    if isempty(pool)
-        disp('Launching parallel pool...');
-        parpool;
-    end
-else
-    if ~isempty(pool)
-        disp('Shutting down parallel pool (parallel computing OFF).');
-        delete(pool);
+hasPCT = ~isempty(ver('parallel')) && license('test', 'Distrib_Computing_Toolbox');   % optional
+if parallel && ~hasPCT
+    disp('Parallel Computing Toolbox not found: running serially.');
+    parallel = false;
+    p.parallel = false;
+end
+if hasPCT
+    pool = gcp('nocreate');   % not 'p': p.save is read at the end
+    if parallel
+        if isempty(pool)
+            disp('Launching parallel pool...');
+            parpool;
+        end
+    else
+        if ~isempty(pool)
+            disp('Shutting down parallel pool (parallel computing OFF).');
+            delete(pool);
+        end
     end
 end
 
@@ -294,16 +344,35 @@ if isICA
     chanLabels = arrayfun(@(k) sprintf('IC%d',k), 1:nChan, 'UniformOutput', false);
     chanlocs   = EEG.chanlocs(icachansind);
 else
-    nChan = length(chanlist);
-    if nChan > 1 && nChan < EEG.nbchan
-        [~, chanIdx] = intersect({EEG.chanlocs.labels}, split(chanlist));
-    else
+    % In the order the user gave; a misspelled label is an error, not a
+    % smaller selection
+    allLabels = {EEG.chanlocs.labels};
+    want = clean_labels(chanlist);
+    if isempty(want) || isequal(want(:), allLabels(:))
         chanIdx = 1:EEG.nbchan;
+    else
+        [found, chanIdx] = ismember(lower(want), lower(allLabels));
+        if ~all(found)
+            error('ascent_compute: channel(s) not found: %s.', strjoin(want(~found), ', '));
+        end
     end
     data       = EEG.data(chanIdx, :);
     nChan      = size(data, 1);
     chanLabels = {EEG.chanlocs(chanIdx).labels};
     chanlocs   = EEG.chanlocs(chanIdx);
+end
+
+% Discontinuities: the measures treat the data as one continuous signal
+if EEG.trials > 1
+    warning(['ascent_compute: the %d epochs are joined into one continuous signal. Entropy, ' ...
+        'the PSD and the mMSE filters run across the joins, which matters most for short ' ...
+        'epochs: mMSE filters last up to 8 s. For a per-epoch result, loop over the epochs.'], EEG.trials);
+elseif isfield(EEG,'event') && ~isempty(EEG.event) && isfield(EEG.event,'type')
+    isBnd = cellfun(@(t) (ischar(t) || isstring(t)) && strcmp(t,'boundary'), {EEG.event.type});
+    if any(isBnd)
+        warning(['ascent_compute: %d boundary event(s) (removed segments). The signal is ' ...
+            'treated as contiguous across them.'], nnz(isBnd));
+    end
 end
 
 % Preallocate
@@ -321,13 +390,13 @@ switch lower(measure)
 
     case 'sampen'
         % Sample Entropy - Richman & Moorman (2000)
-        entropy = compute_SampEn(data, 'm', m, 'r', r, ...
+        entropy = compute_SampEn(data, 'm', m, 'tau', tau, 'r', r, ...
             'Parallel', parallel, 'Progress', progress);
 
     case 'fuzzen'
         % Fuzzy Entropy - Chen et al. (2009)
         entropy = compute_FuzzEn(data, 'm', m, 'tau', tau, 'n', n, 'r', r, ...
-            'Kernel', kernel_meth, ...
+            'Kernel', kernel_meth, 'Mode', p.fuzzy_mode, ...
             'Parallel', parallel, 'Progress', progress);
 
     case 'exsent'
@@ -440,21 +509,24 @@ switch lower(measure)
         % Modified MSE - Kosciessa et al. (2020)
         [entropy, scales, info] = compute_mMSE(data, 'Fs', fs, ...
             'm', m, 'tau', tau, 'r', r, 'num_scales', num_scales, 'coarsing', coarsing, ...
-            'filter_mode', filter_mode, ...
+            'filter_mode', filter_mode, 'FilterType', FilterType, 'StartPoints', StartPoints, ...
             'TimeWin', TimeWin, 'TimeStep', TimeStep, 'TimeOnly', TimeOnly, ...
             'Parallel', parallel, 'Progress', progress);
 
     case 'mfe'
         % Multiscale Fuzzy Entropy - Azami & Escudero (2016)
         [entropy, scales] = compute_MFE(data, 'm', m, ...
-            'tau', tau, 'r', r, 'coarsing', coarsing, 'num_scales', num_scales, ...
-            'zNorm', zNorm, 'Parallel', parallel, 'Progress', progress);
+            'tau', tau, 'r', r, 'n', n, 'Kernel', kernel_meth, 'Mode', p.fuzzy_mode, ...
+            'coarsing', coarsing, 'num_scales', num_scales, ...
+            'zNorm', zNorm, 'IncludeScale1', IncludeScale1, ...
+            'Parallel', parallel, 'Progress', progress);
 
     case 'cmfe'
         % Composite Multiscale Fuzzy Entropy (CMFE) - Azami & Escudero (2016)
         [entropy, scales] = compute_CMFE(data, 'm', m, 'tau', tau, ...
-            'r', r, 'n', n, 'coarsing', coarsing, 'num_scales', num_scales, ...
-            'zNorm', zNorm, 'Parallel', parallel, 'Progress', progress);
+            'r', r, 'n', n, 'Mode', p.fuzzy_mode, 'coarsing', coarsing, 'num_scales', num_scales, ...
+            'zNorm', zNorm, 'IncludeScale1', IncludeScale1, ...
+            'Parallel', parallel, 'Progress', progress);
 
     case 'rcmfe'
         % Refined Composite Multiscale Fuzzy Entropy (RCMFE) - Azami & Escudero (2016)
@@ -465,7 +537,7 @@ switch lower(measure)
 
     case 'rcmvmfe'
         % Refined Composite Multivariate Multiscale Fuzzy Entropy
-        [entropy, scales] = compute_RCmvMFE(data, 'm', m, 'tau', tau, 'r', r, ...
+        [entropy, scales] = compute_RCmvMFE(data, 'm', m, 'tau', tau, 'r', r, 'n', n, ...
             'coarsing', coarsing, 'num_scales', num_scales, ...
             'Parallel', parallel, 'Progress', progress);
 
@@ -473,10 +545,24 @@ switch lower(measure)
         error('Unknown measure: %s. See help ascent_compute for valid options.', measure);
 end
 
+% ----------------------------
+% Spectral covariates of the same signals
+% ----------------------------
+covariates = [];
+if spectralCovariates && ~strcmpi(measure, 'aperiodic')
+    if progress, disp('Spectral covariates: aperiodic fit and alpha power of the same signals.'); end
+    try   % e.g. a signal shorter than the Welch window: the measure is kept
+        covariates = spectral_covariates(data, fs, p);
+    catch ME
+        warning('ascent_compute: no spectral covariates (%s); the results are kept.', ME.message);
+    end
+end
+
 
 % ----------------------------
 % Store outputs in EEG structure
 % ----------------------------
+EEG.ascent.(measure) = struct();   % nothing left from an earlier run of this measure
 switch lower(measure)
     case 'exsent'
         EEG.ascent.(measure).data.HD  = HD;
@@ -542,6 +628,9 @@ end
 if contains(lower(measure), {'mse','mmse','mfe','rcmfe','rcmvmfe'})
     EEG.ascent.(measure).scales = scales;
 end
+if ~isempty(covariates)
+    EEG.ascent.(measure).covariates = covariates;
+end
 if exist('info','var')
     EEG.ascent.(measure).info = info;
 end
@@ -552,17 +641,25 @@ end
 if vis
   try   % a plotting error must not lose the results computed above
     if nChan > 1
-        % Remove scale 1 for std and var coarse-graining
-        if ~isempty(coarsing) && contains(coarsing, {'std' 'sd' 'standard deviation' 'var' 'variance'})
+        % Remove scale 1 for std and var coarse-graining (the SD of one sample
+        % is 0). Only when scale 1 is there: most measures start at scale 2.
+        if ~isempty(coarsing) && contains(lower(coarsing), {'std' 'sd' 'standard deviation' 'var' 'variance'}) ...
+                && isnumeric(scales) && ~isempty(scales) && scales(1) == 1
             entropy(:,1) = [];
             scales(1) = [];
         end
 
-        % Domain-specific arguments, appended to every ascent_plot call.
-        % In channel mode this is empty and the calls are unchanged.
+        % Arguments appended to every ascent_plot call: scale frequency
+        % labels (multiscale) and the ICA domain
         icaArgs = {};
+        if size(entropy,2) > 1 && ~isempty(scaleFreq) && scaleFreq
+            infoArg = [];
+            if exist('info','var'), infoArg = info; end
+            sf = scale_frequencies(measure, scales, fs, coarsing, infoArg);
+            if ~isempty(sf.hz), icaArgs = {'scaleFreq', sf}; end
+        end
         if isICA
-            icaArgs = {'ICA', true, 'icawinv', icawinv};
+            icaArgs = [icaArgs, {'ICA', true, 'icawinv', icawinv}];
             if isfield(EEG,'dipfit') && ~isempty(EEG.dipfit)
                 icaArgs = [icaArgs, {'dipfit', EEG.dipfit}];
             end
@@ -589,7 +686,7 @@ if vis
                 if hasTime
                     plot_mMSE_timecourse(info.mse_time, info.time_sec, scales);
                 end
-                if ~TimeOnly && ~all(isnan(entropy(:)))
+                if ~info.TimeOnly && ~all(isnan(entropy(:)))
                     ascent_plot(entropy, chanlocs, measure, scales, icaArgs{:});
                 end
             otherwise
@@ -605,36 +702,14 @@ end
 
 
 % ----------------------------
-% Command history (eegh)
-% Build chanlist as a valid MATLAB cell-array literal so that replaying
-% history from eegh reproduces the exact channel selection.
+% Command history (eegh): every setting that was used, so that replaying it
+% reproduces the result
 % ----------------------------
-chanlist_str = ['{' strjoin(cellfun(@(c) sprintf('''%s''', c), cellstr(chanlist), ...
-    'UniformOutput', false), ',') '}'];
-
-if strcmpi(measure, 'aperiodic')
-    com = sprintf( ...
-        ['EEG = ascent_compute(EEG, ''measure'', ''%s'', ''domain'', ''%s'', '     ...
-         '''chanlist'', %s, '                                                      ...
-         '''vis'', %d, ''parallel'', %d, ''progress'', %d, '                       ...
-         '''freqrange'', [%g %g], ''slidWinSec'', %g, ''slidOverlap'', %g, '               ...
-         '''aperiodicmode'', ''%s'', ''fitfreqrange'', [%g %g], '                   ...
-         '''maxpeaks'', %d, ''minpeakheight'', %g, ''peakthreshold'', %g, '        ...
-         '''peakwidthlimits'', [%g %g], ''correctaperiodic'', %d, '                ...
-         '''alphaband'', [%g %g], ''timeresolved'', %d;'],                          ...
-        measure, domain, chanlist_str, vis, parallel, progress,                     ...
-        freqRange(1), freqRange(2), slidWinSec, slidOverlap,                            ...
-        aperiodicMode, fitFreqRange(1), fitFreqRange(2),                            ...
-        maxPeaks, minPeakHeight, peakThreshold,                                     ...
-        peakWidthLimits(1), peakWidthLimits(2),                                     ...
-        correctAperiodic, alphaBand(1), alphaBand(2), timeResolved);
-else
-    com = sprintf( ...
-        ['EEG = ascent_compute(EEG, ''measure'', ''%s'', ''domain'', ''%s'', ' ...
-         '''chanlist'', %s, '                                                  ...
-         '''tau'', %d, ''m'', %d, ''r'', %.3f, '                               ...
-         '''vis'', %d, ''parallel'', %d, ''progress'', %d);'],                 ...
-        measure, domain, chanlist_str, tau, m, r, vis, parallel, progress);
+try
+    com = history_command(p, {EEG.chanlocs.labels});
+catch ME
+    warning('ascent_compute: no history command (%s).', ME.message);
+    com = '';
 end
 
 % Save dataset with new outputs
@@ -643,11 +718,10 @@ end
 % tmp.data = EEG.data(:, s1:s2)) inherit EEG.filename/filepath, so the save
 % silently replaced the ORIGINAL .set on disk with the one-block copy.
 % Behaviour now:
-%   'save', 'auto' (default): save ONLY when the dataset has not been
-%       resampled/referenced/filtered/sliced since load, i.e. when saving is
-%       actually safe; otherwise SKIP with a notice (outputs are in EEG.ascent
-%       in memory either way - callers who need them on disk should save under
-%       their own filename).
+%   'save', 'auto' (default): save ONLY when the data in memory are identical
+%       to the data in the file, i.e. when saving is actually safe; otherwise
+%       SKIP with a notice (outputs are in EEG.ascent in memory either way -
+%       callers who need them on disk should save under their own filename).
 %   'save', 'never': never touch disk.
 %   'save', 'always': old behaviour (explicitly requested overwrite).
 if isfield(p, 'save') && ~isempty(p.save)
@@ -663,12 +737,12 @@ switch saveOpt
         doSave = true;
     case 'auto'
         % Save ONLY when the in-memory dataset still matches the file it
-        % claims to come from (channel count, sample count, event count).
-        % The known destructive pattern - batch scripts computing on a
-        % SLICED copy that inherited filename/filepath - always changes
-        % pnts and/or events, and is thereby refused. A plain GUI flow
-        % (load -> compute -> save, no processing in between) still saves
-        % exactly as before. Anything that cannot be verified is not saved.
+        % claims to come from: channel count, sample count, event count,
+        % then the data themselves (filtering, re-referencing, IC removal
+        % and interpolation leave the three counts unchanged). A plain GUI
+        % flow (load -> compute -> save, no processing in between) still
+        % saves exactly as before. Anything that cannot be verified is not
+        % saved.
         try
             assert(~isempty(EEG.filename) && ~isempty(EEG.filepath));
             % never the sample dataset shipped with the plugin
@@ -686,6 +760,15 @@ switch saveOpt
             sigNow  = sprintf('%d:%d:%d', EEG.nbchan, EEG.pnts, numel(EEG.event));
             sigFile = sprintf('%d:%d:%d', S0.nbchan, S0.pnts, numel(S0.event));
             doSave = strcmp(sigNow, sigFile);
+            if doSave
+                S1 = pop_loadset('filename', EEG.filename, 'filepath', EEG.filepath, ...
+                    'verbose', 'off', 'check', 'off');
+                if ischar(S1.data), S1 = eeg_checkset(S1, 'loaddata'); end
+                doSave = isequaln(single(EEG.data(:)), single(S1.data(:)));
+                if ~doSave
+                    disp('The data differ from the file on disk: not overwriting it.');
+                end
+            end
         catch
             doSave = false;   % cannot verify -> do not risk overwriting
         end
@@ -694,8 +777,12 @@ switch saveOpt
         doSave = false;
 end
 if doSave
-    disp("Overwriting .set dataset to save the ASCENT outputs you computed. Note that this does not affect the rest of your EEG dataset.")
-    EEG = pop_saveset(EEG, 'filename', EEG.filename, 'filepath', EEG.filepath);
+    disp("Saving the ASCENT outputs in the .set file (the data are unchanged; the file is rewritten from the current EEG structure).")
+    try
+        EEG = pop_saveset(EEG, 'filename', EEG.filename, 'filepath', EEG.filepath);
+    catch ME
+        warning('ascent_compute: could not save the dataset (%s); the outputs are in EEG.ascent.', ME.message);
+    end
 else
     disp("ASCENT outputs kept in EEG.ascent (in memory only; dataset on disk NOT overwritten).")
 end
@@ -703,6 +790,123 @@ end
 disp('Done!');
 fprintf('Time to compute: %.2f minutes.\n', toc(tstart)/60);
 disp('All outputs are stored in EEG.ascent.');
+
+
+%% Command history
+function want = clean_labels(chanlist)   % no closing END, as below
+% Labels as a cell column, without blanks; labels may contain spaces
+want = strtrim(cellstr(string(chanlist(:))));
+want(cellfun(@isempty, want)) = [];
+
+
+function s = literal(v)
+% MATLAB expression for a setting value, exact when replayed
+if ischar(v) || isstring(v)
+    s = sprintf('''%s''', strrep(char(v), '''', ''''''));
+else
+    s = mat2str(v);
+    if ~isequal(str2num(s), v), s = mat2str(v, 17); end %#ok<ST2NM>
+end
+
+
+function com = history_command(p, allLabels)
+% One name-value pair per setting that was used, as ascent_get_params reads them
+keys = { ...
+    'domain','domain'; 'tau','tau'; 'm','m'; 'r','r'; 'vis','vis'; 'parallel','parallel'; ...
+    'progress','progress'; 'coarsing','coarsing'; 'num_scales','num_scales'; ...
+    'IncludeScale1','includescale1'; 'zNorm','znorm'; 'filter_mode','filter_mode'; ...
+    'FilterType','filtertype'; 'StartPoints','startpoints'; 'scaleFreq','scalefreq'; ...
+    'TimeWin','timewin'; 'TimeStep','timestep'; 'TimeOnly','timeonly'; 'n','n'; ...
+    'kernel_meth','kernel'; 'blocksize','blocksize'; 'fuzzy_mode','fuzzy_mode'; ...
+    'freqRange','freqrange'; 'winSec','winsec'; 'psdOverlap','overlap'; 'windowType','window'; ...
+    'aperiodicMode','aperiodicmode'; 'fitFreqRange','fitfreqrange'; 'maxPeaks','maxpeaks'; ...
+    'minPeakHeight','minpeakheight'; 'peakThreshold','peakthreshold'; ...
+    'peakWidthLimits','peakwidthlimits'; 'correctAperiodic','correctaperiodic'; ...
+    'alphaBand','alphaband'; 'timeResolved','timeresolved'; 'slidWinSec','slidwinsec'; ...
+    'slidOverlap','slidoverlap'; 'slidNAvg','slidnavg'; ...
+    'slidPeakWidthLimits','slidpeakwidthlimits'; 'spectralCovariates','spectralcovariates'; ...
+    'save','save'};
+want = clean_labels(p.chanlist);
+if isempty(want) || isequal(want(:), allLabels(:))
+    chans = '''all''';
+else
+    chans = ['{' strjoin(cellfun(@literal, want, 'UniformOutput', false), ',') '}'];
+end
+com = sprintf('EEG = ascent_compute(EEG, ''measure'', ''%s'', ''chanlist'', %s', p.measure, chans);
+for k = 1:size(keys,1)
+    v = p.(keys{k,1});
+    if isempty(v), continue, end
+    com = sprintf('%s, ''%s'', %s', com, keys{k,2}, literal(v));
+end
+com = [com ');'];
+
+
+%% Spectral covariates: aperiodic fit and alpha power of the analysed signals
+function cv = spectral_covariates(data, fs, p)   % no closing END, as below
+% A signal with no usable data has no spectrum: NaN, not a perfect flat fit
+dead = any(~isfinite(data), 2) | ~(std(double(data), 0, 2) > 0);
+data(dead,:) = 0;
+[psd, freqs] = compute_psd(data, fs, 'freqRange', p.freqRange, 'winSec', p.winSec, ...
+    'overlap', p.psdOverlap, 'window', p.windowType, 'detrend', true, ...
+    'Parallel', p.parallel, 'Progress', false);
+[cv.exponent, cv.offset, fi] = compute_AperiodicFit(freqs, psd, ...
+    'FreqRange', p.fitFreqRange, 'AperiodicMode', p.aperiodicMode, 'MaxPeaks', p.maxPeaks, ...
+    'MinPeakHeight', p.minPeakHeight, 'PeakThreshold', p.peakThreshold, ...
+    'PeakWidthLimits', p.peakWidthLimits, 'Parallel', p.parallel, 'Progress', false);
+if strcmpi(p.aperiodicMode, 'knee')
+    [cv.alpha_raw, cv.alpha_osc] = compute_AperiodicBandPower(freqs, psd, cv.exponent, ...
+        cv.offset, p.alphaBand, cellfun(@(k) k(2), fi.knee));
+else
+    [cv.alpha_raw, cv.alpha_osc] = compute_AperiodicBandPower(freqs, psd, cv.exponent, ...
+        cv.offset, p.alphaBand);
+end
+% Largest fitted peak inside the alpha band ([CF power BW] per peak)
+cv.alpha_peak_freq = nan(size(cv.exponent));
+for k = 1:numel(fi.peak_params)
+    pk = fi.peak_params{k};
+    if isempty(pk), continue, end
+    in = pk(:,1) >= p.alphaBand(1) & pk(:,1) <= p.alphaBand(2);
+    if any(in)
+        pk = pk(in,:); [~, j] = max(pk(:,2));
+        cv.alpha_peak_freq(k) = pk(j,1);
+    end
+end
+cv.r2            = fi.r_squared;
+for f = {'exponent','offset','alpha_raw','alpha_osc','alpha_peak_freq','r2'}
+    cv.(f{1})(dead) = NaN;
+end
+cv.alphaBand     = p.alphaBand;
+cv.freqRange     = p.fitFreqRange;
+cv.aperiodicMode = p.aperiodicMode;
+cv.alpha_osc_rule = 'alpha_raw minus the fitted aperiodic power (subtraction)';
+
+
+%% Frequency kept at each scale, for the plot labels
+function sf = scale_frequencies(measure, scales, fs, coarsing, info)
+% sf.hz: [nScales x 1] upper frequency (Hz) or [nScales x 2] band; empty when
+% the scales have no frequency mapping. sf.approx: true for coarse-graining.
+sf = struct('hz', [], 'approx', false);
+nyq = fs/2;
+isSDvar = ~isempty(coarsing) && contains(lower(coarsing), {'std','sd','standard deviation','var'});
+if strcmpi(measure, 'mmse') && isstruct(info) && isfield(info, 'filter_mode') ...
+        && ~strcmpi(info.filter_mode, 'none')
+    if strcmpi(info.filter_mode, 'lowpass'), sf.hz = info.bands(:,2);
+    else,                                    sf.hz = info.bands;
+    end
+    return
+end
+if isSDvar
+    warning(['ascent_compute: no frequency labels for SD or variance coarse-graining: the SD ' ...
+        'of each window is not a filter, so a scale has no frequency range.']);
+    return
+end
+if iscell(scales), sc = 2:numel(scales)+1; else, sc = double(scales(:)); end
+sf.hz     = nyq ./ sc(:);
+sf.approx = true;
+warning(['ascent_compute: scale frequencies are approximate. Averaging s samples is a weak ' ...
+    'low-pass filter (gain -3.9 dB at Nyquist/s, side lobes about -13 dB), so activity above ' ...
+    'Nyquist/s leaks into scale s and aliases. Each label is the upper limit Nyquist/s; the ' ...
+    'entropy at a scale still depends on all the power below it (Kosciessa et al. 2020).']);
 
 
 %% Dataset checks (before computing)

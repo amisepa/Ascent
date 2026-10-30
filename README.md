@@ -32,7 +32,7 @@ All algorithms were modified to significantly increase computation speed while p
 
 ## Installation
 
-Requires MATLAB and EEGLAB. Download or clone this repository into the `plugins` folder of EEGLAB and restart EEGLAB. An **ASCENT** menu then appears in the EEGLAB menu bar.
+Requires MATLAB with the Signal Processing and the Statistics and Machine Learning toolboxes, and EEGLAB. The Parallel Computing Toolbox is optional. Download or clone this repository into the `plugins` folder of EEGLAB and restart EEGLAB. An **ASCENT** menu then appears in the EEGLAB menu bar.
 
 ## Getting started
 
@@ -56,7 +56,7 @@ For the aperiodic measure, this window sets the power spectrum estimation and th
 
 <img alt="Aperiodic parameters" src="img/gui_aperiodic.png" width="290" />
 
-5. The outputs are plotted and stored in `EEG.ascent.<measure>` (e.g., `EEG.ascent.RCMFE.data`, channels x scales). The dataset with its outputs is added to EEGLAB, and the command is saved in the EEGLAB history (type `eegh`), so that the same analysis can be run from a script. If the dataset was not modified since it was loaded, the outputs are also saved in its .set file.
+5. The outputs are plotted and stored in `EEG.ascent.<measure>` (e.g., `EEG.ascent.RCMFE.data`, channels x scales). The dataset with its outputs is added to EEGLAB, and the command is saved in the EEGLAB history (type `eegh`), so that the same analysis can be run from a script. If the data are identical to those in the dataset's .set file, the outputs are also saved in that file (except for the sample dataset, which stays as shipped).
 
 For the multiscale measures, the figure shows the entropy of each channel at each scale with the high-entropy cluster outlined, the scalp topography of this cluster, and its mean entropy across scales. Below, RCMFE computed on the sample dataset:
 
@@ -64,7 +64,7 @@ For the multiscale measures, the figure shows the entropy of each channel at eac
 
 ## Tutorial: each measure on the sample dataset
 
-The commands below compute each measure on the sample dataset provided with the plugin (64-channel BioSemi, 75 s of resting state with eyes closed, with an ICA decomposition and dipole fits), with the settings used in the paper. Each call plots its outputs (`'vis', false` to turn this off) and stores them in `EEG.ascent.<measure>`. See `help ascent_compute` for all parameters and `ascent_tutorial.m` for more options.
+The commands below compute each measure on the sample dataset provided with the plugin (64-channel BioSemi, 75 s of resting state with eyes closed, with an ICA decomposition and dipole fits); the settings of the group analysis in the paper are in `ascent_group_analysis.m`. Each call plots its outputs (`'vis', false` to turn this off) and stores them in `EEG.ascent.<measure>`. See `help ascent_compute` for all parameters and `ascent_tutorial.m` for more options.
 
 ```matlab
 eeglab nogui
@@ -106,7 +106,7 @@ Left: exponent and offset topographies, their correlation across channels, raw a
 
 ```matlab
 EEG = ascent_compute(EEG, 'measure', 'MSE',   'coarsing', 'mean', 'num_scales', 30);  % multiscale entropy
-EEG = ascent_compute(EEG, 'measure', 'mMSE',  'coarsing', 'mean', 'num_scales', 30);  % modified MSE
+EEG = ascent_compute(EEG, 'measure', 'mMSE',  'num_scales', 30);  % modified MSE (low-pass; 'filter_mode', 'narrowband' for the band-pass check)
 EEG = ascent_compute(EEG, 'measure', 'MFE',   'coarsing', 'mean', 'num_scales', 30);  % multiscale fuzzy entropy
 
 % Refined composite multiscale fuzzy entropy, with mean and standard deviation
@@ -125,6 +125,8 @@ The figure shows the entropy of each channel at each scale, with the high-entrop
 The cluster threshold can be changed when plotting again, e.g. `ascent_plot(EEG.ascent.RCMFE.data, EEG.chanlocs, 'RCMFE', EEG.ascent.RCMFE.scales, 'ClusterThresh', 0.9)`.
 
 ### Independent components and dipoles
+
+Entropy depends on the power spectrum: slow, high-power activity such as alpha and the 1/f slope lowers it (Kosciessa et al., 2020; Courtiol et al., 2016). Every entropy and fractal measure therefore saves, next to its result, the aperiodic exponent and offset and the alpha power of the same signals in `EEG.ascent.<measure>.covariates`, so that a group analysis can test entropy with them as covariates. On ICs, offset and alpha power depend on the arbitrary scale of each IC, so compare them within an IC only. This adds the time of one aperiodic fit to each computation (`'spectralcovariates', false` to skip). Multiscale figures can label each scale with the frequencies it keeps (`'scalefreq', true`). This is on by default for mMSE, where a filter sets them. With mean or median coarse-graining the labels are approximate, because averaging is a weak filter, and ASCENT says so; SD and variance coarse-graining have no frequency mapping. In all cases the entropy at a scale depends on all the power it keeps, not only on the labeled upper limit.
 
 Any measure can be computed on the independent components (ICs) instead of the scalp channels with `'domain', 'ica'`. IC results are back-projected to the scalp for the topographies. When the dataset has ICLabel classifications, the ICs classified as brain are marked with a dot. When it has dipole fits (DIPFIT), every measure except the multivariate ones adds a figure with the equivalent dipoles of the dipolar ICs (residual variance < 15%) located inside the brain on the MNI template: color shows the value of each IC (its mean across scales for multiscale measures, the exponent for the aperiodic fit), size the goodness of fit, and shape the ICLabel class (circles: brain; squares: other classes). Each dipole is labeled with its region in the AAL atlas, and the table of ICLabel classes, residual variances and regions is printed and saved in `EEG.ascent.<measure>.ic_info`. ASCENT also warns when the channel locations are not coregistered with the MNI head model (e.g., EEGLAB coordinates used with an identity transform).
 
@@ -185,6 +187,7 @@ Power spectral density, raw (first) and after removing the aperiodic component (
 - Chen, W., Zhuang, J., Yu, W., & Wang, Z. (2009). Measuring complexity using FuzzyEn, ApEn, and SampEn. *Medical Engineering & Physics*, 31, 61-68.
 - Costa, M. D., & Goldberger, A. L. (2015). Generalized multiscale entropy analysis: Application to quantifying the complex volatility of human heartbeat time series. *Entropy*, 17, 1197-1203.
 - Costa, M., Goldberger, A. L., & Peng, C.-K. (2002). Multiscale entropy analysis of complex physiologic time series. *Physical Review Letters*, 89, 068102.
+- Courtiol, J., Perdikis, D., Petkoski, S., Müller, V., Huys, R., Sleimen-Malkoun, R., & Jirsa, V. K. (2016). The multiscale entropy: Guidelines for use and interpretation in brain signal analysis. *Journal of Neuroscience Methods*, 273, 175-190.
 - Delorme, A., & Makeig, S. (2004). EEGLAB: An open source toolbox for analysis of single-trial EEG dynamics including independent component analysis. *Journal of Neuroscience Methods*, 134, 9-21.
 - Donoghue, T., Haller, M., Peterson, E. J., et al. (2020). Parameterizing neural power spectra into periodic and aperiodic components. *Nature Neuroscience*, 23, 1655-1665.
 - Esteller, R., Vachtsevanos, G., Echauz, J., & Litt, B. (2001). A comparison of waveform fractal dimension algorithms. *IEEE Transactions on Circuits and Systems I*, 48, 177-183.

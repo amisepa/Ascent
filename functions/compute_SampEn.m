@@ -1,7 +1,7 @@
-function SampEn = compute_SampEn(data, varargin)
+function [SampEn, counts] = compute_SampEn(data, varargin)
 % compute_SampEn  Computes Sample Entropy (SampEn) across multichannel data.
 %
-%   SampEn = compute_SampEn(data, 'm', 2, 'tau', 1, 'r', .15, ...
+%   [SampEn, counts] = compute_SampEn(data, 'm', 2, 'tau', 1, 'r', .15, ...
 %       'ZScore', true, 'BlockSize', 2000, 'pdistMaxGB', 2.0, ...
 %       'Parallel', true, 'Progress', true)
 %
@@ -20,6 +20,11 @@ function SampEn = compute_SampEn(data, varargin)
 %
 % Output:
 %   SampEn      : [n_channels x 1] Sample Entropy per channel
+%   counts      : [n_channels x 4] the counts behind each value,
+%                 [matches(m+1) pairs(m+1) matches(m) pairs(m)], so that
+%                 SampEn = -log((c1/c2) / (c3/c4)). Summing counts over
+%                 segments before the log gives a pooled estimate (used by
+%                 compute_mMSE across starting points).
 %
 % Notes:
 %   • When ZScore is true, data is z-scored per channel across time and r is a
@@ -78,6 +83,7 @@ if doZScore
 end
 
 SampEn = nan(nchan, 1);
+counts = zeros(nchan, 4);
 
 % ---------------- Progress header ----------------
 if showProgress
@@ -112,14 +118,14 @@ end
 % ---------------- Compute per channel ----------------
 if parallelMode && ~isempty(ver('parallel'))
     parfor iChan = 1:nchan
-        SampEn(iChan) = compute_SampEn_single(data_z(iChan,:), m, r, tau, blockSize, pdistMaxGB);
+        [SampEn(iChan), counts(iChan,:)] = compute_SampEn_single(data_z(iChan,:), m, r, tau, blockSize, pdistMaxGB);
         if useDQ
             send(dq, 1);
         end
     end
 else
     for iChan = 1:nchan
-        SampEn(iChan) = compute_SampEn_single(data_z(iChan,:), m, r, tau, blockSize, pdistMaxGB);
+        [SampEn(iChan), counts(iChan,:)] = compute_SampEn_single(data_z(iChan,:), m, r, tau, blockSize, pdistMaxGB);
 
         if ~isempty(hWB) && isvalid(hWB)
             try
@@ -147,8 +153,9 @@ end
 end
 
 % =========================================================================
-function SampEn = compute_SampEn_single(signal, m, r, tau, blockSize, pdistMaxGB)
+function [SampEn, cnt] = compute_SampEn_single(signal, m, r, tau, blockSize, pdistMaxGB)
 
+cnt = zeros(1, 4);
 signal = signal(isfinite(signal));
 N = numel(signal);
 
@@ -165,8 +172,9 @@ if size(Xm,1) < 2 || size(Xm1,1) < 2
     return
 end
 
-Bm  = match_fraction_cheby_exact(Xm,  r, blockSize, pdistMaxGB);
-Am1 = match_fraction_cheby_exact(Xm1, r, blockSize, pdistMaxGB);
+[Bm,  hB, pB] = match_fraction_cheby_exact(Xm,  r, blockSize, pdistMaxGB);
+[Am1, hA, pA] = match_fraction_cheby_exact(Xm1, r, blockSize, pdistMaxGB);
+cnt = [hA pA hB pB];
 
 if Bm > 0 && Am1 > 0 && isfinite(Bm) && isfinite(Am1)
     SampEn = -log(Am1 / Bm);
@@ -177,7 +185,7 @@ end
 
 % =========================================================================
 function X = embed_tau(signal, m, tau)
-signal = signal(:).';
+signal = signal(:);   % a column, so that m = 1 gives L x 1
 N = numel(signal);
 L = N - (m - 1) * tau;
 if L <= 0
@@ -190,10 +198,10 @@ X = signal(rows + idx);
 end
 
 % =========================================================================
-function p = match_fraction_cheby_exact(V, r, blockSize, pdistMaxGB)
+function [p, hits, pairs] = match_fraction_cheby_exact(V, r, blockSize, pdistMaxGB)
 M = size(V,1);
 if M < 2
-    p = NaN;
+    p = NaN; hits = 0; pairs = 0;
     return
 end
 
@@ -202,11 +210,11 @@ gbNeeded = (pairs * 8) / (1024^3);
 
 if gbNeeded <= pdistMaxGB
     d = pdist(V, 'chebychev');
-    p = mean(d <= r);
+    hits = nnz(d <= r);
 else
     hits = pairwise_match_count_cheby_blocked(V, r, blockSize);
-    p = hits / pairs;
 end
+p = hits / pairs;
 end
 
 % =========================================================================

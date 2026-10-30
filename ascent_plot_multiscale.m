@@ -24,6 +24,14 @@ iclabel       = [];
 if isfield(opt,'iclabel'), iclabel = opt.iclabel; end
 if isfield(opt,'fontSize') && ~isempty(opt.fontSize), fs = opt.fontSize; else, fs = 9; end
 lw            = max(1, fs/9);   % line widths grow with the font for small prints
+% Frequencies kept at each scale (from ascent_compute), shown as "scale (Hz)"
+sfq = [];
+if isfield(opt,'scaleFreq') && isstruct(opt.scaleFreq) && ~isempty(opt.scaleFreq.hz) ...
+        && size(opt.scaleFreq.hz,1) == size(entropyData,2)
+    sfq = opt.scaleFreq;
+end
+xlab = ifelse(isempty(sfq), 'Scale', ifelse(isempty(sfq) || ~sfq.approx, ...
+    'Scale (frequencies kept, Hz)', 'Scale (approx. upper frequency, Hz)'));
 
 isTimeResolved = ndims(entropyData)==3;
 if isTimeResolved
@@ -85,7 +93,7 @@ if multiscale && multiChan
     end
 
     nScales = size(entropyData,2);
-    xvals   = ifelse(isnumeric(scales), scales, 1:nScales);
+    xvals   = ifelse(isnumeric(scales), scales, 2:nScales+1);   % cell labels: mMSE, scales 2..S
 
     % Compact layouts use OuterPosition so that MATLAB fits tick labels, axis
     % labels and the colorbar inside each panel (subplot slots let a large font
@@ -100,11 +108,11 @@ if multiscale && multiChan
     ax_heat.TickLabelInterpreter='none';
     colormap(ax_heat,'parula');
     ch=colorbar(ax_heat); ch.Label.String='Entropy';
-    xlabel(ax_heat,'Scales');
+    xlabel(ax_heat,ifelse(isempty(sfq),'Scales',xlab));
     ylabel(ax_heat,ifelse(isICA,'ICs','EEG channels'));
     title(ax_heat,entropyType,'Interpreter','none');
     set(ax_heat,'FontSize',fs,'FontWeight','bold'); ch.FontSize=fs;
-    set_heat_ticks(ax_heat, scales, nChan, isICA, chanlocs, fs);
+    set_heat_ticks(ax_heat, scales, nChan, isICA, chanlocs, fs, sfq);
 
     % Overlay cluster boundaries using the shared cluster colours. The outline
     % follows the mask exactly: the member signals over the cluster's scales.
@@ -272,7 +280,8 @@ if multiscale && multiChan
         end
         plot(ax_curve, xvals, curve_k, 'LineWidth', 2*lw, 'Color', clrCluster{k});
         xlim(ax_curve,[xvals(1) xvals(end)]);
-        xlabel(ax_curve,'Scale'); ylabel(ax_curve,'Entropy');
+        xlabel(ax_curve,xlab); ylabel(ax_curve,'Entropy');
+        set_freq_ticks(ax_curve, xvals, scales, sfq, fs);
         title(ax_curve, curveTitle, 'Interpreter','none');
     end
 
@@ -330,12 +339,13 @@ elseif multiscale && ~multiChan
                  'Name',entropyType,'Toolbar','none','Menu','none','NumberTitle','Off');
     try icadefs; set(hFig4,'color',BACKCOLOR); catch; end %#ok<NODEF>
     ax_s=axes(hFig4);
-    xvals = ifelse(isnumeric(scales), scales, 1:numel(scales));
+    xvals = ifelse(isnumeric(scales), scales, 2:numel(scales)+1);   % cell labels: mMSE, scales 2..S
     plot(ax_s,xvals,entropyData,'LineWidth',2*lw);
-    xlabel(ax_s,'Scale'); ylabel(ax_s,'Entropy');
+    xlabel(ax_s,xlab); ylabel(ax_s,'Entropy');
     title(ax_s,entropyType,'Interpreter','none');
     axis(ax_s,'tight');
     set(findall(hFig4,'type','axes'),'FontSize',fs+1,'FontWeight','bold');
+    set_freq_ticks(ax_s, xvals, scales, sfq, fs+1);
 
 elseif ~multiscale && ~multiChan
     % Scalar
@@ -489,7 +499,7 @@ end
 
 
 %% Heatmap ticks
-function set_heat_ticks(ax, scales, nChan, isICA, chanlocs, fs)
+function set_heat_ticks(ax, scales, nChan, isICA, chanlocs, fs, sfq)
 % As many tick labels as fit the axes at font size fs (points): at most 20
 % signal labels, and round scale values with the first scale added.
 drawnow;
@@ -502,6 +512,10 @@ nY = max(2, min([20, nChan, floor(pp(4)/(1.6*ptx))]));
 yt = unique(round(linspace(1, nChan, nY)));
 set(ax,'YTick',yt,'YTickLabel',ylab(yt));
 
+if ~isempty(sfq)
+    set_freq_ticks(ax, 1:numel(scales), scales, sfq, fs);
+    return
+end
 nS = numel(scales);
 if iscell(scales) || nS < 2 || any(diff(double(scales(:))) <= 0)
     xl = scales; if ~iscell(xl), xl = arrayfun(@num2str, xl, 'UniformOutput', false); end
@@ -518,6 +532,36 @@ end
 if isempty(tv) || tv(1) - sv(1) >= step/2, tv = [sv(1) tv]; end
 set(ax,'XTick',interp1(sv, 1:nS, tv),'XTickLabel',arrayfun(@num2str, tv, 'UniformOutput', false), ...
     'XTickLabelRotation',0);
+end
+
+
+%% "scale (Hz)" tick labels
+function set_freq_ticks(ax, xpos, scales, sfq, fs)
+% xpos: x position of each scale on this axes. Labels read "2 (<=64)" for a
+% low-pass upper limit, "2 (40.5-67.2)" for a band, "2 (~64)" when approximate.
+if isempty(sfq), return, end
+lab = scale_freq_labels(scales, sfq);
+pp  = getpixelposition(ax);
+nT  = max(3, min(numel(lab), floor(pp(3)/(1.8*fs*96/72))));   % rotated labels
+xt  = unique(round(linspace(1, numel(lab), nT)));
+set(ax, 'XTick', xpos(xt), 'XTickLabel', lab(xt), 'XTickLabelRotation', 45, ...
+    'TickLabelInterpreter', 'none');
+end
+
+function lab = scale_freq_labels(scales, sfq)
+n = size(sfq.hz, 1);
+if isnumeric(scales), sv = double(scales(:)); else, sv = (2:n+1)'; end   % mMSE: scales 2..S
+lab = cell(1, n);
+for k = 1:n
+    if size(sfq.hz, 2) == 2
+        hz = sprintf('%.3g-%.3g', sfq.hz(k,1), sfq.hz(k,2));
+    elseif sfq.approx
+        hz = sprintf('~%.3g', sfq.hz(k));
+    else
+        hz = sprintf('%s%.3g', char(8804), sfq.hz(k));
+    end
+    lab{k} = sprintf('%g (%s)', sv(k), hz);
+end
 end
 
 

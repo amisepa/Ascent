@@ -4,7 +4,7 @@
 %
 %   Figs. 2-3 : RCMFE on the sample dataset (channels: mean and SD
 %            coarse-graining, 50 scales; ICs: SD, 30 scales, with the
-%            dipole/region figure). The Oct 2026 pass found that the earlier
+%            dipole/region figure). The Oct 2026 review found that the earlier
 %            exports predated the current cluster centroid rule.
 %   Fig. 4 : channel-domain aperiodic, static + time-resolved
 %   Fig. 5 : ICA-domain aperiodic, static + time-resolved
@@ -220,7 +220,8 @@ for cg = {'sd', 'mean'}
         x1 = E1.(m{1})(order_idx, :, :); x2 = E2.(m{1})(order_idx, :, :);
         scales = E1.scales;
         if strcmp(m{1}, 'RCMFE')   % RCMFE keeps scale 1 with mean coarse-graining only
-            if strcmp(cg{1}, 'sd'), x1(:, 1, :) = []; x2(:, 1, :) = []; else, scales = 1:scales(end); end
+            if ~strcmp(cg{1}, 'sd'), scales = 1:scales(end);
+            elseif size(x1, 2) > numel(scales), x1(:, 1, :) = []; x2(:, 1, :) = []; end
         end
         rng(1);
         [tvals, pvals, tvals_H0, pvals_H0] = run_stats_permutation(x1, x2, 2000, 'mean', 'dpt');

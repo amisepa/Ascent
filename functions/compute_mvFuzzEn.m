@@ -27,9 +27,9 @@ function [mvFuzzEn, phi_m, phi_m1] = compute_mvFuzzEn(data, varargin)
 %   • Data are z-score normalized per channel prior to embedding.
 %   • Pairwise similarities are computed exactly using pdist when memory allows,
 %     otherwise an exact blocked fallback is used.
-%   • This implementation follows the multivariate fuzzy entropy formulation
-%     used in the RCmvMFE reference, where phi_m1 is averaged across the K
-%     augmented (m+1) subspaces.
+%   • phi_m1 is averaged across the K augmented (m+1) subspaces. The RCmvMFE
+%     reference instead pools all subspaces into one set of embedded vectors,
+%     which does not scale with channels and samples, so the two values differ.
 %   • Entropy values are not constrained to be positive; negative values are valid.
 %
 % References: 
