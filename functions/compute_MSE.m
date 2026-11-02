@@ -120,39 +120,7 @@ end
 nScales = numel(scales);
 
 % ---------------- Fill missing & z-score per channel (ONCE) --------------
-for ch = 1:nch
-    xi = X(ch,:);
-    if any(~isfinite(xi))
-        try
-            xi = fillmissing(xi, 'linear', 'EndValues', 'nearest');
-        catch
-            isn = ~isfinite(xi);
-            if any(isn)
-                idx = find(~isn, 1, 'first');
-                if ~isempty(idx), xi(1:idx-1) = xi(idx); end
-                idx = find(~isn, 1, 'last');
-                if ~isempty(idx), xi(idx+1:end) = xi(idx); end
-                prev = [xi(1), xi(1:end-1)];
-                next = [xi(2:end), xi(end)];
-                bad  = isn & isfinite(prev) & isfinite(next);
-                xi(bad) = 0.5 * (prev(bad) + next(bad));
-            end
-        end
-        X(ch,:) = xi;
-    end
-end
-
-Xz = X;
-for c = 1:nch
-    x  = X(c,:);
-    mu = mean(x, 'omitnan');
-    sd = std(x, 0, 'omitnan');
-    if ~isfinite(sd) || sd == 0
-        Xz(c,:) = 0;
-    else
-        Xz(c,:) = (x - mu) ./ sd;
-    end
-end
+[Xz, badCh] = prep_channels(X);
 % After z-scoring SD = 1, so the fixed absolute tolerance is simply r.
 
 % ---------------- Outputs & progress header ------------------------------
@@ -216,6 +184,8 @@ else
     end
 end
 
+MSE(badCh,:) = NaN;   % no usable data (all missing or flat)
+
 % ---------------- Complexity index (area under the MSE curve) ------------
 CI = sum(MSE, 2, 'omitnan');
 
@@ -258,7 +228,9 @@ for si = 1:numel(scales)
     if zNorm == 0
         r_s = r;                          % r is a fraction of the (unit) original SD
     else
-        r_s = r * zNorm_scale(cg, zNorm);
+        f = zNorm_scale(cg, zNorm);
+        if ~(isfinite(f) && f > 0), continue, end   % flat series: entropy stays NaN
+        r_s = r * f;
     end
 
     % Fast, memory-safe SampEn. ZScore=false so the coarse-grained series is

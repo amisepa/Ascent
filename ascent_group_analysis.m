@@ -291,7 +291,8 @@ for iFile = 1:num_files
     % % vis_artifacts(EEG,oriEEG);
     % EEG = pop_interp(EEG, oriEEG.chanlocs, 'spherical');
     % dataRank = sum(eig(cov(double(EEG.data'))) > 1e-7);
-    % EEG = pop_runica(EEG, 'icatype', 'picard', 'mode', 'standard','pca', dataRank);
+    % EEG = pop_runica(EEG, 'icatype', 'picard', 'mode', 'standard', ...
+    %     'maxiter', 500, 'pca', dataRank);
     % EEG = pop_iclabel(EEG, 'default');
     % EEG = pop_icflag(EEG, [NaN NaN;0.9 1;0.9 1;0.95 1;0.95 1;0.9 1;NaN NaN]);
     % % pop_selectcomps(EEG, 1:24);
@@ -486,8 +487,6 @@ rng(1);  % fixed seed per test (same as make_revision_figures.m)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...
-        'nonlinear', grp_type, {size(SampEn1,2) size(SampEn2,2)}, [], [], [], 'g');
     % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
@@ -509,8 +508,6 @@ rng(1);  % fixed seed per test (same as make_revision_figures.m)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...
-        'nonlinear', grp_type, {size(SampEn1,2) size(SampEn2,2)}, [], [], [], 'g');
     % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
@@ -531,8 +528,6 @@ rng(1);  % fixed seed per test (same as make_revision_figures.m)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...
-        'nonlinear', grp_type, {size(SampEn1,2) size(SampEn2,2)}, [], [], [], 'g');
     % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
@@ -553,8 +548,6 @@ rng(1);  % fixed seed per test (same as make_revision_figures.m)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...
-        'nonlinear', grp_type, {size(SampEn1,2) size(SampEn2,2)}, [], [], [], 'g');
     % tvals(~mask) = NaN;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
@@ -575,8 +568,6 @@ rng(1);  % fixed seed per test (same as make_revision_figures.m)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...
-        'nonlinear', grp_type, {size(SampEn1,2) size(SampEn2,2)}, [], [], [], 'g');
     % tvals(~mask) = NaN;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
@@ -597,8 +588,6 @@ rng(1);  % fixed seed per test (same as make_revision_figures.m)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...
-        'nonlinear', grp_type, {size(SampEn1,2) size(SampEn2,2)}, [], [], [], 'g');
     % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
@@ -619,8 +608,6 @@ rng(1);  % fixed seed per test (same as make_revision_figures.m)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...
-        'nonlinear', grp_type, {size(SampEn1,2) size(SampEn2,2)}, [], [], [], 'g');
     % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');
@@ -641,8 +628,6 @@ rng(1);  % fixed seed per test (same as make_revision_figures.m)
 mask = compute_mcc(tvals, pvals, tvals_H0, pvals_H0, mcc_type, alpha, chanlocs);
 % [mask, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvals,alpha,'pdep','yes');
 if any(mask)
-    [mask_clusters, summary_tbl] = pull_clusters(mask, tvals, [], chanlocs, ...
-        'nonlinear', grp_type, {size(SampEn1,2) size(SampEn2,2)}, [], [], [], 'g');
     % tvals(~mask) = 0;
     topoplot(tvals, chanlocs, 'colormap', dmap, 'pmask', mask, ...
         'verbose','off','whitebk','on');

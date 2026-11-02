@@ -213,7 +213,7 @@ EEG = pop_dipfit_settings(EEG, 'hdmfile', fullfile(dipfitPath,'standard_BEM','st
     'chanfile',fullfile(dipfitPath,'standard_BEM','elec','standard_1005.elc'), ...
     'coord_transform',[0 0 0 0 0 -pi/2 1 1 1],'chansel',1:EEG.nbchan);
 EEG = pop_multifit(EEG, 1:size(EEG.icaweights,1), 'threshold',100, 'dipplot','off'); % include all ICs (the plot does the classic selection with RV<15)
-EEG = pop_saveset(EEG, 'filepath', EEG.filepath, 'filename', EEG.filename);
+EEG = pop_saveset(EEG, 'filepath', tempdir, 'filename', 'ascent_sample_dipfit.set');   % a copy: the shipped sample stays as is
 
 % Same call as above; the dipole/region figure is added now that EEG.dipfit exists.
 % Dipoles are colored by mean entropy and sized by fit quality (1 - RV); with ICLabel

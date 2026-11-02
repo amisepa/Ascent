@@ -12,7 +12,7 @@ function [RCmvMFE, scales] = compute_RCmvMFE(data, varargin)
 %   'r'         : scalar threshold scaling factor sr (default = 0.15)
 %   'tau'       : scalar time lag (default = 1)
 %   'n'         : fuzzy exponent (default = 2)
-%   'coarsing'  : 'mean' 'median' 'trimmed mean' 'std' or 'var' (default = 'std')
+%   'coarsing'  : 'mean' 'median' 'std' or 'var' (default = 'mean')
 %   'num_scales': number of scales (default = 15)
 %   'Parallel'  : parallelize offsets within a scale when useful (default = false)
 %   'Progress'  : show progress (default = true)
@@ -21,10 +21,11 @@ function [RCmvMFE, scales] = compute_RCmvMFE(data, varargin)
 %
 % Outputs:
 %   RCmvMFE     : [1 x num_scales] refined composite multivariate multiscale fuzzy entropy
-%   scales      : 1:num_scales
+%   scales      : 1:num_scales (2:num_scales for 'std' and 'var')
 %
 % Notes:
-%   • Channels are z-score normalized across time.
+%   • Channels are z-score normalized across time; missing samples are interpolated,
+%     and channels without usable data are left out (with a warning).
 %   • The similarity bound is scaled as r = sr * sum(std(X_k)).
 %   • Coarse-graining uses the external coarsegrain() helper.
 %   • Pairwise similarities are computed exactly via fuzzy_pairmean_cheby_exact(),
@@ -52,7 +53,7 @@ p.addParameter('m', 2, @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('r', 0.15, @(x) isnumeric(x) && isscalar(x) && x > 0 && x < 2);
 p.addParameter('tau', 1, @(x) isnumeric(x) && isscalar(x) && x >= 1);
 p.addParameter('n', 2, @(x) isnumeric(x) && isscalar(x) && x > 0);
-p.addParameter('coarsing', 'mean', @(s) any(strcmpi(s, {'mean','median','trimmed mean','trimmed','trimmean','std','sd','standard deviation','var','variance'})));
+p.addParameter('coarsing', 'mean', @(s) any(strcmpi(s, {'mean','median','std','sd','standard deviation','var','variance'})));
 p.addParameter('num_scales', 15, @(x) isnumeric(x) && isscalar(x) && x >= 1);
 p.addParameter('Parallel', false, @(x) islogical(x) && isscalar(x));
 p.addParameter('Progress', true, @(x) islogical(x) && isscalar(x));
@@ -87,8 +88,13 @@ if size(X,1) > size(X,2)
 end
 [nChan, ~] = size(X);
 
-% ---------- Normalize per channel ----------
-X = zscore(X, 0, 2);
+% ---------- Fill missing samples, normalize per channel ----------
+[X, badCh] = prep_channels(X);
+if any(badCh)
+    warning('compute_RCmvMFE: %d channel(s) without usable data left out.', nnz(badCh));
+    X(badCh,:) = [];
+    nChan = size(X,1);
+end
 
 % ---------- Original r scaling ----------
 r = sr * sum(std(X, 0, 2));

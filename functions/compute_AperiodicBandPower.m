@@ -74,7 +74,7 @@ else
         error('compute_AperiodicBandPower: knee must have one entry per psd row (%d).', ...
               size(psd,1));
     end
-    ap_model = 10.^(offset - log10(knee + freqs.^exponent));   % [nSig x nFreqs]
+    ap_model = 10.^(offset - log10(abs(knee) + freqs.^exponent));   % [nSig x nFreqs]; abs as in the fit
 end
 
 mask = freqs >= band(1) & freqs <= band(2);

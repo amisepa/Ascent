@@ -34,8 +34,7 @@ ASCENT2.1.zip release.
   make_revision_figures there and look at the new tick labels; rerun
   assess_speed_and_outputs.m on an idle machine for serial timings; rebuild the release zip
   (version 2.2) with the revision; EEGLAB upload.
-- Confirm: did the EO ICA use 'maxiter', 500 as the EC block does? (Not recoverable from the
-  files; the EO block of the group script is otherwise the same as EC now.)
+- EO ICA used 'maxiter', 500 as EC (confirmed 2026-11-02); the group script now says so.
 - FOR REVISION 2 (text, with the group result):
   - mMSE: low-pass default and pooled match counts (Wu et al. 2014, a new reference) in 2.2.5, the group Methods,
     4.2 and the reply on default bandpass filtering; band-pass as Kosciessa et al.'s check. Remove
@@ -73,16 +72,17 @@ ASCENT2.1.zip release.
   parameter at a time (Donoghue et al. 2024 design; fuzzy and multiscale entropy were not in it);
   eBOSC-style rhythm detection; corrected outputs labeled by rule and exports for the oneoverf
   work, once that paper is out; per-epoch computation with pooled counts instead of joining epochs;
-  skip boundary segments; cap the band-pass edge at the post-skip Nyquist, if band-pass stays;
-  figures for multivariate measures on ICs; warn when a low sampling rate leaves few bins for the
-  aperiodic fit; tau for ExSEnt (the GUI asks for it, the function has none); keep the knee sign
-  the same in compute_AperiodicFit and compute_AperiodicBandPower; tutorial saves over the sample;
-  signals without electrode coordinates (ECG, RR) are refused; single-scale pull_clusters console
-  tables still run along the channel list (masks and p-values use the scalp neighbours); flat or all-NaN channels give 0
-  in MFE, CMFE and RCMFE where mMSE gives NaN, and a NaN gap makes the scale_tolerance fallback jump
-  within a curve; one NaN sample makes RCmvMFE all NaN; RCmvMFE help (default, scales, 'trimmed');
-  m and m+1 use different template counts in compute_SampEn (negligible at 50+ points and tau 1,
-  a bias on very short windows, so same-template counts would change the published SampEn slightly).
+  skip boundary segments; cap the band-pass edge at the post-skip Nyquist, if band-pass stays.
+- KEPT AS IS (decided): compute_SampEn counts m and m+1 matches over different template sets (as
+  the published values); same-template counts would change them slightly, and matter only for
+  very short windows or tau > 1.
+- DONE 2026-11-02: one fill-and-z-score step for MSE, MFE, CMFE, RCMFE and RCmvMFE (dead channels
+  give NaN, NaN gaps are filled, so the zNorm fallback no longer jumps); RCmvMFE leaves out dead
+  channels; ExSEnt warns that it has no tau; knee sign as in the fit in the band power; datasets
+  without electrode locations (ECG, RR) are computed without figures; no IC maps for the
+  multivariate measures; a warning when the sampling rate leaves few bins for the aperiodic fit;
+  the tutorial saves the dipole fit to a copy; single-scale console tables removed from the group
+  script; RCmvMFE help.
 
 ## Status 2026-10-22 (supersedes the 10-14 "NEXT" below)
 Plugin v2.1 is on GitHub (release v2.1, ASCENT2.1.zip). Manuscript v16 and letter v6 are built

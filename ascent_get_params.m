@@ -354,6 +354,12 @@ if contains(lower(p.measure), {'fuzzen','mfe','cmfe','rcmfe','rcmvmfe'})
     end
 end
 
+% ExSEnt segments the signal at its extrema and has no time lag
+if strcmpi(p.measure, 'ExSEnt') && p.tau ~= 1
+    warning('ExSEnt has no time lag: tau = %g is not used.', p.tau);
+    p.tau = 1;
+end
+
 % Spectral covariates: saved next to every measure except Aperiodic itself
 if isempty(p.spectralCovariates)
     p.spectralCovariates = ~strcmpi(p.measure, 'aperiodic');

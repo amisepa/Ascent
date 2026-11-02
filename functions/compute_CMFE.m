@@ -115,7 +115,7 @@ if isempty(scales)
     error('compute_CMFE: not enough samples/scales to compute even scale 2. Provide longer data or increase num_scales.');
 end
 
-Xz = zscore_channels_local(X);
+[Xz, badCh] = prep_channels(X);   % fills missing samples, z-scores
 CMFE = nan(nch, numel(scales));
 
 if showProg
@@ -205,6 +205,7 @@ else
     end
     if ~isempty(hWB) && isvalid(hWB), try, close(hWB); catch, end, end
 end
+CMFE(badCh,:) = NaN;   % no usable data (all missing or flat)
 
     function notifyProgress(~)
         nDone = nDone + 1;

@@ -204,7 +204,7 @@ if nargin < 1, help ascent_compute; return; end
 % With no name-value pairs the GUI opens, and it can load a dataset (or the
 % sample dataset) when none is loaded, so the dataset is checked after it
 guiMode = isempty(varargin) || (numel(varargin) == 1 && isempty(varargin{1}));
-if ~guiMode, check_dataset(EEG); end
+if ~guiMode, hasLocs = check_dataset(EEG); end
 
 % ----------------------------
 % Get and validate all parameters
@@ -215,7 +215,7 @@ if isempty(p)
     return          % the dataset passed in, not one loaded in the window
 end
 EEG = EEGin;
-if guiMode, check_dataset(EEG); end
+if guiMode, hasLocs = check_dataset(EEG); end
 
 % Unpack struct into local variables for readability below
 measure          = p.measure;
@@ -223,7 +223,7 @@ chanlist         = p.chanlist;
 tau              = p.tau;
 m                = p.m;
 r                = p.r;
-vis              = p.vis;
+vis              = p.vis && hasLocs;   % figures need electrode locations
 parallel         = p.parallel;
 progress         = p.progress;
 coarsing         = p.coarsing;
@@ -658,7 +658,7 @@ if vis
             sf = scale_frequencies(measure, scales, fs, coarsing, infoArg);
             if ~isempty(sf.hz), icaArgs = {'scaleFreq', sf}; end
         end
-        if isICA
+        if isICA && ~any(strcmpi(measure, {'mvFuzzEn','RCmvMFE'}))   % one value for all ICs: no map
             icaArgs = [icaArgs, {'ICA', true, 'icawinv', icawinv}];
             if isfield(EEG,'dipfit') && ~isempty(EEG.dipfit)
                 icaArgs = [icaArgs, {'dipfit', EEG.dipfit}];
@@ -849,6 +849,11 @@ data(dead,:) = 0;
 [psd, freqs] = compute_psd(data, fs, 'freqRange', p.freqRange, 'winSec', p.winSec, ...
     'overlap', p.psdOverlap, 'window', p.windowType, 'detrend', true, ...
     'Parallel', p.parallel, 'Progress', false);
+nBins = nnz(freqs >= p.fitFreqRange(1) & freqs <= p.fitFreqRange(2));
+if nBins < 20
+    warning(['ascent_compute: only %d frequency bins in the aperiodic fit range at %g Hz: the ' ...
+        'covariates are unreliable (set ''freqrange'' and ''fitfreqrange'').'], nBins, fs);
+end
 [cv.exponent, cv.offset, fi] = compute_AperiodicFit(freqs, psd, ...
     'FreqRange', p.fitFreqRange, 'AperiodicMode', p.aperiodicMode, 'MaxPeaks', p.maxPeaks, ...
     'MinPeakHeight', p.minPeakHeight, 'PeakThreshold', p.peakThreshold, ...
@@ -910,11 +915,15 @@ warning(['ascent_compute: scale frequencies are approximate. Averaging s samples
 
 
 %% Dataset checks (before computing)
-function check_dataset(EEG)   % no closing END: the main function has none
+function hasLocs = check_dataset(EEG)   % no closing END: the main function has none
 if isempty(EEG) || ~isfield(EEG,'data') || isempty(EEG.data), error('Empty dataset.'); end
 if isempty(EEG.chanlocs) || isempty(EEG.chanlocs(1).labels), error('No channel labels.'); end
-if ~isfield(EEG.chanlocs,'X') || isempty(EEG.chanlocs(1).X)
-    error("Electrode locations are required. Go to 'Edit > Channel locations' and import coordinates.");
+% Locations are needed for the scalp maps only: signals such as ECG or RR
+% series are computed without figures
+hasLocs = isfield(EEG.chanlocs,'X') && ~isempty(EEG.chanlocs(1).X);
+if ~hasLocs
+    warning(['ascent_compute: no electrode locations, so no figures. For scalp maps, import ' ...
+        'coordinates in Edit > Channel locations.']);
 end
 if isempty(EEG.ref)
     warning('EEG data not referenced. Referencing is strongly recommended (e.g., average-reference).');

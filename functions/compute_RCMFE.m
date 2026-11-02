@@ -122,17 +122,7 @@ if isempty(scales)
     error('compute_RCMFE: not enough samples/scales to compute even scale 2. Provide longer data or increase num_scales.');
 end
 
-Xz = X;
-for c = 1:nch
-    x  = X(c,:);
-    mu = mean(x, 'omitnan');
-    sd = std(x, 0, 'omitnan');
-    if ~isfinite(sd) || sd == 0
-        Xz(c,:) = 0;
-    else
-        Xz(c,:) = (x - mu) ./ sd;
-    end
-end
+[Xz, badCh] = prep_channels(X);   % fills missing samples, z-scores
 
 coarseLabel = coarse_label(coarseType);
 
@@ -260,6 +250,7 @@ else
         end
     end
 end
+RCMFE(badCh,:) = NaN;   % no usable data (all missing or flat)
 
     function notifyProgress(~)
         nDone = nDone + 1;
