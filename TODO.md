@@ -50,11 +50,13 @@ ASCENT2.1.zip release.
     vs Azami; FuzzEn 5.8e-5 local and 7.7e-5 global vs Azami; ExSEnt 3.1e-4 vs the authors' code; MSE
     1.1e-4 to 6.5e-4 over scales 1-5 vs EntropyHub with the same tolerance rule, as the reference in
     place of our port of Costa. No fixed-tolerance or 50-scale rerun: drop the stated cause of the
-    old 5- and 50-scale differences, or run them. Serial timings, idle machine, 2026-11-02
-    (reference vs ASCENT, 64 channels, 75 s): SampEn 70.9 vs 30.1 s; FuzzEn local 82.3 vs 130.4 s
-    (ASCENT slower); FuzzEn global 146.1 vs 95.3 s; ExSEnt 1178 vs 25.2 s; MSE 5 scales 1415 vs
-    108 s. So "reduced for all benchmarked measures" is false for FuzzEn in local mode run
-    serially: say so, or report it with the parallel pool and state the pool and hardware.
+    old 5- and 50-scale differences, or run them. Serial timings 2026-11-02 (reference vs ASCENT,
+    64 channels, 75 s): SampEn 70.9 vs 30.1 s, ExSEnt 1178 vs 25.2 s, MSE 5 scales 1415 vs 108 s.
+    The machine was not idle (other MATLAB jobs), so rerun on a checked idle machine. FuzzEn:
+    controlled run (1 thread, interleaved, 3 repeats, 4 channels): ASCENT = Azami's code in both
+    modes (local 37.6 vs 38.4 s, global 44.1 vs 39.6 s); both compute all pairs with pdist, so
+    serially there is no speedup to claim for FuzzEn: its gain is the parallel pool. Say that in
+    3.1, with pool size and hardware.
   - The 69 GiB crash claim belongs to RCmvMFE, not mvFuzzEn (text and reply).
   - "exceed available RAM" -> "exceed a set size (2 GB by default)".
   - 2.7 and Data Availability: name the commit once the group script has run end to end; say the
