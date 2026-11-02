@@ -67,10 +67,21 @@ ASCENT2.1.zip release.
   - Reply to R1, now "Not applicable.": the title and scope were revised (abstract, 1.3:
     computation and export, statistics done externally), and the authors will gladly address the
     details given to the editor.
-- PLANNED FOR REVISION 2: surrogate test, optional for every entropy/fractal measure: IAAFT or
-  Fourier phase randomization, n surrogates; output the measure, the surrogate mean and original
-  minus surrogate per channel and scale (Kosciessa et al. 2020; Courtiol et al. 2016). In the
-  plugin first, with a check on the sample data; group level if time allows.
+- DONE 2026-11-02 (v2.2): surrogate test, 'surrogates', N for every measure except Aperiodic
+  (compute_surrogates, surrogate_segment): the same call on N surrogates, saved as original, mean,
+  SD, diff, z and rank p per channel and scale. Default 'gaussphase': on the segment whose ends
+  match (at most 10% cut), each signal is rank-transformed to a Gaussian, then phase-randomized
+  with the same phases for all signals; the original is the measure of that transformed signal.
+  Chosen by simulation (SampEn, 100 signals of 3000 samples per case, 19 surrogates, % with
+  p <= .05): linear Gaussian 7 (phase 9, IAAFT 24); linear then exp() 8 (phase 100, IAAFT 100);
+  noisy logistic map 100 for all three. IAAFT, which Kosciessa et al. used, is biased (mean z
+  +0.6 to +1.5 on linear signals). Plain phase rejects for a non-Gaussian amplitude distribution
+  alone: on the sample dataset (eyes closed) SampEn was below its phase surrogates in 59 of 64
+  channels (z -4.9) but not below its IAAFT surrogates (median z +0.3; excess kurtosis 0.31).
+  In the paper: the method, these sizes and power, and what the null is.
+- NEXT: surrogate test on the group data (EC and EO, low-pass mMSE) for revision 2: about N times the
+  group run (4.7 h per run of 80 recordings at 6 workers), so 19 surrogates is days: test a subset
+  of channels or subjects, or the channel mean, and say so.
 - PLANNED after the paper (the v2.2 items below move to the next version): Kosciessa's high-pass
   check; MRMSSD (Courtiol et al. 2016); alpha band-stop check; simulation mode varying one
   parameter at a time (Donoghue et al. 2024 design; fuzzy and multiscale entropy were not in it);

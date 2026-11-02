@@ -125,6 +125,10 @@ p.slidOverlap      = [];
 p.slidNAvg         = [];
 p.slidPeakWidthLimits = [];
 p.spectralCovariates = [];
+p.surrogates        = [];
+p.surrogateMethod   = [];
+p.surrogateSeed     = [];
+p.surrogateMatchEnds = [];
 p.save               = [];
 
 % ----------------------------
@@ -205,6 +209,10 @@ else
             case 'startpoints',      p.StartPoints      = val;
             case 'scalefreq',        p.scaleFreq        = logical(val);
             case 'spectralcovariates', p.spectralCovariates = logical(val);
+            case 'surrogates',       p.surrogates       = double(val);
+            case 'surrogatemethod',  p.surrogateMethod  = lower(char(val));
+            case 'surrogateseed',    p.surrogateSeed    = double(val);
+            case 'surrogatematchends', p.surrogateMatchEnds = logical(val);
             case 'timewin',          p.TimeWin          = double(val);
             case 'timestep',         p.TimeStep         = double(val);
             case 'timeonly',         p.TimeOnly         = logical(val);
@@ -358,6 +366,26 @@ end
 if strcmpi(p.measure, 'ExSEnt') && p.tau ~= 1
     warning('ExSEnt has no time lag: tau = %g is not used.', p.tau);
     p.tau = 1;
+end
+
+% Surrogate test
+if isempty(p.surrogates),      p.surrogates      = 0;       end
+if isempty(p.surrogateMethod), p.surrogateMethod = 'gaussphase'; end
+if isempty(p.surrogateMatchEnds), p.surrogateMatchEnds = true; end
+if isempty(p.surrogateSeed),   p.surrogateSeed   = 1;       end
+if ~isscalar(p.surrogates) || p.surrogates < 0 || p.surrogates ~= round(p.surrogates)
+    error('surrogates must be 0 (off) or a positive integer.');
+end
+if ~any(strcmp(p.surrogateMethod, {'gaussphase','phase','iaaft'}))
+    error('surrogatemethod must be ''gaussphase'', ''phase'' or ''iaaft''.');
+end
+if p.surrogates > 0 && strcmpi(p.measure, 'aperiodic')
+    warning('No surrogate test for Aperiodic: surrogates keep the spectrum by construction.');
+    p.surrogates = 0;
+end
+if p.surrogates > 0 && strcmp(p.surrogateMethod, 'iaaft') && any(strcmpi(p.measure, {'mvFuzzEn','RCmvMFE'}))
+    warning(['IAAFT surrogates do not keep the correlations between channels, which %s ' ...
+        'depends on: use ''surrogatemethod'', ''phase'' to test nonlinearity alone.'], p.measure);
 end
 
 % Spectral covariates: saved next to every measure except Aperiodic itself

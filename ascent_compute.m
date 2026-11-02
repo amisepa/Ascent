@@ -93,6 +93,31 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %                          the arbitrary scale of each IC: compare them within an
 %                          IC across conditions only, not across ICs or subjects.
 %
+%   Surrogate test (every measure except Aperiodic):
+%     'surrogates'       - Number of spectrum-preserving surrogates to compute the
+%                          measure on (default: 0 = off). Each surrogate keeps the
+%                          power spectrum and destroys nonlinear structure, so a
+%                          measure that differs from its surrogates reflects more
+%                          than the spectrum (Kosciessa et al. 2020; Courtiol et
+%                          al. 2016). Costs N times the measure; 19 or more give
+%                          p-values down to .05.
+%     'surrogatemethod'  - 'gaussphase' (default): each signal is rank-transformed
+%                          to a Gaussian distribution, then phase-randomized with
+%                          the same phases for all signals (keeps every spectrum
+%                          and cross-spectrum). It tests the dynamics, not the
+%                          amplitude distribution, and .original is then the
+%                          measure of the transformed signal. 'phase': the same
+%                          without the transform (a non-Gaussian amplitude
+%                          distribution alone makes it reject). 'iaaft': keeps
+%                          each signal's amplitude distribution but rejects too
+%                          often. Sizes and power: see compute_surrogates.
+%     'surrogatematchends' - Test on the segment, common to all signals, whose
+%                          ends match (at most 10% cut), so that the Fourier
+%                          surrogates do not add a jump; the measure is
+%                          recomputed on that segment for the comparison
+%                          (default: true; see surrogate_segment)
+%     'surrogateseed'    - Seed of the surrogates (default: 1), for reproducibility
+%
 % OUTPUTS:
 %   Below, "signals" are scalp channels, or ICs when domain = 'ica'.
 %
@@ -116,6 +141,15 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %       .alpha_peak_freq    frequency of the largest fitted peak in .alphaBand (Hz;
 %                           NaN when no peak was fitted there)
 %       .r2                 aperiodic fit R² (screen poor fits before using them)
+%   EEG.ascent.(measure).surrogates         - surrogate test ('surrogates' > 0), same size
+%                                             as .data (fields per output for ExSEnt):
+%       .original           the measure on the signal tested: the segment
+%                           (.samples), rank-transformed for 'gaussphase'
+%       .mean, .sd          the measure over the surrogates
+%       .diff               original minus surrogate mean
+%       .z                  diff / sd
+%       .p                  two-sided rank p over the surrogates (at least 1/(N+1))
+%       .values             the measure on each surrogate (last dimension)
 %   EEG.ascent.Aperiodic.data.exponent     - aperiodic exponent [signals x 1]
 %   EEG.ascent.Aperiodic.data.offset        - aperiodic offset [signals x 1]
 %   EEG.ascent.Aperiodic.data.psd           - raw PSD [signals x freqs]
@@ -343,6 +377,7 @@ if isICA
     nChan      = size(data, 1);
     chanLabels = arrayfun(@(k) sprintf('IC%d',k), 1:nChan, 'UniformOutput', false);
     chanlocs   = EEG.chanlocs(icachansind);
+    chanIdx    = [];
 else
     % In the order the user gave; a misspelled label is an error, not a
     % smaller selection
@@ -636,6 +671,14 @@ if exist('info','var')
 end
 
 % ----------------------------
+% Surrogate test (optional)
+% ----------------------------
+if p.surrogates > 0
+    EEG.ascent.(measure).surrogates = surrogate_test(EEG, p, measure, data, isICA, chanIdx, ...
+        EEG.ascent.(measure).data);
+end
+
+% ----------------------------
 % VISUALIZATIONS | PLOTS
 % ----------------------------
 if vis
@@ -809,8 +852,8 @@ else
 end
 
 
-function com = history_command(p, allLabels)
-% One name-value pair per setting that was used, as ascent_get_params reads them
+function keys = setting_keys()
+% p field and the name ascent_get_params reads it under, for every setting
 keys = { ...
     'domain','domain'; 'tau','tau'; 'm','m'; 'r','r'; 'vis','vis'; 'parallel','parallel'; ...
     'progress','progress'; 'coarsing','coarsing'; 'num_scales','num_scales'; ...
@@ -825,7 +868,14 @@ keys = { ...
     'alphaBand','alphaband'; 'timeResolved','timeresolved'; 'slidWinSec','slidwinsec'; ...
     'slidOverlap','slidoverlap'; 'slidNAvg','slidnavg'; ...
     'slidPeakWidthLimits','slidpeakwidthlimits'; 'spectralCovariates','spectralcovariates'; ...
+    'surrogates','surrogates'; 'surrogateMethod','surrogatemethod'; 'surrogateSeed','surrogateseed'; ...
+    'surrogateMatchEnds','surrogatematchends'; ...
     'save','save'};
+
+
+function com = history_command(p, allLabels)
+% One name-value pair per setting that was used, as ascent_get_params reads them
+keys = setting_keys();
 want = clean_labels(p.chanlist);
 if isempty(want) || isequal(want(:), allLabels(:))
     chans = '''all''';
@@ -839,6 +889,98 @@ for k = 1:size(keys,1)
     com = sprintf('%s, ''%s'', %s', com, keys{k,2}, literal(v));
 end
 com = [com ');'];
+
+
+%% Surrogate test: the same measure, with the same settings, on surrogates
+function st = surrogate_test(EEG, p, measure, data, isICA, chanIdx, orig)
+n    = p.surrogates;
+rs   = RandStream('mt19937ar', 'Seed', p.surrogateSeed);   % one reproducible sequence
+args = {'measure', p.measure, 'chanlist', p.chanlist};
+keys = setting_keys();
+for k = 1:size(keys,1)
+    v = p.(keys{k,1});
+    if ~isempty(v), args = [args, keys(k,2), {v}]; end %#ok<AGROW>
+end
+args = [args, {'vis', false, 'save', 'never', 'spectralcovariates', false, 'surrogates', 0, 'progress', false}];
+fprintf('Surrogate test: %s on %d %s surrogates (seed %g)...\n', measure, n, p.surrogateMethod, p.surrogateSeed);
+ws = warning('off', 'all');   % the same warnings as for the original, n times
+restoreWarnings = onCleanup(@() warning(ws));
+% The segment whose ends match; the measure is recomputed on it, so that the
+% original and the surrogates have the same samples
+idx = 1:size(data,2);
+if p.surrogateMatchEnds, idx = surrogate_segment(data); end
+trimmed = numel(idx) < size(data,2);
+if trimmed
+    EEG  = segment_dataset(EEG, idx);
+    data = data(:, idx);
+end
+gauss = strcmp(p.surrogateMethod, 'gaussphase');
+if gauss
+    [~, sinfo] = compute_surrogates(data, 'Method', 'gaussphase', 'N', 1, 'Seed', 0);
+    data = sinfo.tested;          % the rank-Gaussianized signals
+    EEG  = with_signals(EEG, isICA, chanIdx, data);
+end
+if trimmed || gauss               % the original is the measure of the signal tested
+    evalc('E = ascent_compute(EEG, args{:});');
+    orig = E.ascent.(measure).data;
+end
+isStruct = isstruct(orig);
+if isStruct, fn = fieldnames(orig)'; else, fn = {'data'}; end
+vals  = cell(1, numel(fn));
+iters = nan(1, n);
+for k = 1:n
+    % data are already transformed for 'gaussphase': phase-randomize them
+    m = p.surrogateMethod; if strcmp(m, 'gaussphase'), m = 'phase'; end
+    [Sk, sinfo] = compute_surrogates(data, 'Method', m, 'Stream', rs);
+    iters(k) = sinfo.iterations;
+    E = with_signals(EEG, isICA, chanIdx, Sk);
+    evalc('E = ascent_compute(E, args{:});');
+    out = E.ascent.(measure).data;
+    for f = 1:numel(fn)
+        if isStruct, v = out.(fn{f}); else, v = out; end
+        vals{f} = cat(3, vals{f}, v);
+    end
+    if p.progress, fprintf('  surrogate %d/%d done\n', k, n); end
+end
+clear restoreWarnings
+st = struct('method', p.surrogateMethod, 'n', n, 'seed', p.surrogateSeed, 'iterations', iters, ...
+    'samples', idx([1 end]), 'n_samples', numel(idx), ...
+    'note', 'diff = original - surrogate mean on the segment tested; z = diff/sd; p = two-sided rank p, at least 1/(n+1)');
+for f = 1:numel(fn)
+    if isStruct, o = orig.(fn{f}); else, o = orig; end
+    V  = vals{f};
+    mu = mean(V, 3, 'omitnan');
+    sd = std(V, 0, 3, 'omitnan');
+    r  = struct('original', o, 'mean', mu, 'sd', sd, 'diff', o - mu, 'z', (o - mu) ./ sd, ...
+        'p', (1 + sum(abs(V - mu) >= abs(o - mu), 3)) ./ (n + 1), 'values', V);
+    if isStruct, st.(fn{f}) = r;
+    else, for g = fieldnames(r)', st.(g{1}) = r.(g{1}); end
+    end
+end
+
+
+function E = with_signals(EEG, isICA, chanIdx, X)
+% The dataset with the analysed signals replaced by X
+E = EEG; E.filename = ''; E.filepath = '';
+if isICA
+    E.icaact = reshape(cast(X, 'like', EEG.icaact), size(EEG.icaact));
+else
+    E.data(chanIdx,:) = cast(X, 'like', EEG.data);
+end
+
+
+function E = segment_dataset(EEG, idx)
+% The dataset restricted to samples idx of its (flattened) time axis
+E = EEG; E.filename = ''; E.filepath = '';
+E.data = reshape(EEG.data, size(EEG.data,1), []);
+E.data = E.data(:, idx);
+if ~isempty(EEG.icaact)
+    A = reshape(EEG.icaact, size(EEG.icaact,1), []);
+    E.icaact = A(:, idx);
+end
+E.pnts = numel(idx); E.trials = 1; E.xmin = 0; E.xmax = (E.pnts-1) / E.srate;
+E.times = (0:E.pnts-1) / E.srate * 1000;
+E.event = []; E.epoch = []; E.urevent = [];
 
 
 %% Spectral covariates: aperiodic fit and alpha power of the analysed signals
