@@ -411,8 +411,7 @@ end
 
 function [se, cnt] = sampen(x, o)
 % SampEn of an already normalized series (r is an absolute bound here)
-[se, cnt] = compute_SampEn(x, 'm', o.m, 'tau', o.tau, 'r', o.r, 'ZScore', false, ...
-    'BlockSize', o.BlockSize, 'pdistMaxGB', o.pdistMaxGB, 'Parallel', false, 'Progress', false);
+[se, cnt] = sampen_exact(x, o.m, o.r, o.tau);   % = compute_SampEn with 'ZScore', false
 end
 
 function se = pooled_sampen(cnt)

@@ -9,7 +9,6 @@ end
 kernelType = lower(kernelType);
 
 m = size(V, 1);
-p = size(V, 2);
 
 S = 0;
 
@@ -27,13 +26,9 @@ for i0 = 1:blockSize:m-1
     % Across-blocks
     for j0 = i1+1:blockSize:m
         j1 = min(j0 + blockSize - 1, m);
-        Vj = V(j0:j1, :);
-        nj = size(Vj, 1);
-
-        Dmax = zeros(nb, nj);
-        for k = 1:p
-            Dmax = max(Dmax, abs(Vi(:, k) - Vj(:, k)'));
-        end
+        % [nb x nj] Chebyshev distances: the same values as the max over
+        % coordinates of |Vi(:,k) - Vj(:,k)'| (exact operations), faster
+        Dmax = pdist2(Vi, V(j0:j1, :), 'chebychev');
 
         S = S + apply_kernel_sum(Dmax, r, n, kernelType);
     end

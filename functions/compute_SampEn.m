@@ -13,8 +13,8 @@ function [SampEn, counts] = compute_SampEn(data, varargin)
 %   'ZScore'    : z-score each channel before computing SampEn (default = true).
 %                 Set false when the caller has already normalised the data and
 %                 'r' is an absolute Chebyshev threshold (used by compute_MSE).
-%   'BlockSize' : block size for exact blocked fallback (default = 2000)
-%   'pdistMaxGB': max GB allowed for pdist temporary vector (default = 2.0)
+%   'BlockSize', 'pdistMaxGB': no longer used (accepted so that existing
+%                 calls still work)
 %   'Parallel'  : logical true/false to enable parfor over channels (default = true)
 %   'Progress'  : logical true/false to show progress
 %
@@ -30,8 +30,8 @@ function [SampEn, counts] = compute_SampEn(data, varargin)
 %   • When ZScore is true, data is z-scored per channel across time and r is a
 %     fraction of the (unit) SD. When false, data is used as-is and r is the
 %     absolute Chebyshev tolerance.
-%   • Pairwise Chebyshev match fractions are computed exactly using pdist
-%     when memory allows, otherwise an exact blocked fallback is used.
+%   • Match counts are exact (sampen_exact: templates sorted by their first
+%     coordinate, O(N) memory); they equal comparing every pair with pdist.
 %
 % References:
 %   Richman, J. S., & Moorman, J. R. (2000). Physiological time-series analysis using
@@ -57,8 +57,6 @@ m            = p.Results.m;
 tau          = p.Results.tau;
 r            = p.Results.r;
 doZScore     = p.Results.ZScore;
-blockSize    = p.Results.BlockSize;
-pdistMaxGB   = p.Results.pdistMaxGB;
 parallelMode = p.Results.Parallel;
 showProgress = p.Results.Progress;
 
@@ -118,14 +116,14 @@ end
 % ---------------- Compute per channel ----------------
 if parallelMode && ~isempty(ver('parallel'))
     parfor iChan = 1:nchan
-        [SampEn(iChan), counts(iChan,:)] = compute_SampEn_single(data_z(iChan,:), m, r, tau, blockSize, pdistMaxGB);
+        [SampEn(iChan), counts(iChan,:)] = sampen_exact(data_z(iChan,:), m, r, tau);
         if useDQ
             send(dq, 1);
         end
     end
 else
     for iChan = 1:nchan
-        [SampEn(iChan), counts(iChan,:)] = compute_SampEn_single(data_z(iChan,:), m, r, tau, blockSize, pdistMaxGB);
+        [SampEn(iChan), counts(iChan,:)] = sampen_exact(data_z(iChan,:), m, r, tau);
 
         if ~isempty(hWB) && isvalid(hWB)
             try
@@ -150,103 +148,4 @@ end
             fprintf('  progress: ch %d/%d\n', nDone, nchan);
         end
     end
-end
-
-% =========================================================================
-function [SampEn, cnt] = compute_SampEn_single(signal, m, r, tau, blockSize, pdistMaxGB)
-
-cnt = zeros(1, 4);
-signal = signal(isfinite(signal));
-N = numel(signal);
-
-if N <= m + 1
-    SampEn = NaN;
-    return
-end
-
-Xm  = embed_tau(signal, m,   tau);
-Xm1 = embed_tau(signal, m+1, tau);
-
-if size(Xm,1) < 2 || size(Xm1,1) < 2
-    SampEn = NaN;
-    return
-end
-
-[Bm,  hB, pB] = match_fraction_cheby_exact(Xm,  r, blockSize, pdistMaxGB);
-[Am1, hA, pA] = match_fraction_cheby_exact(Xm1, r, blockSize, pdistMaxGB);
-cnt = [hA pA hB pB];
-
-if Bm > 0 && Am1 > 0 && isfinite(Bm) && isfinite(Am1)
-    SampEn = -log(Am1 / Bm);
-else
-    SampEn = NaN;
-end
-end
-
-% =========================================================================
-function X = embed_tau(signal, m, tau)
-signal = signal(:);   % a column, so that m = 1 gives L x 1
-N = numel(signal);
-L = N - (m - 1) * tau;
-if L <= 0
-    X = zeros(0, m);
-    return
-end
-idx  = (0:(m-1)) * tau;
-rows = (1:L).';
-X = signal(rows + idx);
-end
-
-% =========================================================================
-function [p, hits, pairs] = match_fraction_cheby_exact(V, r, blockSize, pdistMaxGB)
-M = size(V,1);
-if M < 2
-    p = NaN; hits = 0; pairs = 0;
-    return
-end
-
-pairs = double(M) * double(M - 1) / 2;
-gbNeeded = (pairs * 8) / (1024^3);
-
-if gbNeeded <= pdistMaxGB
-    d = pdist(V, 'chebychev');
-    hits = nnz(d <= r);
-else
-    hits = pairwise_match_count_cheby_blocked(V, r, blockSize);
-end
-p = hits / pairs;
-end
-
-% =========================================================================
-function hits = pairwise_match_count_cheby_blocked(V, r, blockSize)
-
-m = size(V,1);
-pdim = size(V,2);
-hits = 0;
-
-for i0 = 1:blockSize:m-1
-    i1 = min(i0 + blockSize - 1, m - 1);
-    Vi = V(i0:i1,:);
-    nb = size(Vi,1);
-
-    % within-block
-    for ii = 1:nb-1
-        D = max(abs(Vi(ii+1:end,:) - Vi(ii,:)), [], 2);
-        hits = hits + nnz(D <= r);
-    end
-
-    % across-blocks
-    for j0 = i1+1:blockSize:m
-        j1 = min(j0 + blockSize - 1, m);
-        Vj = V(j0:j1,:);
-        nj = size(Vj,1);
-
-        Dmax = zeros(nb, nj);
-        for k = 1:pdim
-            Dmax = max(Dmax, abs(Vi(:,k) - Vj(:,k)'));
-        end
-
-        hits = hits + nnz(Dmax <= r);
-    end
-end
 end

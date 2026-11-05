@@ -233,10 +233,9 @@ for si = 1:numel(scales)
         r_s = r * f;
     end
 
-    % Fast, memory-safe SampEn. ZScore=false so the coarse-grained series is
-    % used as-is and r_s is applied as an absolute Chebyshev threshold.
-    v(si) = compute_SampEn(cg, 'm', m, 'r', r_s, 'tau', tau, ...
-        'ZScore', false, 'Parallel', false, 'Progress', false);
+    % Exact SampEn of the coarse-grained series as-is, r_s an absolute
+    % Chebyshev threshold (what compute_SampEn does with 'ZScore', false)
+    v(si) = sampen_exact(cg, m, r_s, tau);
 end
 
 if showProgress
