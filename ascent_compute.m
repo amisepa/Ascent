@@ -147,8 +147,9 @@ function [EEG, com] = ascent_compute(EEG, varargin)
 %                           (.samples), rank-transformed for 'gaussphase'
 %       .mean, .sd          the measure over the surrogates
 %       .diff               original minus surrogate mean
-%       .z                  diff / sd
-%       .p                  two-sided rank p over the surrogates (at least 1/(N+1))
+%       .z                  diff / (sd * sqrt(1 + 1/N)): about t with N-1 df under the null
+%       .p                  two-sided rank p: rank of the original's distance from the
+%                           mean of all N+1 values (exact under the null, at least 1/(N+1))
 %       .values             the measure on each surrogate (last dimension)
 %   EEG.ascent.Aperiodic.data.exponent     - aperiodic exponent [signals x 1]
 %   EEG.ascent.Aperiodic.data.offset        - aperiodic offset [signals x 1]
@@ -945,14 +946,21 @@ end
 clear restoreWarnings
 st = struct('method', p.surrogateMethod, 'n', n, 'seed', p.surrogateSeed, 'iterations', iters, ...
     'samples', idx([1 end]), 'n_samples', numel(idx), ...
-    'note', 'diff = original - surrogate mean on the segment tested; z = diff/sd; p = two-sided rank p, at least 1/(n+1)');
+    'note', ['diff = original - surrogate mean on the segment tested; z = diff/(sd*sqrt(1+1/n)), ' ...
+             'about t with n-1 df under the null; p = two-sided rank p of |value - mean of all n+1|, ' ...
+             'exact under the null, at least 1/(n+1)']);
 for f = 1:numel(fn)
     if isStruct, o = orig.(fn{f}); else, o = orig; end
     V  = vals{f};
     mu = mean(V, 3, 'omitnan');
     sd = std(V, 0, 3, 'omitnan');
-    r  = struct('original', o, 'mean', mu, 'sd', sd, 'diff', o - mu, 'z', (o - mu) ./ sd, ...
-        'p', (1 + sum(abs(V - mu) >= abs(o - mu), 3)) ./ (n + 1), 'values', V);
+    % Under the null the original and the n surrogates are exchangeable, so the
+    % rank test centres on the mean of all n+1 values (centring on the
+    % surrogates alone pulls the centre toward each surrogate: 6.2% of p <= .05)
+    ma = mean(cat(3, V, o), 3, 'omitnan');
+    r  = struct('original', o, 'mean', mu, 'sd', sd, 'diff', o - mu, ...
+        'z', (o - mu) ./ (sd * sqrt(1 + 1/n)), ...
+        'p', (1 + sum(abs(V - ma) >= abs(o - ma), 3)) ./ (n + 1), 'values', V);
     if isStruct, st.(fn{f}) = r;
     else, for g = fieldnames(r)', st.(g{1}) = r.(g{1}); end
     end

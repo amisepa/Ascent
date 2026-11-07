@@ -28,10 +28,11 @@ function [S, info] = compute_surrogates(X, varargin)
 %                randomized independently, so cross-channel correlations are
 %                not kept.
 %                Measured (SampEn, 100 signals of 3000 samples per case, 19
-%                surrogates, ends matched; % of tests with p <= .05):
+%                surrogates, ends matched, the rank test of ascent_compute;
+%                % of tests with p <= .05, binomial SE about 2):
 %                                         gaussphase   phase   iaaft
-%                  linear Gaussian            7          9       24
-%                  linear, then exp()         8        100      100
+%                  linear Gaussian            5          7       20
+%                  linear, then exp()         6        100      100
 %                  noisy logistic map       100        100      100
 %   'N'        : number of surrogates (default 1)
 %   'Seed'     : seed of a private random stream (default: the global stream)
