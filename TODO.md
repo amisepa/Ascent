@@ -44,6 +44,13 @@ ASCENT2.1.zip release.
     decimation, so "a defined frequency band" is approximate.
   - Spectral covariates and scale frequency labels: Methods, and the limitation on power control.
   - Surrogate test (see below): wanted in the paper.
+  - Citations to add in the next revision round, before publication (user, 2026-11-06; abstracts
+    read only, read the full texts first): Ghassemkhani & Dotta 2026, Brain Topogr
+    39:36, doi:10.1007/s10548-026-01176-9, cites the 2022 preprint; MDD > controls in MSE and HFD
+    alongside higher beta power and a flatter aperiodic exponent, not separated: an example for
+    the spectral covariates and the surrogate test. Racz et al. 2025, arXiv:2505.18117 (MMSPM):
+    two aperiodic slopes, steeper below ~2 Hz; at most one clause where the fit range is
+    discussed ('knee' mode exists; the 1-Hz high-pass and 1-40 Hz default fit avoid that range).
   - zNorm 1 equals z-scoring each series with the population SD, for MSE and the fuzzy measures
     (the group run used the sample SD).
   - 3.1 benchmark (sample data, 64 channels, code of this version, max |difference|): SampEn 1.1e-4
@@ -73,15 +80,167 @@ ASCENT2.1.zip release.
   match (at most 10% cut), each signal is rank-transformed to a Gaussian, then phase-randomized
   with the same phases for all signals; the original is the measure of that transformed signal.
   Chosen by simulation (SampEn, 100 signals of 3000 samples per case, 19 surrogates, % with
-  p <= .05): linear Gaussian 7 (phase 9, IAAFT 24); linear then exp() 8 (phase 100, IAAFT 100);
-  noisy logistic map 100 for all three. IAAFT, which Kosciessa et al. used, is biased (mean z
-  +0.6 to +1.5 on linear signals). Plain phase rejects for a non-Gaussian amplitude distribution
+  p <= .05, with the exact rank test of 2026-11-03: the distance from the mean of all N+1 values;
+  the first version centred on the surrogates alone and gave 6.2% under an exact null): linear
+  Gaussian 5 (phase 7, IAAFT 20); linear then exp() 6 (phase 100, IAAFT 100); noisy logistic map
+  100 for all three. z is now diff/(sd*sqrt(1+1/N)). IAAFT, which Kosciessa et al. used, is biased
+  (mean z +1.2 on linear Gaussian signals). Plain phase rejects for a non-Gaussian amplitude distribution
   alone: on the sample dataset (eyes closed) SampEn was below its phase surrogates in 59 of 64
   channels (z -4.9) but not below its IAAFT surrogates (median z +0.3; excess kurtosis 0.31).
   In the paper: the method, these sizes and power, and what the null is.
-- NEXT: surrogate test on the group data (EC and EO, low-pass mMSE) for revision 2: about N times the
-  group run (4.7 h per run of 80 recordings at 6 workers), so 19 surrogates is days: test a subset
-  of channels or subjects, or the channel mean, and say so.
+- RUN 2026-11-03: surrogate test on the group data (EC and EO, low-pass mMSE, 30 scales, 8 channels
+  F3 Fz F4 Cz P3 Pz P4 Oz, 19 'gaussphase' surrogates per recording, seed = recording index; 4.6 h).
+  EC vs EO tested on the raw value, the original tested, the surrogate mean (the spectral part) and
+  their difference (beyond the spectrum): sign-flip max-|t| over scales on the channel mean, and the
+  cluster test. RESULT: in both conditions the data are below their surrogates at every scale
+  (FWER p <= .0002); the EC < EO effect (scales 2-6, t up to -10.1) is the same in the surrogate
+  mean (t -9.4 at scale 2) and absent from the difference (max |t| 1.85, FWER p >= .52): the
+  low-pass mMSE effect is spectral (alpha +4.3 dB). For revision 2 (with the caveat that phase
+  surrogates are stationary).
+- RUN 2026-11-04/05: the same surrogate test for SampEn, FuzzEn, MSE, MFE and RCMFE (mean and SD
+  coarse-graining), same 80 recordings, channels and seeds (laptop; RCMFE mean alone 13.7 h).
+  RESULT: the same in all eight. EC vs EO raw and surrogate mean |t| 7.6-10; data minus
+  surrogates max channel-mean |t| 0.7-1.9 (FWER p .27-.87), no cluster. RCMFE mean crosses over (EC < EO at scales 1-3 and
+  20-30, EC > EO at 5-10) and the surrogates reproduce the crossover. One marginal exception:
+  RCMFE SD scale 5, t +2.78, FWER p .042, no cluster (chance level for 8 tests). Arrays:
+  group_surr_stats_<measure>.mat (not in the repo).
+- RUN 2026-11-06: 60-Hz line noise in the group data (8 channels, every paper measure, 80 recordings,
+  6.3 h). A 60-Hz peak (> 3 dB above the flanks, median channel) in 52 of 80 recordings; amplitude in
+  the 8 channels median 0.029 uV, 95th percentile 0.091 uV. Notch: pop_eegfiltnew 58-62 Hz band-stop
+  (-47.5 dB at 60 Hz, flat below 55 Hz). Effects in units of the between-subject SD, channel mean.
+  RESULT: the notch moves no measure by more than .1 SD (TOST, 90% CI, both conditions, every
+  scale) in 15 of 16 outputs; worst means .02 SD (MSEmean), worst single channel .08 SD. The EC-EO
+  effect is unchanged: same t to 2 decimals, same cluster cells (MSEsd 73 -> 76, all 73 kept); the
+  change in the effect reaches FWER p < .05 for MSEsd (.015), RCMFEsd (.027) and RCMFEmean (.008)
+  but is at most .013 SD (every recording shifts by nearly the same tiny amount). Exception: the
+  band-pass mMSE check at scale 2 (42.7-64 Hz, the only band holding 60 Hz): -.14 SD EC, -.08 EO
+  (other scales <= .003). Positive control (28 recordings without a peak): adding the 95th-percentile
+  amplitude shifts measures by <= .02 SD (band-pass mMSE .17); 10 times it, .2-1.6 SD for the entropy
+  measures (band-pass mMSE 3.7), .06 HFD, 0 Aperiodic; the notch then removes it (<= .008 SD). Lengths:
+  EC-EO -0.9 s (SD 4.8, p .24), no crop; r(length difference, EC-EO difference) up to .38
+  (RCMFEmean scale 3, p .015 uncorrected over scales and measures). For revision 2: one sentence
+  that line noise does not drive the results, and the band-pass caveat.
+- NEXT: sampling rate (the paper lists it as a limitation). Published: SampEn falls as fs rises
+  at a fixed delay (gait: McCamley et al. 2018, Raffalt et al. 2019; the only EEG study,
+  Espinosa et al. 2020, upsampled 160 Hz data); a scale maps to fs/(2s), so the same scale list
+  covers different bands at 256 and 512 Hz (Kosciessa et al. 2020; Zheng et al. 2023 propose
+  scales in absolute time); Higuchi's k is a decimation factor, so kmax spans kmax/fs s. Nothing
+  measured for FuzzEn, MFE, CMFE, RCMFE, mMSE, Katz, ExSEnt (durations in samples) or the
+  multivariate measures. STUDY BUILT 2026-11-03 (branch timescales, not merged):
+  assess_rate_and_length.m with simulate_eeg.m (1/f + alpha, 1/f^1 and ^2, Rossler + 1/f;
+  band-passed 1-45 Hz or broadband with a white floor and an amplifier low-pass), 128-1024 Hz
+  incl. 250/500/1000, four settings ('samples', 'time' = 'timebase' 256, 'resample' to 256 Hz,
+  fixed number of samples), criteria fixed in advance in units of the real between-subject SD.
+  New options: 'timescales' (seconds), 'timebase' (count tau, Higuchi intervals and scales at a
+  reference rate), 'kmax'. RESULTS 2026-11-04 (1958 files; scratchpad sim_out/summary.csv,
+  units: real between-subject SD): same settings at another rate shift every entropy and
+  fractal measure by a median 1-5 SD at 512-1024 Hz (Aperiodic unaffected). Resampling to
+  256 Hz is exact (0.00 SD) for band-passed data, every measure; on broadband data (amplifier
+  low-pass at fs/5) SampEn, FuzzEn, ExSEnt and box-counting FD still differ by 1-4 SD, since
+  tau = 1 sees the band between the two anti-alias corners. 'timebase' is close at integer
+  ratios for MFE, CMFE, RCMFE, RCmvMFE, mvFuzzEn, HFD, mMSE at 512 Hz; approximate at 250/500/
+  1000 Hz; no help for MSE, RCMFEsd, ExSEnt, box-counting FD. Rule: low-pass every dataset
+  below the lowest rate's anti-alias corner, then resample to one rate. TO DECIDE: the default
+  (warning when the rate is not 256 Hz, or an internal resampling option).
+- NEXT: minimum length per measure (also a stated limitation). Published: SampEn 10^m to 30^m
+  points (100-900 for m = 2; Pincus & Goldberger 1994); on 1/f noise it is biased upward below
+  ~10^4 points, and pooling segments works (Grandy et al. 2016); MSE needs N/s_max >= 10^m, better
+  20^m-30^m (Azami et al. 2017); fuzzy variants stay defined on short data, MFE accurate at 400
+  points on HRV (Borin et al. 2021); Higuchi N >= 100, kmax(N) rule for fBm only (Wanliss &
+  Wanliss 2022); ExSEnt stable at 500-3000 points on the logistic map (its authors); specparam
+  segments >= 0.5 s. No study on EEG-like signals for any measure, none for filter-and-skip
+  mMSE. STUDY BUILT 2026-11-03 (same script): segments of 2-60 s at 256 Hz and 2-30 s at 512 Hz
+  ('time') against the process value; real EEG split-half ICC from 2 to 30 s (40 EC recordings,
+  8 channels). One minimum-length rule now in all multiscale measures: StableMinBins (100 = 10^m
+  for m = 2) on templates per series, or pooled over offsets where the estimator pools (CMFE on
+  data under 101*S-1 samples, i.e. 11.8 s at 256 Hz, is now NaN at its coarsest scales; v2.2 gave
+  values there). RESULTS 2026-11-04: real split-half ICC(A,1) lower bound >= .75 at 20 s for
+  SampEn, FuzzEn, HFD, mvFuzzEn, Aperiodic and scale 2 of every multiscale measure; MSE scale 5
+  needs 30 s; MFE/CMFE/RCMFE coarse scales reach ~.8 (lower ~.7) at 30 s; mMSE scales >= 10
+  stay below .5 at 30 s (scale 30: .09); box-counting FD .3-.4 at every length and biased by
+  length itself (-2.75 SD at 60 s vs 180 s); ExSEnt HA/HDA under .7. Simulation RMSE < .5 SD:
+  MSE/mMSE need ~900-1500 samples per coarse series (30^m), fuzzy variants far fewer. The bias
+  equivalence test (16 signals) is underpowered at coarse scales, so "never" there means not
+  shown, not biased. TO DO: per-measure length warning (20 s; MSE/mMSE N/s < 900); a note
+  that box-counting FD needs equal lengths; RCmvMFE allows a 2-GB pdist temporary per worker,
+  which ran out of memory once at 8 workers.
+- NEXT (rigor of the real-data part): the group recordings are ~65 s, so halves stop at 30 s
+  (measures still below .75 there are censored, not settled), adjacent halves of one minute
+  mix estimator noise with drift and leave out between-session variance, and the yardstick SD
+  comes from 60-s values. Planned: (1) Wang et al. 2022 test-retest dataset (OpenNeuro
+  ds004148, 60 adults, 5 min EO then 5 min EC per session, sessions 90 min and 1 month apart,
+  Brain Products 63/64 ch, 500 Hz; 33 GB for all five states, EC/EO only is a subset): split
+  halves up to 150 s, within-session non-adjacent segments, same-day and 1-month ICC, yardstick
+  from 5-min values. (2) MPI LEMON raw EEG (Babayan et al. 2019; 62 ch, 2500 Hz, hardware band
+  0.015 Hz-1 kHz, 16 alternating 60-s blocks, 8 EC; ~317 MB per subject, ~220 subjects): the
+  rate study on real broadband EEG (resample to 1024/512/500/256/250/128) and reliability across
+  non-adjacent EC blocks; a subset of ~50 subjects. (3) Simulations: references of 300 s and
+  segments up to 120-300 s for the coarse scales. Downloads not started.
+- RUNNING 2026-11-05 (Mac, from 11:14): ds004148 EC preprocessing (180 recordings), then analysis
+  A trimmed (no CMFE, no FuzzEnGlobal, no 295-s value in session 2, REST arm deferred), 6 workers,
+  runners in .claude/mac-runners/, results ~/ascent/results/A (one file per recording x measure x L).
+  Statistics written and checked on simulations; they run on their own when A ends (expected
+  2026-11-06 evening; ~170 worker-h in all). QUEUED on the Mac, in this order (user, 2026-11-06:
+  all of these on the Mac): (1) read A: minimum length, ICCs, drowsiness sensitivity; (2) the
+  paper's 3.1 timings on the idle Mac; (3) LEMON (B), the 2500-Hz raw (~25 GB; the LEMON copy in
+  the challenge folder is the 250-Hz preprocessed release): the Mac has 85 GB free since the user
+  set duplicate Proton folders and DATA/Ascent/raw to "Online Only" (cloud copies kept), guard
+  12 GB; (4) surrogates that keep non-stationarity
+  (PLANNED below), built and validated on simulations, then the group data.
+- DONE 2026-11-05 (branch timescales, commit ab93b01): exact speedups, outputs bit-identical to the
+  previous code. functions/sampen_exact.m: SampEn match counts with templates sorted by their first
+  coordinate (a lag sweep over sorted neighbours within r), O(N) memory; all pairs with pdist for
+  short series (<= 5e5 pairs) and when > .4/maxNumCompThreads of pairs are within r on the first
+  coordinate. compute_SampEn, compute_MSE and compute_mMSE use it (MSE/mMSE without the
+  compute_SampEn front end). Blocked fuzzy sum: across-block tiles from pdist2. Validated: new
+  tests/test_exact_counts.m (320 settings x 3 routes vs pdist counts, short and 25000-sample series,
+  pdist2 tile = max-abs loop); old vs new on real EEG (sample data on the laptop, ds004148 sub-01 on
+  the Mac): every output isequaln for SampEn, MSE (mean, sd, zNorm 1-4), mMSE (6 variants incl.
+  time-resolved), ExSEnt, FuzzEn/MFE/mvFuzzEn/RCmvMFE on the blocked path. Mac, one thread, 1 ch:
+  SampEn 3.3x (60 s) and 5.5x (290 s), MSE 4.2x/5.1x, mMSE 2.2x/3.6x, ExSEnt 3.4x, FuzzEn 120 s
+  1.03x, RCmvMFE 120 s scale 1 1.28x. The paper's 3.1 timings (SampEn, MSE vs reference) need
+  rerunning with this code. Not done: sharing CMFE/RCMFE/MFE sums; a MEX.
+- SPEED (audit 2026-11-04, scratch audit/). All entropy measures share one
+  path: pdist (Chebyshev) into a <= 2 GB vector, then sum(exp(-d.^2/r)); above 2 GB a blocked
+  loop. Bit-identical wins: pdist2 for the blocked across-block tile (1.49x at dim 17, so ~1.25x
+  for RCmvMFE); sorted-template SampEn (prototype 3.6x, 60/60 cases identical) used directly by
+  MSE/mMSE (mMSE loses ~37% to compute_SampEn call overhead); share the (pm, pm1) sums of
+  CMFE/RCMFE/MFE when settings match; parfor over row blocks for RCmvMFE scales 1-5 (wall time).
+  Round-off-level: global FuzzEn by lag blocks (1.49x, |dFuzzEn| <= 4.7e-15). Only a MEX
+  (distance + kernel fused, SIMD exp) gives 10-30x; needs compilers for Windows/macOS arm64 and a
+  test tolerance ~1e-12. Not reachable: GEMM (max-norm), truncating the fuzzy kernel (too wide).
+- PLANNED: surrogates that keep non-stationarity, to split each measure into a spectral, an
+  amplitude-modulation and a nonlinear part. Full texts read 2026-11-04 (Lancaster 2018,
+  Breakspear 2003, Xiong 2017, Keylock 2019): no published benchmark on linear non-stationary
+  data, so validate ours on such simulations; one randomization shared by all channels; keep
+  slow trends or high-pass data and surrogates alike; pinned-wavelet results over a range of
+  pinned energy fractions, not one. Phase surrogates are stationary, and for SampEn on
+  linear AR processes amplitude modulation alone gives > 80% rejections with FT surrogates
+  (Faes et al. 2009, doi:10.1109/TBME.2008.2009358). First choice: band-envelope surrogates
+  (filter bank, ~4 bands per octave; envelopes smoothed over max(0.5 s, 3 cycles); carriers
+  phase-randomized with the same phases for all channels, then remodulated; IAAFT-style
+  iterations for the global spectrum, envelopes and ranks), built on Chavez & Cazelles 2019
+  (doi:10.1038/s41598-019-43571-2) and Keylock's IAAWT; it reduces to the current surrogate
+  for infinite smoothing. Checks: pinned wavelet IAAFT (Keylock 2007, doi:10.1016/
+  j.physd.2006.10.012) at several pinning fractions; time-varying AR (Faes 2009) on a few
+  channels. Validate before real data: size on linear non-stationary processes (bursting
+  alpha, frequency drift, spectral switching, slow drift, static distortion, 64-channel
+  mixtures), power on nonlinear ones (phase-locked harmonics, phase-amplitude coupling,
+  asymmetric waveforms, Stuart-Landau, neural mass incl. bistable alpha, chaos by SNR), a
+  sweep of the smoothing and band settings fixed before real data. Still to read in full:
+  Lancaster et al. 2018 (doi:10.1016/j.physrep.2018.06.001), Breakspear et al. 2003
+  (doi:10.1016/S0167-2789(03)00136-2).
+- ascent_group_analysis.m (branch timescales): optional surrogate section added (run_surrogates,
+  off by default; results in data_path/ascent_surrogates_<tag>/). Seen, not fixed: the NaN
+  check after each compute loop tests MFE(:,2:end,:) only and its disp comes after error; the
+  MSE section has no 'any(mask)' guard before pull_clusters_by_sign/plot_results; output names
+  say 'tfce'/'uncorrected' where mcc_type 2 is cluster correction; the correlation section runs
+  2000 permutations for t-values only; 'Prosessing' in progress titles; pull_clusters_by_sign
+  fails on single-scale maps (no Start/End).
+- CHECK on the desktop (figures hang headless): multiscale plots with 'timescales'/'timebase'
+  (axes in ms) and mMSE plots (now numeric scale factors).
+- NOTE: specparam with the default settings fits about 3 Gaussians to pure 1/f noise and raises
+  the exponent by about .01 (MaxPeaks 0: exact). Defaults unchanged; mention if relevant.
 - PLANNED after the paper (the v2.2 items below move to the next version): Kosciessa's high-pass
   check; MRMSSD (Courtiol et al. 2016); alpha band-stop check; simulation mode varying one
   parameter at a time (Donoghue et al. 2024 design; fuzzy and multiscale entropy were not in it);
@@ -109,9 +268,10 @@ in manuscript/ (no PDFs), with all figures current; next is the final read and s
   3. Submit v16 red + letter v6. IRB protocol code: none available,
      v16 cites the IONS IRB and the dataset paper.
 - NEXT (plugin):
-  - Upload ASCENT2.1.zip through the EEGLAB plugin form once it works again (down on
-    2026-10-22, a server-side PHP issue according to Arnaud Delorme): name ASCENT, version 2.1,
-    docs https://github.com/amisepa/Ascent.
+  - EEGLAB upload: version 2.2 only, not 2.1 (user, 2026-11-06), from the zip rebuilt with the
+    revision. Not on the EEGLAB plugin list as of 2026-11-06. The form failed on 2026-10-22 (a
+    server-side PHP issue according to Arnaud Delorme): name ASCENT, docs
+    https://github.com/amisepa/Ascent.
   - DONE 2026-10-22: old copies deleted; eeglab/plugins/ASCENT is the clean install from
     ASCENT2.1.zip (52 files, no .git).
   - Optional: ask GitHub Support to purge unreferenced objects after the history rewrite.
@@ -123,7 +283,7 @@ in manuscript/ (no PDFs), with all figures current; next is the final read and s
   multivariate ones (ascent_plot_dipoles); guards for non-MNI fits, unreadable head models,
   DIPFIT models that no longer match the ICs, and plotting errors (results are kept).
 - DONE 2026-10-23: Revision 1 submitted to Entropy (v16, letter v6, Figure S1, cover letter).
-- NEXT: wait for the editor's decision; EEGLAB plugin form upload when their server is fixed.
+- NEXT: wait for the editor's decision; EEGLAB plugin form upload with version 2.2.
 - PLANNED v2.2: brain-only option (ICLabel) for the IC figures and cluster detection.
 - PLANNED v2.2: source-space entropy through ROIconnect (LCMV/eLORETA ROI time series), the
   route for any claim about where entropy differs.
@@ -166,7 +326,7 @@ Review of v15 done; v16 is one build away.
      the numbers against manuscript/figures/regen/*.csv; then submit v16 red + letter v6.
   5. DONE 2026-10-22: code committed and pushed (history rewritten and slimmed to 57 MB);
      GitHub release v2.1 with ASCENT2.1.zip. v16 manuscript + letter v6 built (no PDFs).
-  6. Upload ASCENT2.1.zip to the EEGLAB extension manager (plugin_uploader form).
+  6. Upload to the EEGLAB extension manager (plugin_uploader form): version 2.2, not 2.1.
 - Decided: no disclosure statement added; Fig 2 uses the default 75th-percentile threshold.
 - OPEN (code, not fixed): ascent_compute.m:505-509 drops scale 2 in SD/var plots;
   (fixed 2026-10-14: 'save' option ignored); tau never passed to SampEn, n never
