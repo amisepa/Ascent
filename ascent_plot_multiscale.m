@@ -181,15 +181,21 @@ if multiscale && multiChan
         nSc_k = sum(scaleMask_k);
         pc_k  = centroids(k,1);
         ps_k  = centroids(k,2);
-        if iscell(scales), scLabel_k = scales{ps_k}; else, scLabel_k = num2str(scales(ps_k)); end
+        % Scale numbers in the titles (mMSE gives band strings for scales 2..S),
+        % with the frequencies kept as on the axis when known
+        if isnumeric(scales), scNum = double(scales(:))'; else, scNum = 2:numel(scales)+1; end
+        if ~isempty(sfq)
+            scLabs = scale_freq_labels(scales, sfq);
+        else
+            scLabs = arrayfun(@(v) sprintf('%g', v), scNum, 'UniformOutput', false);
+        end
+        scLabel_k = scLabs{ps_k};
         if isICA, sigName = sprintf('IC%d', pc_k); else, sigName = chanlocs(pc_k).labels; end
         sc_idx_k = find(scaleMask_k);
         if isempty(sc_idx_k)
             scRange = scLabel_k;
-        elseif isnumeric(scales)
-            scRange = sprintf('%g-%g', scales(sc_idx_k(1)), scales(sc_idx_k(end)));
         else
-            scRange = sprintf('%s-%s', scales{sc_idx_k(1)}, scales{sc_idx_k(end)});
+            scRange = sprintf('%g-%g', scNum(sc_idx_k(1)), scNum(sc_idx_k(end)));
         end
         if k == 1, ic_idx_1 = find(chanMask_k); end
 
@@ -215,7 +221,7 @@ if multiscale && multiChan
             curveTitle = ifelse(usedCluster, sprintf('Cluster mean (%d ch)', nCh_k), ['Peak ' sigName]);
         else
             if usedCluster
-                topoTitle = sprintf('Cluster %d  (%d %s x %d sc, %s sc%s)', k, nCh_k, unit, ...
+                topoTitle = sprintf('Cluster %d  (%d %s x %d sc, %s sc %s)', k, nCh_k, unit, ...
                                     nSc_k, sigName, scLabel_k);
                 curveTitle = sprintf('Cluster %d mean  (%d %s)', k, nCh_k, unit);
             else
